@@ -8,11 +8,12 @@ class Settings(BaseSettings):
     BOT_TOKEN: str
     ADMIN_IDS: List[int] = []
 
-    # AI (Google Gemini) - Optional default to prevent hard crash if not set immediately
+    # AI (Google Gemini) - Optional
     GEMINI_API_KEY: str = ""
 
-    # Database
-    DATABASE_URL: str = "sqlite+aiosqlite:///./storage/edubot.db"
+    # Telegram Channel Database (Cloud storage)
+    CHANNEL_DB_ID: int = -1004294226425
+    BACKUP_CHANNEL_ID: int = -1004294226425
 
     # Web App & Host
     WEBAPP_URL: str = ""
@@ -21,7 +22,6 @@ class Settings(BaseSettings):
     WEBHOOK_URL: Optional[str] = None
     WEBHOOK_PORT: int = 8443
     STORAGE_PATH: str = "./storage"
-    BACKUP_CHANNEL_ID: int = -1004294226425
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

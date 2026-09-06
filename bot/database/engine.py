@@ -1,11 +1,14 @@
+import os
 from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
-from bot.config import get_settings
 
-settings = get_settings()
+# Internal runtime SQLite engine (acts as in-memory/local cache synchronized with Telegram Channel)
+_STORAGE_DIR = os.getenv("STORAGE_PATH", "./storage")
+os.makedirs(_STORAGE_DIR, exist_ok=True)
+_LOCAL_DB_FILE = os.path.join(_STORAGE_DIR, "edubot_cache.db")
 
-async_engine = create_async_engine(settings.DATABASE_URL, echo=False)
+async_engine = create_async_engine(f"sqlite+aiosqlite:///{_LOCAL_DB_FILE}", echo=False)
 AsyncSessionLocal = async_sessionmaker(async_engine, expire_on_commit=False, class_=AsyncSession)
 
 Base = declarative_base()

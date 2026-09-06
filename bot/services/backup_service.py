@@ -1,4 +1,4 @@
-"""Cloud Database Sync Service — Backs up and restores database to/from a Telegram Channel as .js / JSON format."""
+"""Cloud Database Sync Service — Backs up and restores database to/from a Telegram Channel as .js format."""
 
 import io
 import json
@@ -105,13 +105,16 @@ class DatabaseSyncService:
         try:
             data = await self.export_database_to_json()
             # Wrap as .js (JavaScript object format) as requested
-            js_content = f"// EduBot Database Backup - {datetime.utcnow().isoformat()}\nwindow.EDUBOT_DB = {json.dumps(data, indent=2, ensure_ascii=False)};\n"
+            js_content = (
+                f"// EduBot Cloud Database - {datetime.utcnow().isoformat()}\n"
+                f"window.EDUBOT_DB = {json.dumps(data, indent=2, ensure_ascii=False)};\n"
+            )
             
             file_stream = io.BytesIO(js_content.encode("utf-8"))
             filename = f"edubot_db_{int(datetime.utcnow().timestamp())}.js"
             
             caption = (
-                f"📦 <b>EduBot Database Backup</b>\n"
+                f"📦 <b>EduBot Database (.js)</b>\n"
                 f"🕒 Vaqt: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
                 f"👤 Foydalanuvchilar: {len(data['users'])}\n"
                 f"📁 Fayllar: {len(data['files'])}\n"
@@ -119,14 +122,20 @@ class DatabaseSyncService:
                 f"📌 Sabab: {reason}"
             )
 
-            await self.bot.send_document(
+            sent_msg = await self.bot.send_document(
                 chat_id=self.channel_id,
                 document=file_stream,
                 filename=filename,
                 caption=caption,
                 parse_mode="HTML",
             )
-            logger.info(f"Database successfully backed up to channel {self.channel_id} as {filename}")
+            # Pin the newest backup message so it can always be located instantly on restart!
+            try:
+                await sent_msg.pin(disable_notification=True)
+            except Exception:
+                pass
+
+            logger.info(f"Database successfully saved to Telegram channel {self.channel_id} as {filename}")
             return True
         except TelegramError as te:
             logger.error(f"Telegram error during DB sync to channel: {te}")
@@ -141,29 +150,22 @@ class DatabaseSyncService:
             logger.warning("No channel ID provided for DB restore.")
             return False
 
-        logger.info(f"Checking channel {self.channel_id} for database backups...")
+        logger.info(f"Connecting to database channel: {self.channel_id} ...")
         try:
-            # We fetch chat history or latest updates to find the last database backup file
-            # In Telegram Bot API, we can inspect messages by listening or via getChat/forward
-            # Alternatively, bot sends a probe or reads last known backup message
-            # For robust recovery on startup, bot queries the last messages if bot has history access
-            
-            # Note: For bots in channels, get_chat gives chat info. 
-            # To fetch messages directly, we can read updates or check pins/history:
             chat = await self.bot.get_chat(self.channel_id)
-            logger.info(f"Connected to backup channel: {chat.title or self.channel_id}")
+            logger.info(f"Connected to database channel: {chat.title or self.channel_id}")
 
-            # If the channel has a pinned message with backup or recent document:
-            pinned = chat.pinned_message
             target_file_id = None
 
-            if pinned and pinned.document and (pinned.document.file_name.endswith(".js") or pinned.document.file_name.endswith(".json")):
-                target_file_id = pinned.document.file_id
-                logger.info(f"Found pinned DB backup in channel: {pinned.document.file_name}")
+            # 1. Check pinned message first
+            if chat.pinned_message and chat.pinned_message.document:
+                doc = chat.pinned_message.document
+                if doc.file_name and (doc.file_name.endswith(".js") or doc.file_name.endswith(".json")):
+                    target_file_id = doc.file_id
+                    logger.info(f"Found pinned database file: {doc.file_name}")
 
-            # If no pinned message, we'll restore if passed or when updates arrive
             if not target_file_id:
-                logger.info("No pinned DB backup found in channel. Database will start with existing or new schema.")
+                logger.info("No pinned database backup found. Starting fresh schema in channel.")
                 return False
 
             # Download document
@@ -173,7 +175,7 @@ class DatabaseSyncService:
             file_bytes.seek(0)
             raw_text = file_bytes.read().decode("utf-8")
 
-            # Extract JSON from .js (window.EDUBOT_DB = { ... };)
+            # Extract JSON from .js
             json_str = raw_text
             if "window.EDUBOT_DB =" in raw_text:
                 json_str = raw_text.split("window.EDUBOT_DB =", 1)[1].strip()
@@ -182,7 +184,7 @@ class DatabaseSyncService:
 
             data = json.loads(json_str)
             await self._apply_restored_data(data)
-            logger.info("Database successfully restored from Telegram channel!")
+            logger.info(f"Database successfully restored from Telegram channel! ({len(data.get('users', []))} users loaded)")
             return True
 
         except Exception as e:
@@ -190,7 +192,7 @@ class DatabaseSyncService:
             return False
 
     async def _apply_restored_data(self, data: dict) -> None:
-        """Insert or update restored data into SQLite tables."""
+        """Insert or update restored data into tables."""
         async with get_session() as session:
             # 1. Restore Users
             for u in data.get("users", []):

@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: edubot
+    env: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:///./storage/edubot.db
+      - key: WEBAPP_URL
+        sync: false
+      - key: STORAGE_PATH
+        value: ./storage
+      - key: PYTHONUNBUFFERED
+        value: "1"

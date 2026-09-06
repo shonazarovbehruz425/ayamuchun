@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     WEBAPP_URL: str
     API_HOST: str = "0.0.0.0"
-    API_PORT: int = 8000
+    API_PORT: int = int(os.getenv("PORT", 8000))
     WEBHOOK_URL: Optional[str] = None
     WEBHOOK_PORT: int = 8443
     STORAGE_PATH: str = "./storage"

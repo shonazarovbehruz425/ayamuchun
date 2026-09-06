@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  edubot:
+    build: .
+    ports:
+      - "8443:8443"
+      - "8000:8000"
+    volumes:
+      - ./storage:/app/storage
+      - ./.env:/app/.env
+    restart: unless-stopped

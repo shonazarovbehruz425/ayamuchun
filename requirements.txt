@@ -1,0 +1,25 @@
+# Bot
+python-telegram-bot[webhooks]==21.*
+# Web Framework
+fastapi==0.115.*
+uvicorn[standard]==0.30.*
+# AI
+google-generativeai==0.8.*
+# Document Processing
+pdfplumber==0.11.*
+pypdf==5.*
+python-docx==1.1.*
+openpyxl==3.1.*
+python-pptx==1.0.*
+pdf2docx==0.5.*
+# PDF Generation
+fpdf2==2.8.*
+# Database
+sqlalchemy[asyncio]==2.0.*
+aiosqlite==0.20.*
+# Utils
+python-dotenv==1.0.*
+aiofiles==24.*
+Pillow==10.*
+pydantic==2.*
+pydantic-settings==2.*

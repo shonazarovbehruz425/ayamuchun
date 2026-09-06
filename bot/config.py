@@ -4,11 +4,18 @@ from functools import lru_cache
 import os
 
 class Settings(BaseSettings):
+    # Telegram Bot
     BOT_TOKEN: str
     ADMIN_IDS: List[int] = []
-    GEMINI_API_KEY: str
-    DATABASE_URL: str
-    WEBAPP_URL: str
+
+    # AI (Google Gemini) - Optional default to prevent hard crash if not set immediately
+    GEMINI_API_KEY: str = ""
+
+    # Database
+    DATABASE_URL: str = "sqlite+aiosqlite:///./storage/edubot.db"
+
+    # Web App & Host
+    WEBAPP_URL: str = ""
     API_HOST: str = "0.0.0.0"
     API_PORT: int = int(os.getenv("PORT", 8000))
     WEBHOOK_URL: Optional[str] = None
@@ -47,4 +54,3 @@ def _get_config():
         return None
 
 config = _get_config()
-

@@ -13,12 +13,22 @@ class AIService:
     """Service for AI-powered text processing using Google Gemini."""
 
     def __init__(self, api_key: str) -> None:
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel("gemini-2.0-flash")
-        logger.info("AIService initialized with Gemini 2.0 Flash")
+        self.api_key = api_key
+        self.model = None
+        if api_key and api_key.strip():
+            try:
+                genai.configure(api_key=api_key)
+                self.model = genai.GenerativeModel("gemini-2.0-flash")
+                logger.info("AIService initialized with Gemini 2.0 Flash")
+            except Exception as e:
+                logger.error(f"Failed to configure Gemini: {e}")
+        else:
+            logger.warning("GEMINI_API_KEY is not configured. AI features will be limited until provided.")
 
     async def _generate(self, prompt: str) -> str:
         """Send a prompt to Gemini and return the response text."""
+        if not self.model:
+            raise RuntimeError("GEMINI_API_KEY sozlanmagan. Iltimos, Render muhit o'zgaruvchilariga GEMINI_API_KEY kiriting.")
         try:
             response = await self.model.generate_content_async(prompt)
             return response.text

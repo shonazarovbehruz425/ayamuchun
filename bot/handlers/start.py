@@ -29,26 +29,31 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     welcome_text = (
         f"Assalomu alaykum, {user.first_name}! 🎓 <b>EduBot</b>'ga xush kelibsiz.\n\n"
-        "Men o'qituvchi va murabbiylar uchun yaratilgan universal yordamchiman.\n\n"
-        "📌 <b>Imkoniyatlar:</b>\n"
-        "• PDF, Word, Excel, PowerPoint fayllarni tahlil qilish va konvertatsiya\n"
-        "• AI orqali dars rejasi, xulosalar va tarjimalar\n"
-        "• Avtomatik testlar tuzish va Word/PDF formatda olish\n"
-        "• Baholar va davomat jadvallari\n"
-        "• Telegram Mini App orqali qulay boshqaruv\n\n"
-        "Quyidagi menyudan kerakli bo'limni tanlang:"
+        "Men hujjatlar bilan ishlash va ta'lim jarayonini tezlashtiruvchi universal yordamchiman.\n\n"
+        "📌 <b>Asosiy 7 ta asbob:</b>\n"
+        "1️⃣ <b>PDF ➔ Word</b> — PDF faylni sifatli Word (.docx) ga aylantirish\n"
+        "2️⃣ <b>Word ➔ PDF</b> — Word hujjatini 100% asl sifatda PDF qilish\n"
+        "3️⃣ <b>Doc tahrirlash</b> — Word matn va jadvallarini to'g'ridan-to'g'ri tahrirlash\n"
+        "4️⃣ <b>PDF tahrirlash</b> — PDF hujjat matnlarini o'zgartirish\n"
+        "5️⃣ <b>Rasmlarni PDF qilish</b> — Suratlarni tartibli A4 PDF ga yig'ish\n"
+        "6️⃣ <b>PDF rasmlarini olish</b> — PDF dagi barcha rasmlarni ZIP qilib olish\n"
+        "7️⃣ <b>AI Pedagogik yordamchi</b> — Dars ishlanmasi, xulosa, test va tarjimalar\n\n"
+        "Quyidagi menyudan kerakli asbobni tanlang yoki fayl yuboring:"
     )
     await update.message.reply_text(welcome_text, reply_markup=main_menu_keyboard(), parse_mode="HTML")
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     help_text = (
-        "📖 <b>EduBot yordam bo'limi:</b>\n\n"
-        "📄 <b>Fayl asboblari</b> — PDF, DOCX, XLSX, PPTX fayllarni yuboring va ulardan matn ajratish, konvertatsiya qilish yoki tahlil qilish imkoniyati.\n"
-        "🧠 <b>AI yordamchi</b> — Mavzularni tushuntirish, dars ishlanmasi (lesson plan) yaratish, grammatika tekshirish.\n"
-        "📝 <b>Test yaratish</b> — Istalgan mavzu yoki matn asosida avtomatik test tuzish.\n"
-        "📊 <b>Baholar jadvali</b> — O'quvchilar ro'yxati va fanlar bo'yicha tayyor Excel jadval generatsiyasi.\n"
-        "📱 <b>Mini App</b> — Barcha funksiyalarni qulay veb interfeys orqali boshqarish.\n\n"
-        "Savol yoki takliflar uchun bot administratsiyasiga murojaat qiling."
+        "📖 <b>EduBot — Asboblar bo'yicha qo'llanma:</b>\n\n"
+        "🔄 <b>PDF ➔ Word</b> — PDF fayl yuboring, uni bir zumda tahrirlanadigan DOCX faylga o'tkazib beradi.\n"
+        "🔄 <b>Word ➔ PDF</b> — Word (.docx, .doc) fayl yuboring, uni sifatli PDF hujjatga aylantiradi.\n"
+        "📝 <b>Doc tahrirlash</b> — Word faylingizni qulay interaktiv veb tahrirlovchida ochish va tahrirlash.\n"
+        "✏️ <b>PDF tahrirlash</b> — PDF matnlarini to'g'ridan-to'g'ri tahrirlash.\n"
+        "🖼️ <b>Rasmlarni PDF qilish</b> — Bir nechta rasmlarni bitta PDF ga birlashtirish.\n"
+        "📦 <b>PDF rasmlarini olish</b> — PDF fayl ichidagi barcha suratlarni alohida ZIP arxivida yuklab olish.\n"
+        "🧠 <b>AI yordamchi</b> — Mavzularni tushuntirish, test yaratish, dars rejasi va tarjimalar.\n"
+        "📱 <b>Mini App</b> — Barcha funksiyalardan zamonaviy veb interfeys orqali foydalanish.\n\n"
+        "Savol yoki takliflar bo'lsa, adminga murojaat qiling."
     )
     await update.message.reply_text(help_text, parse_mode="HTML")

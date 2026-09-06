@@ -2,9 +2,11 @@ from telegram import ReplyKeyboardMarkup
 
 def main_menu_keyboard() -> ReplyKeyboardMarkup:
     keyboard = [
-        ['📄 Fayl asboblari', '🧠 AI yordamchi'],
-        ['📝 Test yaratish', '📊 Baholar jadvali'],
-        ['⚙️ Sozlamalar', '📱 Mini App']
+        ['🔄 PDF ➔ Word', '🔄 Word ➔ PDF'],
+        ['📝 Doc tahrirlash', '✏️ PDF tahrirlash'],
+        ['🖼️ Rasmlarni PDF qilish', '📦 PDF rasmlarini olish'],
+        ['🧠 AI yordamchi', '📱 Mini App'],
+        ['⚙️ Sozlamalar']
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 

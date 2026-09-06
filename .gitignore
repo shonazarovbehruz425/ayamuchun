@@ -33,5 +33,7 @@ logs/
 .idea/
 *.sublime-project
 *.sublime-workspace
-.DS_Store
-Thumbs.db
+# Temporary & scratch files
+scratch/
+installed_packages.txt
+temp_save_*

@@ -1,11 +1,24 @@
-WELCOME_MESSAGE = "Xush kelibsiz! Men EduBot, sizning ta'lim bo'yicha yordamchingizman.\n\nMen quyidagilarni qila olaman:\n- Fayllar bilan ishlash\n- Testlar tuzish\n- AI yordamida matnlarni tahlil qilish\n\nBoshlash uchun menyudan foydalaning."
-HELP_MESSAGE = "Yordam menyusi:\n\n/start - Botni qayta ishga tushirish\n/help - Shu yordam xabarini ko'rsatish\n\nFayl yuborsangiz, men uni qabul qilib olaman va qayta ishlayman."
-MAIN_MENU_TEXT = "Asosiy menyu. O'zingizga kerakli bo'limni tanlang:"
-FILE_RECEIVED_TEXT = "Faylingiz muvaffaqiyatli qabul qilindi. Nima qilishni xohlaysiz?"
+WELCOME_MESSAGE = (
+    "Xush kelibsiz! Men EduBot — zamonaviy ta'lim va hujjat asboblari yordamchisiman.\n\n"
+    "Asosiy imkoniyatlar:\n"
+    "• PDF ➔ Word va Word ➔ PDF konvertatsiya\n"
+    "• Doc va PDF interaktiv tahrirlash\n"
+    "• Rasmlarni PDF qilish va PDF dagi rasmlarni olish (ZIP)\n"
+    "• AI pedagogik yordamchi va testlar yaratish\n\n"
+    "Boshlash uchun menyudagi asboblardan foydalaning yoki fayl yuboring."
+)
+HELP_MESSAGE = (
+    "Yordam menyusi:\n\n"
+    "/start - Botni qayta ishga tushirish\n"
+    "/help - Bot va uning 7 ta asosiy asbobi haqida ma'lumot\n\n"
+    "Hujjat yuborsangiz, darhol kerakli amallarni bajarish taklif etiladi."
+)
+MAIN_MENU_TEXT = "Asosiy menyu. Kerakli asbobni tanlang:"
+FILE_RECEIVED_TEXT = "Faylingiz muvaffaqiyatli qabul qilindi. Qanday amal bajaramiz?"
 FILE_ACTIONS_TEXT = "Fayl ustida amal bajarish:"
-AI_MENU_TEXT = "Sun'iy intellekt menyusi:"
-QUIZ_MENU_TEXT = "Testlar menyusi:"
-SETTINGS_TEXT = "Sozlamalar:"
+AI_MENU_TEXT = "🧠 AI Pedagogik yordamchi menyusi:"
+QUIZ_MENU_TEXT = "📝 Testlar menyusi:"
+SETTINGS_TEXT = "⚙️ Sozlamalar:"
 
 ERROR_MESSAGES = {
     "file_too_large": "Fayl hajmi juda katta. Iltimos, kichikroq fayl yuboring.",

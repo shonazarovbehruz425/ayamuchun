@@ -1,34 +1,42 @@
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
 def file_actions_keyboard(file_type: str) -> InlineKeyboardMarkup:
-    keyboard = [
-        [InlineKeyboardButton("📖 Matn olish", callback_data="file_extract_text"),
-         InlineKeyboardButton("🧠 AI tahlil", callback_data="file_ai_analyze")]
-    ]
+    from bot.config import get_settings
+    from telegram import WebAppInfo
+    settings = get_settings()
+    keyboard = []
     
     if file_type == 'pdf':
         keyboard.append([
-            InlineKeyboardButton("✂️ Kesish", callback_data="file_split"),
-            InlineKeyboardButton("🔗 Birlashtirish", callback_data="file_merge"),
-            InlineKeyboardButton("🔒 Himoyalash", callback_data="file_protect")
+            InlineKeyboardButton("🔄 Word (DOCX) ga", callback_data="file_to_docx"),
+            InlineKeyboardButton("🖼️ Rasmlarni olish (ZIP)", callback_data="file_extract_images")
         ])
-    elif file_type == 'docx':
+        if settings.WEBAPP_URL:
+            keyboard.append([
+                InlineKeyboardButton("✏️ PDF tahrirlash (Mini App)", web_app=WebAppInfo(url=f"{settings.WEBAPP_URL}#/"))
+            ])
+        keyboard.append([
+            InlineKeyboardButton("📖 Matn olish", callback_data="file_extract_text"),
+            InlineKeyboardButton("🧠 AI tahlil", callback_data="file_ai_analyze")
+        ])
+    elif file_type in ('docx', 'doc'):
         keyboard.append([
             InlineKeyboardButton("🔄 PDF ga", callback_data="file_to_pdf"),
-            InlineKeyboardButton("✏️ Almashtirish", callback_data="file_replace")
+            InlineKeyboardButton("📖 Matn olish", callback_data="file_extract_text")
         ])
-    elif file_type == 'xlsx':
+        if settings.WEBAPP_URL:
+            keyboard.append([
+                InlineKeyboardButton("📝 Doc tahrirlash (Mini App)", web_app=WebAppInfo(url=f"{settings.WEBAPP_URL}#/"))
+            ])
         keyboard.append([
-            InlineKeyboardButton("📊 Statistika", callback_data="file_stats"),
-            InlineKeyboardButton("🔄 PDF ga", callback_data="file_to_pdf"),
-            InlineKeyboardButton("📋 CSV ga", callback_data="file_to_csv")
+            InlineKeyboardButton("🧠 AI tahlil", callback_data="file_ai_analyze")
         ])
-    elif file_type == 'pptx':
+    else:
         keyboard.append([
-            InlineKeyboardButton("🔄 PDF ga", callback_data="file_to_pdf")
+            InlineKeyboardButton("📖 Matn olish", callback_data="file_extract_text"),
+            InlineKeyboardButton("🧠 AI tahlil", callback_data="file_ai_analyze")
         ])
         
-    keyboard.append([InlineKeyboardButton("📝 Test yaratish", callback_data="file_quiz")])
     return InlineKeyboardMarkup(keyboard)
 
 def quiz_settings_keyboard() -> InlineKeyboardMarkup:

@@ -21,11 +21,18 @@ const api = {
         return response.json();
     },
     
-    // Files
+    // Files & Documents
     getFiles() { return this.fetchWithAuth('/files'); },
     uploadFile(formData) { return this.fetchWithAuth('/files/upload', { method: 'POST', body: formData }); },
     convertFile(fileId, format) { return this.fetchWithAuth(`/files/${fileId}/convert?format=${format}`, { method: 'POST' }); },
     deleteFile(fileId) { return this.fetchWithAuth(`/files/${fileId}`, { method: 'DELETE' }); },
+    clearAllFiles() { return this.fetchWithAuth('/files/clear-all', { method: 'DELETE' }); },
+    getFileContent(fileId) { return this.fetchWithAuth(`/files/${fileId}/content`); },
+    saveFileContent(fileId, content) { return this.fetchWithAuth(`/files/${fileId}/save-content`, { method: 'POST', body: { content } }); },
+    getFileHtml(fileId) { return this.fetchWithAuth(`/files/${fileId}/html`); },
+    saveFileHtml(fileId, html, format = 'both') { return this.fetchWithAuth(`/files/${fileId}/save-html`, { method: 'POST', body: { html, format } }); },
+    imagesToPdf(formData) { return this.fetchWithAuth('/files/images-to-pdf', { method: 'POST', body: formData }); },
+    extractImages(fileId) { return this.fetchWithAuth(`/files/${fileId}/extract-images`, { method: 'POST' }); },
     
     // AI tools
     summarizeText(text, language = 'uz') { return this.fetchWithAuth('/ai/summarize', { method: 'POST', body: { text, action: 'summarize', language } }); },
@@ -35,6 +42,9 @@ const api = {
     improveText(text, language = 'uz') { return this.fetchWithAuth('/ai/improve', { method: 'POST', body: { text, action: 'improve', language } }); },
     explainTopic(text, language = 'uz') { return this.fetchWithAuth('/ai/explain', { method: 'POST', body: { text, action: 'explain', language } }); },
     
+    // Auth & Profile
+    getMe() { return this.fetchWithAuth('/auth/me'); },
+
     // Quiz
     getQuizzes() { return this.fetchWithAuth('/quiz/list'); },
     createQuiz(topic, count, type) { return this.fetchWithAuth('/quiz/create', { method: 'POST', body: { topic, num_questions: count, quiz_type: type } }); },

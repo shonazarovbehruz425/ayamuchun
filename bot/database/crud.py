@@ -28,7 +28,30 @@ async def update_user_activity(session: AsyncSession, telegram_id: int):
         user.last_active = datetime.utcnow()
         await session.commit()
 
-async def save_file_record(session: AsyncSession, user_id: int, file_name: str, file_type: str, telegram_file_id: str, local_path: str, file_size: int) -> File:
+async def save_file_record(session: AsyncSession, user_id: int, file_name: str, file_type: str, telegram_file_id: str, local_path: str, file_size: int, upsert: bool = True) -> File:
+    if upsert:
+        import os
+        from datetime import datetime
+        result = await session.execute(
+            select(File).where(File.user_id == user_id, File.file_name == file_name).order_by(File.uploaded_at.desc())
+        )
+        existing = result.scalars().first()
+        if existing:
+            # Delete old file on disk if path changed
+            if existing.local_path and existing.local_path != local_path and os.path.exists(existing.local_path):
+                try:
+                    os.remove(existing.local_path)
+                except Exception:
+                    pass
+            existing.file_type = file_type
+            existing.telegram_file_id = telegram_file_id
+            existing.local_path = local_path
+            existing.file_size = file_size
+            existing.uploaded_at = datetime.utcnow()
+            await session.commit()
+            await session.refresh(existing)
+            return existing
+
     file_record = File(
         user_id=user_id,
         file_name=file_name,

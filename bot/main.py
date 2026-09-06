@@ -62,9 +62,73 @@ config = get_settings()
 
 async def handle_menu_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Route main menu button presses to the appropriate handlers."""
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
     text = update.message.text
 
-    if text == "📄 Fayl asboblari":
+    if text in ("🔄 PDF ➔ Word", "PDF ➔ Word"):
+        context.user_data["expected_tool"] = "pdf_to_word"
+        await update.message.reply_text(
+            "🔄 <b>PDF ➔ Word (DOCX)</b>\n\n"
+            "Menga <b>PDF fayl</b> yuboring, uni sifatli va tahrirlanadigan Word (.docx) hujjatiga aylantirib beraman.",
+            parse_mode="HTML"
+        )
+    elif text in ("🔄 Word ➔ PDF", "Word ➔ PDF"):
+        context.user_data["expected_tool"] = "word_to_pdf"
+        await update.message.reply_text(
+            "🔄 <b>Word ➔ PDF</b>\n\n"
+            "Menga <b>Word (.docx yoki .doc)</b> fayl yuboring, uni 100% asl format va shriftlarida sifatli PDF ga aylantirib beraman.",
+            parse_mode="HTML"
+        )
+    elif text in ("📝 Doc tahrirlash", "Doc tahrirlash"):
+        keyboard = []
+        if config.WEBAPP_URL:
+            keyboard.append([
+                InlineKeyboardButton("📝 Doc Tahrirlovchini ochish", web_app=WebAppInfo(url=f"{config.WEBAPP_URL}#/"))
+            ])
+        await update.message.reply_text(
+            "📝 <b>Doc tahrirlash (Word)</b>\n\n"
+            "Word hujjatini to'liq format, jadvallar va shriftlari bilan ko'rish hamda tahrirlash uchun:\n"
+            "1. Yangi Word fayl yuboring, yoki\n"
+            "2. Quyidagi tugma orqali interaktiv tahrirlovchini oching:",
+            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
+            parse_mode="HTML"
+        )
+    elif text in ("✏️ PDF tahrirlash", "PDF tahrirlash"):
+        keyboard = []
+        if config.WEBAPP_URL:
+            keyboard.append([
+                InlineKeyboardButton("✏️ PDF Tahrirlovchini ochish", web_app=WebAppInfo(url=f"{config.WEBAPP_URL}#/"))
+            ])
+        await update.message.reply_text(
+            "✏️ <b>PDF tahrirlash</b>\n\n"
+            "PDF hujjat matnlarini qulay tahrirlash uchun:\n"
+            "1. PDF fayl yuboring, yoki\n"
+            "2. Quyidagi tugma orqali tahrirlovchini oching:",
+            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
+            parse_mode="HTML"
+        )
+    elif text in ("🖼️ Rasmlarni PDF qilish", "Rasmlarni PDF qilish"):
+        keyboard = []
+        if config.WEBAPP_URL:
+            keyboard.append([
+                InlineKeyboardButton("🖼️ Rasmlarni PDF qilish (Mini App)", web_app=WebAppInfo(url=f"{config.WEBAPP_URL}#/"))
+            ])
+        await update.message.reply_text(
+            "🖼️ <b>Rasmlarni PDF qilish</b>\n\n"
+            "Bir nechta rasmlarni tartibli A4 PDF hujjatiga yig'ish uchun:\n"
+            "• Rasmlarni botga alohida rasm yoki fayl sifatida yuboring, yoki\n"
+            "• Mini App dagi qulay va vizual asbobdan foydalaning:",
+            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
+            parse_mode="HTML"
+        )
+    elif text in ("📦 PDF rasmlarini olish", "PDF rasmlarini olish"):
+        context.user_data["expected_tool"] = "extract_images"
+        await update.message.reply_text(
+            "📦 <b>PDF rasmlarini olish (ZIP)</b>\n\n"
+            "Menga <b>PDF fayl</b> yuboring. Men uning ichidagi barcha fotosuratlarni sifatini yo'qotmagan holda bitta ZIP arxiv qilib yuboraman.",
+            parse_mode="HTML"
+        )
+    elif text == "📄 Fayl asboblari":
         await update.message.reply_text(
             "📎 Iltimos, menga fayl yuboring.\n"
             "Qo'llab-quvvatlanadigan formatlar: PDF, Word, Excel, PowerPoint, CSV"
@@ -78,7 +142,6 @@ async def handle_menu_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     elif text == "⚙️ Sozlamalar":
         await settings_menu(update, context)
     elif text == "📱 Mini App":
-        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
         if config.WEBAPP_URL:
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton(

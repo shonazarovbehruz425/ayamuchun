@@ -38,24 +38,23 @@ def validate_init_data(init_data: str, bot_token: str) -> dict:
         return None
 
 async def get_current_user(authorization: str = Header(None)):
-    if not authorization:
-        # Dev fallback if no auth header passed
-        return {"telegram_id": 99999999, "first_name": "Demo Teacher", "username": "demo"}
+    user_data = {"telegram_id": 99999999, "first_name": "Demo Teacher", "username": "demo"}
     
-    parts = authorization.split(" ")
-    if len(parts) == 2 and parts[0] == "Bearer":
-        init_data = parts[1]
-        user_info = validate_init_data(init_data, settings.BOT_TOKEN)
-        if user_info:
-            return user_info
-        # If bot token isn't yet configured with real values or testing locally:
-        if settings.BOT_TOKEN == "your_bot_token_here":
-            return {"telegram_id": 99999999, "first_name": "Teacher", "username": "teacher"}
-        raise HTTPException(status_code=401, detail="Noto'g'ri Telegram autentifikatsiya ma'lumoti")
-        
-    return {"telegram_id": 99999999, "first_name": "Teacher", "username": "teacher"}
+    if authorization:
+        parts = authorization.split(" ")
+        if len(parts) == 2 and parts[0] == "Bearer":
+            init_data = parts[1]
+            validated = validate_init_data(init_data, settings.BOT_TOKEN)
+            if validated:
+                user_data = validated
+            elif settings.BOT_TOKEN not in ("your_bot_token_here", "local_dev_preview_token"):
+                raise HTTPException(status_code=401, detail="Noto'g'ri Telegram autentifikatsiya ma'lumoti")
 
+    user_data["is_admin"] = user_data["telegram_id"] in settings.ADMIN_IDS
+    return user_data
+
+@router.get("/me")
 @router.post("/validate")
 async def validate_auth(authorization: str = Header(None)):
     user = await get_current_user(authorization)
-    return {"status": "ok", "user": user}
+    return {"status": "ok", "user": user, "is_admin": user.get("is_admin", False)}

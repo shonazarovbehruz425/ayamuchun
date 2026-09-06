@@ -5,7 +5,7 @@ import os
 
 class Settings(BaseSettings):
     # Telegram Bot
-    BOT_TOKEN: str
+    BOT_TOKEN: str = "local_dev_preview_token"
     ADMIN_IDS: List[int] = []
 
     # AI (Google Gemini) - Optional
@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     BACKUP_CHANNEL_ID: int = -1004294226425
 
     # Web App & Host
-    WEBAPP_URL: str = ""
+    WEBAPP_URL: str = os.getenv("WEBAPP_URL", "https://ayamuchun.onrender.com")
     API_HOST: str = "0.0.0.0"
     API_PORT: int = int(os.getenv("PORT", 8000))
     WEBHOOK_URL: Optional[str] = None

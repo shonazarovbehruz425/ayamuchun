@@ -42,12 +42,75 @@ class FileConverter:
             raise
 
     async def word_to_pdf(self, input_path: str, output_path: str) -> str:
-        """Word dan PDF formatiga o'tkazish."""
+        """Word dan PDF formatiga o'tkazish (Word COM, LibreOffice yoki PyMuPDF fallback)."""
         output_dir = os.path.dirname(output_path) or '.'
-        result_path = await self._convert_with_libreoffice(input_path, output_dir, 'pdf')
-        if result_path != output_path:
-            os.rename(result_path, output_path)
-        return output_path
+        abs_in = os.path.abspath(input_path)
+        abs_out = os.path.abspath(output_path)
+
+        # 1. Windows da Microsoft Word COM orqali 100% asl sifatda konvertatsiya
+        if os.name == 'nt':
+            def _convert_with_word_com():
+                import pythoncom
+                import win32com.client
+                pythoncom.CoInitialize()
+                word = None
+                doc = None
+                try:
+                    word = win32com.client.Dispatch('Word.Application')
+                    word.Visible = False
+                    word.DisplayAlerts = False
+                    doc = word.Documents.Open(abs_in)
+                    doc.SaveAs(abs_out, FileFormat=17)  # 17 = wdFormatPDF
+                    doc.Close(SaveChanges=0)
+                    return abs_out
+                finally:
+                    if word:
+                        try:
+                            word.Quit()
+                        except Exception:
+                            pass
+                    pythoncom.CoUninitialize()
+
+            try:
+                await asyncio.to_thread(_convert_with_word_com)
+                if os.path.exists(abs_out) and os.path.getsize(abs_out) > 0:
+                    return abs_out
+            except Exception as e:
+                logger.warning(f"Word COM orqali konvertatsiya qilib bo'lmadi: {e}, muqobil usul tekshirilmoqda...")
+
+        # 2. LibreOffice headless orqali sinab ko'rish
+        try:
+            result_path = await self._convert_with_libreoffice(input_path, output_dir, 'pdf')
+            if result_path != output_path and os.path.exists(result_path):
+                if os.path.exists(output_path):
+                    os.remove(output_path)
+                os.rename(result_path, output_path)
+            return output_path
+        except Exception:
+            pass
+
+        # 3. Python-native fallback: PyMuPDF orqali to'liq UTF-8 matnli PDF yaratish
+        def _fallback_convert():
+            import fitz
+            from docx import Document
+            doc = Document(input_path)
+            pdf = fitz.open()
+            
+            page = pdf.new_page(width=595, height=842) # A4
+            rect = fitz.Rect(50, 50, 545, 792)
+            
+            lines = []
+            for p in doc.paragraphs:
+                if p.text.strip():
+                    lines.append(p.text.strip())
+            
+            full_text = "\n\n".join(lines)
+            page.insert_textbox(rect, full_text, fontsize=11, fontname="helv")
+            pdf.save(output_path)
+            pdf.close()
+            return output_path
+
+        return await asyncio.to_thread(_fallback_convert)
 
     async def excel_to_pdf(self, input_path: str, output_path: str) -> str:
         """Excel dan PDF formatiga o'tkazish."""

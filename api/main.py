@@ -19,12 +19,22 @@ app.include_router(files.router, prefix="/api/files", tags=["files"])
 app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
 app.include_router(quiz.router, prefix="/api/quiz", tags=["quiz"])
 
-app.mount("/", StaticFiles(directory="webapp", html=True), name="webapp")
-
-@app.on_event("startup")
-async def startup_event():
-    await init_db()
-
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():
-    return {"status": "ok"}
+    """Health check endpoint for UptimeRobot and monitoring services."""
+    return {
+        "status": "ok",
+        "service": "EduBot",
+        "active": True
+    }
+
+@app.api_route("/ping", methods=["GET", "HEAD"])
+async def ping():
+    """Fast ping endpoint for keep-alive bots to prevent Render free-tier sleep."""
+    return "pong"
+
+@app.api_route("/keepalive", methods=["GET", "HEAD"])
+async def keepalive():
+    return {"status": "awake", "message": "Server is up and running"}
+
+app.mount("/", StaticFiles(directory="webapp", html=True), name="webapp")

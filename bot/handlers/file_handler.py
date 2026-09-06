@@ -111,6 +111,20 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             except Exception:
                 pass
 
+        expected_tool = context.user_data.pop("expected_tool", None)
+        if expected_tool == "pdf_to_word" and ext_lower == "pdf":
+            await msg.edit_text("⏳ PDF ni Word (DOCX) ga aylantirish boshlandi...")
+            await _convert_to_docx(msg, update, local_path, file_name)
+            return
+        elif expected_tool == "word_to_pdf" and ext_lower in ("docx", "doc"):
+            await msg.edit_text("⏳ Word ni PDF ga aylantirish boshlandi...")
+            await _convert_to_pdf(msg, update, local_path, file_name)
+            return
+        elif expected_tool == "extract_images" and ext_lower == "pdf":
+            await msg.edit_text("⏳ PDF dagi barcha rasmlar ajratilmoqda...")
+            await _extract_images(msg, update, local_path, file_name)
+            return
+
         info_text = (
             f"✅ Fayl qabul qilindi!\n\n"
             f"📄 Nomi: {file_name}\n"
@@ -153,6 +167,12 @@ async def handle_file_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
         elif action == "file_ai_analyze":
             await _ai_analyze(msg, query, file_path)
+
+        elif action == "file_to_docx":
+            await _convert_to_docx(msg, query, file_path, file_name)
+
+        elif action == "file_extract_images":
+            await _extract_images(msg, query, file_path, file_name)
 
         elif action == "file_to_pdf":
             await _convert_to_pdf(msg, query, file_path, file_name)
@@ -258,15 +278,79 @@ async def _ai_analyze(msg, query, file_path: str) -> None:
         await msg.edit_text(full)
 
 
-async def _convert_to_pdf(msg, query, file_path: str, file_name: str) -> None:
+async def _convert_to_docx(msg, query_or_update, file_path: str, file_name: str) -> None:
+    """Convert PDF to DOCX (Word)."""
+    output_path = os.path.join(
+        config.processed_dir,
+        os.path.splitext(os.path.basename(file_name))[0] + ".docx",
+    )
+    reply_target = query_or_update.message if hasattr(query_or_update, "message") and query_or_update.message else msg
+    try:
+        await converter.pdf_to_word(file_path, output_path)
+        await msg.edit_text("✅ Word (DOCX) ga aylantirildi!")
+        with open(output_path, "rb") as f:
+            await reply_target.reply_document(
+                document=f,
+                filename=os.path.basename(output_path),
+                caption="📝 Word (DOCX) hujjati tayyor!",
+            )
+    except Exception as e:
+        await msg.edit_text(f"❌ Word ga aylantirishda xatolik: {str(e)}")
+
+
+async def _extract_images(msg, query_or_update, file_path: str, file_name: str) -> None:
+    """Extract all images from PDF into a ZIP file."""
+    import fitz
+    import zipfile
+    
+    zip_name = f"{os.path.splitext(os.path.basename(file_name))[0]}_rasmlar.zip"
+    zip_path = os.path.join(config.processed_dir, zip_name)
+    reply_target = query_or_update.message if hasattr(query_or_update, "message") and query_or_update.message else msg
+    
+    try:
+        doc = fitz.open(file_path)
+        img_count = 0
+        with zipfile.ZipFile(zip_path, 'w') as zipf:
+            for page_idx in range(len(doc)):
+                page = doc[page_idx]
+                image_list = page.get_images(full=True)
+                for img_idx, img_info in enumerate(image_list):
+                    xref = img_info[0]
+                    base_image = doc.extract_image(xref)
+                    image_bytes = base_image["image"]
+                    image_ext = base_image["ext"]
+                    img_filename = f"sahifa_{page_idx+1}_rasm_{img_idx+1}.{image_ext}"
+                    zipf.writestr(img_filename, image_bytes)
+                    img_count += 1
+        doc.close()
+
+        if img_count == 0:
+            if os.path.exists(zip_path):
+                os.remove(zip_path)
+            await msg.edit_text("⚠️ Ushbu PDF ichida hech qanday rasm topilmadi.")
+            return
+
+        await msg.edit_text(f"✅ {img_count} ta rasm ajratib olindi!")
+        with open(zip_path, "rb") as f:
+            await reply_target.reply_document(
+                document=f,
+                filename=zip_name,
+                caption=f"🖼️ PDF dagi {img_count} ta rasm arxivi (ZIP)",
+            )
+    except Exception as e:
+        await msg.edit_text(f"❌ Rasmlarni ajratishda xatolik: {str(e)}")
+
+
+async def _convert_to_pdf(msg, query_or_update, file_path: str, file_name: str) -> None:
     """Convert file to PDF."""
     output_dir = config.processed_dir
+    reply_target = query_or_update.message if hasattr(query_or_update, "message") and query_or_update.message else msg
     try:
         output_path = await converter.convert_to_pdf(file_path, output_dir)
         await msg.edit_text("✅ PDF ga aylantirildi!")
         with open(output_path, "rb") as f:
             pdf_name = os.path.splitext(file_name)[0] + ".pdf"
-            await query.message.reply_document(
+            await reply_target.reply_document(
                 document=f,
                 filename=pdf_name,
                 caption="📄 Konvertatsiya qilingan PDF fayl",

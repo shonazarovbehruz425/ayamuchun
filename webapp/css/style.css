@@ -28,6 +28,19 @@ body {
     min-height: 100dvh;
     padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
     padding-top: env(safe-area-inset-top, 0px);
+    position: relative;
+}
+
+/* GPU-accelerated stationary background plane (fixes mobile scroll jank) */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -10;
+    pointer-events: none;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    background-color: #f6f8fc;
     background-image: 
         radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.12) 0px, transparent 45%),
         radial-gradient(circle at 85% 25%, rgba(217, 70, 239, 0.08) 0px, transparent 40%),
@@ -36,7 +49,6 @@ body {
         linear-gradient(to bottom, rgba(99, 102, 241, 0.08) 1px, transparent 1px);
     background-size: 100% 100%, 100% 100%, 100% 100%, 28px 28px, 28px 28px;
     background-position: 0 0, 0 0, 0 0, -1px -1px, -1px -1px;
-    background-attachment: fixed;
 }
 
 /* Custom scrollbars */
@@ -55,30 +67,33 @@ body {
     background: #94a3b8;
 }
 
-/* Smooth active micro-transitions */
-button, a, .interactive-card {
+/* Smooth active micro-transitions & Instant tap response without 300ms mobile delay */
+button, a, .interactive-card, [role="button"], .ios-tab-btn, .liquid-glass-interactive, .ribbon-btn {
     -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
 }
 
 /* ======================================================================
-   Liquid Glass System (iOS 26 Frosted Glass Materials)
+   Liquid Glass System (GPU-Optimized iOS Frosted Materials)
    ====================================================================== */
 .liquid-glass-header {
-    background: rgba(255, 255, 255, 0.42);
-    backdrop-filter: blur(52px) saturate(240%) contrast(108%);
-    -webkit-backdrop-filter: blur(52px) saturate(240%) contrast(108%);
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
     border-bottom: 1.5px solid rgba(255, 255, 255, 0.9);
     box-shadow: 
         0 10px 30px -10px rgba(15, 23, 42, 0.08),
         inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.95),
         inset 0 -1.5px 2.5px 0 rgba(0, 0, 0, 0.03);
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
 }
 
 .liquid-glass-card {
     position: relative;
-    background: rgba(255, 255, 255, 0.42);
-    backdrop-filter: blur(52px) saturate(240%) contrast(108%);
-    -webkit-backdrop-filter: blur(52px) saturate(240%) contrast(108%);
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
     border: 1.5px solid rgba(255, 255, 255, 0.95);
     border-radius: 28px;
     box-shadow: 
@@ -86,24 +101,26 @@ button, a, .interactive-card {
         0 8px 24px -4px rgba(99, 102, 241, 0.06),
         inset 0 1.8px 2px 0 rgba(255, 255, 255, 1),
         inset 0 -1.5px 2.5px 0 rgba(0, 0, 0, 0.03);
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease, box-shadow 0.2s ease;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
 }
 
 .liquid-glass-card:hover {
-    background: rgba(255, 255, 255, 0.58);
+    background: rgba(255, 255, 255, 0.75);
     box-shadow: 
         0 30px 60px -15px rgba(15, 23, 42, 0.14),
         0 12px 28px -4px rgba(99, 102, 241, 0.12),
         inset 0 2px 2px 0 rgba(255, 255, 255, 1),
         inset 0 -1.5px 2px 0 rgba(0, 0, 0, 0.02);
-    transform: translateY(-2.5px);
+    transform: translateY(-2.5px) translateZ(0);
 }
 
 .liquid-glass-interactive {
     position: relative;
-    background: rgba(255, 255, 255, 0.42);
-    backdrop-filter: blur(48px) saturate(220%) contrast(106%);
-    -webkit-backdrop-filter: blur(48px) saturate(220%) contrast(106%);
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
     border: 1.5px solid rgba(255, 255, 255, 0.92);
     border-radius: 24px;
     box-shadow: 
@@ -111,27 +128,31 @@ button, a, .interactive-card {
         0 6px 16px -2px rgba(99, 102, 241, 0.05),
         inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.98),
         inset 0 -1px 2px 0 rgba(0, 0, 0, 0.03);
-    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
 }
 
 .liquid-glass-interactive:hover {
-    background: rgba(255, 255, 255, 0.65);
+    background: rgba(255, 255, 255, 0.8);
     border-color: rgba(99, 102, 241, 0.45);
     box-shadow: 
         0 20px 40px -10px rgba(99, 102, 241, 0.16),
         0 8px 20px -2px rgba(99, 102, 241, 0.1),
         inset 0 1.5px 2px 0 rgba(255, 255, 255, 1);
-    transform: translateY(-2.5px);
+    transform: translateY(-2.5px) translateZ(0);
 }
 
 .liquid-glass-pill {
-    background: rgba(255, 255, 255, 0.45);
-    backdrop-filter: blur(40px) saturate(220%);
-    -webkit-backdrop-filter: blur(40px) saturate(220%);
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
     border: 1.5px solid rgba(255, 255, 255, 0.95);
     box-shadow: 
         0 6px 16px -4px rgba(15, 23, 42, 0.08),
         inset 0 1.2px 1.5px 0 rgba(255, 255, 255, 0.95);
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
 }
 
 /* Animation keyframes */
@@ -160,9 +181,9 @@ button, a, .interactive-card {
 
 .ios26-glass-chassis {
     position: relative;
-    background: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(48px) saturate(220%) contrast(105%);
-    -webkit-backdrop-filter: blur(48px) saturate(220%) contrast(105%);
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
     border-radius: 40px;
     padding: 6px;
     box-shadow: 
@@ -170,6 +191,8 @@ button, a, .interactive-card {
         0 8px 20px -4px rgba(99, 102, 241, 0.08),
         inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.95),
         inset 0 -1.5px 2.5px 0 rgba(0, 0, 0, 0.05);
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
 }
 
 /* Chromatic Edge Aberration */
@@ -231,6 +254,9 @@ button, a, .interactive-card {
         transform 0.2s cubic-bezier(0.2, 0, 0, 1);
     z-index: 10;
     overflow: hidden;
+    will-change: left, width, transform;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
 }
 
 /* Liquid Caustic Sheen inside capsule */
@@ -240,13 +266,15 @@ button, a, .interactive-card {
     inset: 0;
     background: linear-gradient(
         120deg,
-        rgba(255, 255, 255, 0.45) 0%,
+        rgba(255, 255, 255, 0.35) 0%,
         rgba(255, 255, 255, 0) 40%,
-        rgba(255, 255, 255, 0.25) 60%,
-        rgba(255, 255, 255, 0) 100%
+        rgba(255, 255, 255, 0.2) 60%,
+        rgba(255, 255, 255, 0.35) 100%
     );
-    mix-blend-mode: overlay;
     pointer-events: none;
+    will-change: transform;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
     animation: liquidSheen 6s infinite linear;
 }
 
@@ -277,6 +305,10 @@ button, a, .interactive-card {
 html.dark body {
     background-color: #080c16;
     color: #f8fafc !important;
+}
+
+html.dark body::before {
+    background-color: #080c16;
     background-image: 
         radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.22) 0px, transparent 50%),
         radial-gradient(circle at 85% 25%, rgba(217, 70, 239, 0.18) 0px, transparent 45%),
@@ -312,17 +344,17 @@ html.dark .text-slate-400 {
 }
 
 html.dark .liquid-glass-header {
-    background: rgba(15, 23, 42, 0.75);
-    backdrop-filter: blur(48px) saturate(210%);
-    -webkit-backdrop-filter: blur(48px) saturate(210%);
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
     border-bottom: 1.5px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6);
 }
 
 html.dark .liquid-glass-card {
-    background: rgba(19, 28, 49, 0.62) !important;
-    backdrop-filter: blur(48px) saturate(220%) contrast(110%);
-    -webkit-backdrop-filter: blur(48px) saturate(220%) contrast(110%);
+    background: rgba(19, 28, 49, 0.78) !important;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
     border: 1.5px solid rgba(255, 255, 255, 0.12) !important;
     box-shadow: 
         0 24px 48px -15px rgba(0, 0, 0, 0.7),
@@ -331,7 +363,7 @@ html.dark .liquid-glass-card {
 }
 
 html.dark .liquid-glass-card:hover {
-    background: rgba(26, 38, 66, 0.75) !important;
+    background: rgba(26, 38, 66, 0.88) !important;
     border-color: rgba(99, 102, 241, 0.45) !important;
     box-shadow: 
         0 28px 56px -12px rgba(0, 0, 0, 0.8),
@@ -339,24 +371,24 @@ html.dark .liquid-glass-card:hover {
 }
 
 html.dark .liquid-glass-interactive {
-    background: rgba(19, 28, 49, 0.55) !important;
+    background: rgba(19, 28, 49, 0.72) !important;
     border: 1.5px solid rgba(255, 255, 255, 0.1) !important;
     box-shadow: 0 12px 28px -8px rgba(0, 0, 0, 0.5) !important;
 }
 
 html.dark .liquid-glass-interactive:hover {
-    background: rgba(26, 38, 66, 0.8) !important;
+    background: rgba(26, 38, 66, 0.88) !important;
     border-color: rgba(99, 102, 241, 0.5) !important;
 }
 
 html.dark .liquid-glass-pill {
-    background: rgba(26, 38, 66, 0.65) !important;
+    background: rgba(26, 38, 66, 0.75) !important;
     border: 1.5px solid rgba(255, 255, 255, 0.15) !important;
     color: #e2e8f0 !important;
 }
 
 html.dark .ios26-glass-chassis {
-    background: rgba(13, 20, 36, 0.82) !important;
+    background: rgba(13, 20, 36, 0.88) !important;
     border: 1.5px solid rgba(255, 255, 255, 0.14) !important;
     box-shadow: 
         0 35px 70px -15px rgba(0, 0, 0, 0.8),
@@ -536,6 +568,7 @@ html.dark .ribbon-separator {
     align-items: center;
     background: #525f78;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
     position: relative;
 }
 

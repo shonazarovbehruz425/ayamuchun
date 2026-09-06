@@ -28,9 +28,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }).catch(() => {});
 
-    function refreshIcons() {
+    function refreshIcons(rootNode) {
         if (window.lucide) {
-            window.lucide.createIcons();
+            try {
+                if (rootNode && (rootNode instanceof HTMLElement || rootNode instanceof DocumentFragment)) {
+                    window.lucide.createIcons({ root: rootNode });
+                } else {
+                    window.lucide.createIcons();
+                }
+            } catch (e) {
+                try { window.lucide.createIcons(); } catch (err) {}
+            }
         }
     }
 
@@ -634,8 +642,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let savedSelectionRange = null;
     let isDocDirty = false;
 
-    // Helper: Update active page and total pages indicator
-    window.updateDocPagination = function() {
+    // Helper: Update active page and total pages indicator (RAF throttled for 60fps mobile scrolling)
+    let _docPaginationRaf = null;
+    function _executeDocPagination() {
         const iframe = document.getElementById('doc-active-iframe');
         const totalPagesEl = document.getElementById('doc-total-pages');
         const activePageEl = document.getElementById('doc-active-page');
@@ -658,7 +667,6 @@ document.addEventListener('DOMContentLoaded', () => {
             let current = 1;
             if (viewport) {
                 const scrollPos = viewport.scrollTop + 200;
-                // Check positions of page breaks relative to viewport
                 breaks.forEach((b, idx) => {
                     const rect = b.getBoundingClientRect();
                     if (rect.top <= 250) {
@@ -668,10 +676,19 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             activePageEl.innerText = current;
         } catch (e) {}
+    }
+
+    window.updateDocPagination = function() {
+        if (_docPaginationRaf) return;
+        _docPaginationRaf = requestAnimationFrame(() => {
+            _docPaginationRaf = null;
+            _executeDocPagination();
+        });
     };
 
-    // Helper: Adjust iframe height to fit document content
-    window.adjustIframeHeight = function() {
+    // Helper: Adjust iframe height to fit document content (Debounced for zero-lag mobile typing)
+    let _adjustHeightDebounceTimer = null;
+    function _executeAdjustIframeHeight() {
         const iframe = document.getElementById('doc-active-iframe');
         const frameBox = document.getElementById('doc-frame-box');
         if (!iframe || !frameBox) return;
@@ -684,6 +701,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.updateDocPagination();
             }
         } catch (e) {}
+    }
+
+    window.adjustIframeHeight = function(immediate = false) {
+        if (immediate === true) {
+            if (_adjustHeightDebounceTimer) clearTimeout(_adjustHeightDebounceTimer);
+            _executeAdjustIframeHeight();
+            return;
+        }
+        if (_adjustHeightDebounceTimer) clearTimeout(_adjustHeightDebounceTimer);
+        _adjustHeightDebounceTimer = setTimeout(_executeAdjustIframeHeight, 100);
     };
 
     // Helper: Restore last saved selection inside iframe
@@ -1212,18 +1239,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        setTimeout(window.adjustIframeHeight, 200);
+        setTimeout(() => window.adjustIframeHeight(true), 200);
         iDoc.addEventListener('input', () => {
             isDocDirty = true;
-            window.adjustIframeHeight();
-        });
-        iDoc.addEventListener('keyup', window.adjustIframeHeight);
+            window.adjustIframeHeight(false);
+        }, { passive: true });
+        iDoc.addEventListener('keyup', () => {
+            window.adjustIframeHeight(false);
+        }, { passive: true });
 
-        // Scroll listener on viewport to update active page number
+        // Passive scroll listener on viewport to update active page number smoothly
         if (viewport) {
-            viewport.addEventListener('scroll', () => {
-                window.updateDocPagination();
-            });
+            viewport.addEventListener('scroll', window.updateDocPagination, { passive: true });
         }
 
         // Zoom Management

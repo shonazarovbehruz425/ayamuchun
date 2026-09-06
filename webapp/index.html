@@ -2,24 +2,104 @@
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduBot Mini App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>EduBot - Teacher Workspace</title>
+    
+    <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <!-- Tailwind CSS Play CDN & Lucide Icons -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
     <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
-    <div id="app" class="content">
-        <!-- Content gets rendered here by app.js -->
-    </div>
-    
-    <nav class="bottom-nav">
-        <a href="#/" class="nav-item">🏠 Bosh sahifa</a>
-        <a href="#/files" class="nav-item">📁 Fayllar</a>
-        <a href="#/ai" class="nav-item">🧠 AI</a>
-        <a href="#/quiz" class="nav-item">📝 Test</a>
-        <a href="#/settings" class="nav-item">⚙️ Sozlamalar</a>
+<body class="bg-slate-50 text-slate-900 font-sans antialiased min-h-screen pb-24 select-none">
+
+    <!-- Top Navigation Bar / Header -->
+    <header class="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-4 py-3 sm:px-6">
+        <div class="max-w-xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-brand-600 flex items-center justify-center text-white shadow-sm shadow-brand-500/20">
+                    <i data-lucide="graduation-cap" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h1 class="text-base font-semibold text-slate-900 leading-none">EduBot</h1>
+                    <p class="text-xs text-slate-500 mt-0.5">O'qituvchi ish stoli</p>
+                </div>
+            </div>
+            
+            <div id="user-badge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200/60 text-xs font-medium text-slate-600">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span id="header-user-name">O'qituvchi</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container Content (rendered by app.js) -->
+    <main id="app" class="max-w-xl mx-auto px-4 pt-5 pb-8">
+        <!-- Dynamic views injected here -->
+    </main>
+
+    <!-- Sleek Floating Bottom Navigation Bar (Linear / Vercel pill dock) -->
+    <nav class="fixed bottom-3 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
+        <div class="pointer-events-auto bg-white/95 backdrop-blur-lg border border-slate-200/90 shadow-lg shadow-slate-900/5 rounded-full p-1.5 flex items-center gap-1 max-w-md w-full justify-between sm:justify-center sm:gap-2">
+            
+            <a href="#/" class="nav-item flex flex-col sm:flex-row items-center gap-1 px-3.5 py-1.5 rounded-full text-slate-500 transition-all duration-200 hover:text-slate-900" data-route="#/">
+                <i data-lucide="layout-grid" class="w-4 h-4"></i>
+                <span class="text-[11px] font-medium tracking-tight">Asosiy</span>
+            </a>
+            
+            <a href="#/files" class="nav-item flex flex-col sm:flex-row items-center gap-1 px-3.5 py-1.5 rounded-full text-slate-500 transition-all duration-200 hover:text-slate-900" data-route="#/files">
+                <i data-lucide="files" class="w-4 h-4"></i>
+                <span class="text-[11px] font-medium tracking-tight">Hujjatlar</span>
+            </a>
+            
+            <a href="#/ai" class="nav-item flex flex-col sm:flex-row items-center gap-1 px-3.5 py-1.5 rounded-full text-slate-500 transition-all duration-200 hover:text-slate-900" data-route="#/ai">
+                <i data-lucide="sparkles" class="w-4 h-4"></i>
+                <span class="text-[11px] font-medium tracking-tight">AI</span>
+            </a>
+            
+            <a href="#/quiz" class="nav-item flex flex-col sm:flex-row items-center gap-1 px-3.5 py-1.5 rounded-full text-slate-500 transition-all duration-200 hover:text-slate-900" data-route="#/quiz">
+                <i data-lucide="clipboard-check" class="w-4 h-4"></i>
+                <span class="text-[11px] font-medium tracking-tight">Testlar</span>
+            </a>
+            
+            <a href="#/settings" class="nav-item flex flex-col sm:flex-row items-center gap-1 px-3.5 py-1.5 rounded-full text-slate-500 transition-all duration-200 hover:text-slate-900" data-route="#/settings">
+                <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+                <span class="text-[11px] font-medium tracking-tight">Profil</span>
+            </a>
+
+        </div>
     </nav>
 
+    <!-- Scripts -->
     <script src="js/telegram.js"></script>
     <script src="js/api.js"></script>
     <script src="js/app.js"></script>

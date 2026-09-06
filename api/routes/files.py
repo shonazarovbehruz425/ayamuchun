@@ -410,6 +410,7 @@ def docx_to_filtered_html(docx_path: str, temp_dir: str) -> str:
                 t = html.escape(r.text)
                 t = t.replace('\t', '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;')
                 t = t.replace('  ', '&nbsp;&nbsp;')
+                t = t.replace('\n', '<br>')
                 style = []
                 if r.bold: style.append('font-weight: bold;')
                 if r.italic: style.append('font-style: italic;')
@@ -495,26 +496,65 @@ body {{
 
 
 def pdf_to_filtered_html(pdf_path: str, temp_dir: str) -> str:
-    """Converts a PDF file to high fidelity HTML with clear page dividers and tags."""
+    """
+    Converts a PDF file to clean, high-fidelity editable HTML.
+    Uses pdf2docx to accurately rebuild text flow, paragraphs, tables, alignments and fonts,
+    eliminating absolute positioning bugs and overlapping text.
+    """
+    import tempfile
+    import os
+    import fitz
+    
+    timestamp = int(datetime.now().timestamp())
+    temp_docx = os.path.join(temp_dir, f"temp_pdf_render_{timestamp}_{os.getpid()}.docx")
+    
     try:
-        import fitz
+        from pdf2docx import Converter
+        cv = Converter(pdf_path)
+        cv.convert(temp_docx, start=0, end=None)
+        cv.close()
+
+        if os.path.exists(temp_docx) and os.path.getsize(temp_docx) > 0:
+            html = docx_to_filtered_html(temp_docx, temp_dir)
+            return html
+    except Exception as conv_err:
+        logger.warning(f"pdf2docx parsing encountered error: {conv_err}. Falling back to structured PyMuPDF text flow...")
+    finally:
+        if os.path.exists(temp_docx):
+            try:
+                os.remove(temp_docx)
+            except Exception:
+                pass
+
+    # Fallback: PyMuPDF clean structured text flow (avoids overlapping absolute coordinates)
+    try:
         doc = fitz.open(pdf_path)
-        pages_html = []
         total_p = len(doc)
+        pages_html = []
         for idx, page in enumerate(doc):
             p_num = idx + 1
             break_tag = ""
             if idx > 0:
                 break_tag = f'<div class="doc-page-break" data-page="{p_num}"><span class="page-tag">Sahifa {p_num}</span></div>'
-            pages_html.append(f"{break_tag}<div class='pdf-page' style='padding: 20px; background: white;'>{page.get_text('html')}</div>")
+            
+            blocks = page.get_text("blocks")
+            page_content = []
+            for b in blocks:
+                # b = (x0, y0, x1, y1, text, block_no, block_type)
+                if len(b) >= 5 and b[4].strip():
+                    block_text = html.escape(b[4].strip()).replace('\n', '<br>')
+                    page_content.append(f'<p style="margin: 6px 0; line-height: 1.4; font-size: 11.5pt;">{block_text}</p>')
+            
+            pages_html.append(f"{break_tag}<div class='pdf-page' style='padding: 10px 0;'>{''.join(page_content)}</div>")
         doc.close()
+
         return f"""<!DOCTYPE html><html><head><meta charset='utf-8'><style>
 body {{ font-family: 'Times New Roman', Arial, sans-serif; padding: 25px 35px; background: #ffffff; color: #0f172a; }}
 .doc-page-break {{ margin: 30px -35px; padding: 10px 0; background: #f8fafc; border-top: 2px dashed #94a3b8; border-bottom: 2px dashed #94a3b8; text-align: center; }}
 .page-tag {{ display: inline-block; padding: 3px 12px; background: #4f46e5; color: #ffffff; font-size: 11px; font-weight: 700; border-radius: 9999px; }}
 </style></head><body data-total-pages="{total_p}">{''.join(pages_html)}</body></html>"""
     except Exception as e:
-        logger.error(f"PyMuPDF PDF to HTML failed: {e}")
+        logger.error(f"PyMuPDF structured fallback failed: {e}")
         raise e
 
 

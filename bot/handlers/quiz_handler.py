@@ -89,6 +89,24 @@ async def handle_quiz_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
         context.user_data["quiz_data"] = questions
 
+        # Save to database
+        try:
+            from bot.database.engine import get_session
+            from bot.database import crud
+            async with get_session() as session:
+                db_user = await crud.get_or_create_user(session, query.from_user.id, query.from_user.full_name)
+                await crud.create_quiz(
+                    session=session,
+                    user_id=db_user.id,
+                    title=topic[:50],
+                    subject="Ta'lim",
+                    questions_count=len(questions),
+                    questions_data=questions
+                )
+                await crud.log_usage(session, db_user.id, "create_quiz", topic[:50])
+        except Exception as dbe:
+            logger.warning(f"Could not persist quiz to DB: {dbe}")
+
         # Show preview
         preview = "📝 Test tayyor! Ko'rib chiqing:\n\n"
         for i, q in enumerate(questions[:3], 1):  # Show first 3 questions as preview

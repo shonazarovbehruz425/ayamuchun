@@ -45,8 +45,9 @@ from bot.handlers.quiz_handler import (
     QUIZ_EXPORT,
 )
 from bot.handlers.tools_handler import tools_menu, create_grade_table, WAITING_STUDENTS, WAITING_SUBJECTS
-from bot.handlers.settings_handler import settings_menu, show_stats, change_language
+from bot.handlers.settings_handler import settings_menu, show_stats, change_language, manual_backup_command
 from bot.keyboards.reply import main_menu_keyboard
+from bot.services.backup_service import DatabaseSyncService
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -66,7 +67,7 @@ async def handle_menu_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if text == "📄 Fayl asboblari":
         await update.message.reply_text(
             "📎 Iltimos, menga fayl yuboring.\n"
-            "Qo'llab-quvvatlanadigan formatlar: PDF, Word, Excel, PowerPoint"
+            "Qo'llab-quvvatlanadigan formatlar: PDF, Word, Excel, PowerPoint, CSV"
         )
     elif text == "🧠 AI yordamchi":
         await ai_menu(update, context)
@@ -78,16 +79,21 @@ async def handle_menu_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await settings_menu(update, context)
     elif text == "📱 Mini App":
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton(
-                "📱 Mini App ochish",
-                web_app=WebAppInfo(url=config.WEBAPP_URL)
-            )]
-        ])
-        await update.message.reply_text(
-            "Mini ilovani ochish uchun quyidagi tugmani bosing:",
-            reply_markup=keyboard,
-        )
+        if config.WEBAPP_URL:
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton(
+                    "📱 Mini App ochish",
+                    web_app=WebAppInfo(url=config.WEBAPP_URL)
+                )]
+            ])
+            await update.message.reply_text(
+                "Mini ilovani ochish uchun quyidagi tugmani bosing:",
+                reply_markup=keyboard,
+            )
+        else:
+            await update.message.reply_text(
+                "ℹ️ Mini App havolasi serverda sozlanmoqda. Tez orada faollashadi!"
+            )
     elif text == "🔙 Orqaga":
         await update.message.reply_text(
             "🏠 Bosh menyu",
@@ -109,6 +115,7 @@ def build_application():
     # ── Command handlers ───────────────────────────────────────────────
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("backup", manual_backup_command))
 
     # ── AI conversation handler ────────────────────────────────────────
     ai_conv_handler = ConversationHandler(
@@ -219,20 +226,45 @@ async def start_quiz_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     return QUIZ_TOPIC
 
 
+async def periodic_db_sync(sync_service: DatabaseSyncService, interval_seconds: int = 600):
+    """Background loop that exports DB to channel every 10 minutes."""
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+            logger.info("Executing periodic database sync to channel...")
+            await sync_service.sync_to_channel(reason="Periodic Auto-Backup (10m)")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Error in periodic_db_sync: {e}")
+
+
 # ── Main entry point ──────────────────────────────────────────────────────
 
 async def main() -> None:
     """Start the bot and API server concurrently."""
     # Initialize database
     await init_db()
-    logger.info("Database initialized")
+    logger.info("Local SQLite database initialized")
 
     # Build bot application
     application = build_application()
 
-    # Initialize and start the bot
+    # Initialize bot
     await application.initialize()
 
+    # ── RESTORE DATABASE FROM TELEGRAM CHANNEL (IF BACKUP EXISTS) ───────────
+    sync_service = DatabaseSyncService(bot=application.bot, channel_id=config.BACKUP_CHANNEL_ID)
+    try:
+        restored = await sync_service.restore_from_channel()
+        if restored:
+            logger.info("Database state successfully restored from Telegram channel!")
+        else:
+            logger.info("No prior channel backup applied. Using local state.")
+    except Exception as e:
+        logger.warning(f"Could not restore database from channel on boot: {e}")
+
+    # Start bot
     if config.WEBHOOK_URL:
         logger.info(f"Starting webhook on {config.WEBHOOK_URL}")
         await application.bot.set_webhook(url=config.WEBHOOK_URL)
@@ -257,6 +289,12 @@ async def main() -> None:
     except Exception as e:
         logger.warning(f"Could not set menu button: {e}")
 
+    # Initial backup on start
+    asyncio.create_task(sync_service.sync_to_channel(reason="Service Startup Sync"))
+
+    # Launch periodic backup background task
+    sync_task = asyncio.create_task(periodic_db_sync(sync_service, interval_seconds=600))
+
     # Start FastAPI server
     logger.info(f"Starting API server on {config.API_HOST}:{config.API_PORT}")
     uvicorn_config = uvicorn.Config(
@@ -270,7 +308,13 @@ async def main() -> None:
     try:
         await server.serve()
     finally:
-        logger.info("Shutting down...")
+        logger.info("Shutting down... Performing final database sync to channel.")
+        sync_task.cancel()
+        try:
+            await sync_service.sync_to_channel(reason="Service Graceful Shutdown Sync")
+        except Exception as e:
+            logger.error(f"Shutdown sync error: {e}")
+
         if not config.WEBHOOK_URL:
             await application.updater.stop()
         await application.stop()

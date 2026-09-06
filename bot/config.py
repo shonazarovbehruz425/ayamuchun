@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     WEBHOOK_URL: Optional[str] = None
     WEBHOOK_PORT: int = 8443
     STORAGE_PATH: str = "./storage"
+    BACKUP_CHANNEL_ID: int = -1004294226425
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

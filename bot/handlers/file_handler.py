@@ -79,6 +79,25 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             "telegram_file_id": document.file_id,
         }
 
+        # Save record in database
+        try:
+            from bot.database.engine import get_session
+            from bot.database import crud
+            async with get_session() as session:
+                db_user = await crud.get_or_create_user(session, update.effective_user.id, update.effective_user.full_name)
+                await crud.save_file_record(
+                    session=session,
+                    user_id=db_user.id,
+                    file_name=file_name,
+                    file_type=ext_lower,
+                    telegram_file_id=document.file_id,
+                    local_path=local_path,
+                    file_size=document.file_size
+                )
+                await crud.log_usage(session, db_user.id, "upload_file", file_name)
+        except Exception as dbe:
+            logger.warning(f"Could not persist file record to DB: {dbe}")
+
         # Get processor and metadata
         processor = get_processor(local_path)
         meta_text = ""

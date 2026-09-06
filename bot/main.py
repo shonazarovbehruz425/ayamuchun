@@ -110,7 +110,13 @@ async def handle_menu_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 def build_application():
     """Build and configure the Telegram bot application."""
-    application = ApplicationBuilder().token(config.BOT_TOKEN).build()
+    application = (
+        ApplicationBuilder()
+        .token(config.BOT_TOKEN)
+        .connection_pool_size(30)
+        .pool_timeout(30.0)
+        .build()
+    )
 
     # ── Command handlers ───────────────────────────────────────────────
     application.add_handler(CommandHandler("start", start_command))

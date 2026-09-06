@@ -3,6 +3,7 @@ python-telegram-bot[webhooks]==21.*
 # Web Framework
 fastapi==0.115.*
 uvicorn[standard]==0.30.*
+python-multipart==0.0.*
 # AI
 google-generativeai==0.8.*
 # Document Processing

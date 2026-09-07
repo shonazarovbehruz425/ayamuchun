@@ -486,12 +486,20 @@ def docx_to_filtered_html(docx_path: str, temp_dir: str) -> str:
 <head>
 <meta charset="utf-8">
 <style>
-body {{
+html, body {{
     font-family: 'Times New Roman', serif;
     background: #ffffff;
     color: #0f172a;
     padding: 35px 45px;
     margin: 0;
+    overflow: hidden !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}}
+::-webkit-scrollbar {{
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
 }}
 .doc-page-break {{
     margin: 30px -45px;
@@ -577,7 +585,8 @@ def pdf_to_filtered_html(pdf_path: str, temp_dir: str) -> str:
         doc.close()
 
         return f"""<!DOCTYPE html><html><head><meta charset='utf-8'><style>
-body {{ font-family: 'Times New Roman', Arial, sans-serif; padding: 25px 35px; background: #ffffff; color: #0f172a; }}
+html, body {{ font-family: 'Times New Roman', Arial, sans-serif; padding: 25px 35px; margin: 0; background: #ffffff; color: #0f172a; overflow: hidden !important; scrollbar-width: none !important; -ms-overflow-style: none !important; }}
+::-webkit-scrollbar {{ display: none !important; width: 0 !important; height: 0 !important; }}
 .doc-page-break {{ margin: 30px -35px; padding: 10px 0; background: #f8fafc; border-top: 2px dashed #94a3b8; border-bottom: 2px dashed #94a3b8; text-align: center; }}
 .page-tag {{ display: inline-block; padding: 3px 12px; background: #4f46e5; color: #ffffff; font-size: 11px; font-weight: 700; border-radius: 9999px; }}
 </style></head><body data-total-pages="{total_p}">{''.join(pages_html)}</body></html>"""

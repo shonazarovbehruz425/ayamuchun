@@ -4,8 +4,23 @@ const TelegramApp = {
     init() {
         if (!tg) return;
         try {
-            tg.ready();
-            tg.expand();
+            const triggerExpandAndFullscreen = () => {
+                try {
+                    tg.ready();
+                    tg.expand();
+                    if (tg.requestFullscreen && !tg.isFullscreen) {
+                        tg.requestFullscreen();
+                    }
+                    if (tg.disableVerticalSwipes) {
+                        tg.disableVerticalSwipes();
+                    }
+                } catch (e) {}
+            };
+
+            triggerExpandAndFullscreen();
+            setTimeout(triggerExpandAndFullscreen, 50);
+            setTimeout(triggerExpandAndFullscreen, 150);
+            setTimeout(triggerExpandAndFullscreen, 400);
 
             // Synchronize Telegram Safe Area Insets for notch and status bar
             const syncSafeArea = () => {
@@ -23,6 +38,12 @@ const TelegramApp = {
             syncSafeArea();
             tg.onEvent?.('safeAreaChanged', syncSafeArea);
             tg.onEvent?.('contentSafeAreaChanged', syncSafeArea);
+            tg.onEvent?.('fullscreenChanged', () => {
+                syncSafeArea();
+            });
+            tg.onEvent?.('fullscreenFailed', () => {
+                tg.expand();
+            });
 
             // Set app headers and backgrounds
             if (tg.setHeaderColor) {
@@ -35,10 +56,14 @@ const TelegramApp = {
                 tg.enableClosingConfirmation();
             }
 
-            // Disable vertical swipes to prevent accidental minimize/close
-            if (tg.disableVerticalSwipes) {
-                tg.disableVerticalSwipes();
-            }
+            // Fallback: on first interaction, ensure full screen if webview restricted auto-fullscreen
+            const onFirstTouch = () => {
+                triggerExpandAndFullscreen();
+                window.removeEventListener('touchstart', onFirstTouch);
+                window.removeEventListener('click', onFirstTouch);
+            };
+            window.addEventListener('touchstart', onFirstTouch, { passive: true, once: true });
+            window.addEventListener('click', onFirstTouch, { passive: true, once: true });
         } catch (e) {
             console.warn("Telegram WebApp init warning:", e);
         }

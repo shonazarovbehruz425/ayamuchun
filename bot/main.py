@@ -29,6 +29,7 @@ from bot.handlers.ai_handler import (
     handle_improve_text,
     handle_grammar_check,
     handle_explain,
+    handle_quiz,
     process_text_input,
     WAITING_TEXT,
     WAITING_TOPIC,
@@ -189,12 +190,13 @@ def build_application():
     # ── AI conversation handler ────────────────────────────────────────
     ai_conv_handler = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.Regex("^📋 Xulosa qilish$"), handle_summarize),
-            MessageHandler(filters.Regex("^🔄 Tarjima$"), handle_translate),
             MessageHandler(filters.Regex("^📝 Dars rejasi$"), handle_lesson_plan),
-            MessageHandler(filters.Regex("^✏️ Matn yaxshilash$"), handle_improve_text),
-            MessageHandler(filters.Regex("^🔍 Grammatika tekshirish$"), handle_grammar_check),
+            MessageHandler(filters.Regex("^❓ Test & Savollar$"), handle_quiz),
+            MessageHandler(filters.Regex("^📋 Xulosa qilish$"), handle_summarize),
             MessageHandler(filters.Regex("^💡 Tushuntirish$"), handle_explain),
+            MessageHandler(filters.Regex("^🔍 Grammatika tekshirish$"), handle_grammar_check),
+            MessageHandler(filters.Regex("^🔄 Tarjima$"), handle_translate),
+            MessageHandler(filters.Regex("^✏️ Matn yaxshilash$"), handle_improve_text),
         ],
         states={
             WAITING_TEXT: [

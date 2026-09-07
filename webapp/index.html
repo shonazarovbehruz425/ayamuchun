@@ -7,6 +7,34 @@
     
     <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+        // Immediate Fullscreen & Expand activation at earliest head execution
+        (function() {
+            function activateFullscreen() {
+                try {
+                    var tw = window.Telegram && window.Telegram.WebApp;
+                    if (tw) {
+                        tw.ready();
+                        tw.expand();
+                        if (tw.requestFullscreen && !tw.isFullscreen) {
+                            tw.requestFullscreen();
+                        }
+                        if (tw.disableVerticalSwipes) {
+                            tw.disableVerticalSwipes();
+                        }
+                    }
+                } catch(e) {}
+            }
+            activateFullscreen();
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', activateFullscreen);
+            }
+            window.addEventListener('load', activateFullscreen);
+            setTimeout(activateFullscreen, 50);
+            setTimeout(activateFullscreen, 150);
+            setTimeout(activateFullscreen, 350);
+        })();
+    </script>
     
     <!-- Tailwind CSS Play CDN & Lucide Icons -->
     <script src="https://cdn.tailwindcss.com"></script>

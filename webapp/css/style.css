@@ -612,6 +612,15 @@ html.dark .doc-canvas-viewport {
     display: block;
     background: #ffffff;
     border-radius: 4px;
+    overflow: hidden !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+.doc-page-iframe::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
 }
 
 

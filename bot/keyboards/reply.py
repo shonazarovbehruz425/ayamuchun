@@ -12,10 +12,10 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
 
 def ai_menu_keyboard() -> ReplyKeyboardMarkup:
     keyboard = [
-        ['📋 Xulosa qilish', '🔄 Tarjima'],
-        ['📝 Dars rejasi', '✏️ Matn yaxshilash'],
-        ['🔍 Grammatika tekshirish', '💡 Tushuntirish'],
-        ['🔙 Orqaga']
+        ['📝 Dars rejasi', '❓ Test & Savollar'],
+        ['📋 Xulosa qilish', '💡 Tushuntirish'],
+        ['🔍 Grammatika tekshirish', '🔄 Tarjima'],
+        ['✏️ Matn yaxshilash', '🔙 Orqaga']
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 

@@ -709,9 +709,19 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const iDoc = iframe.contentDocument || iframe.contentWindow.document;
             if (iDoc && iDoc.body) {
-                const scrollH = Math.max(1123, iDoc.documentElement.scrollHeight, iDoc.body.scrollHeight);
-                iframe.style.height = `${scrollH + 80}px`;
-                frameBox.style.minHeight = `${scrollH + 80}px`;
+                iDoc.documentElement.style.overflow = 'hidden';
+                iDoc.body.style.overflow = 'hidden';
+                const scrollH = Math.max(
+                    1123,
+                    iDoc.documentElement.scrollHeight || 0,
+                    iDoc.documentElement.offsetHeight || 0,
+                    iDoc.body.scrollHeight || 0,
+                    iDoc.body.offsetHeight || 0
+                );
+                const targetH = scrollH + 50;
+                iframe.style.height = `${targetH}px`;
+                frameBox.style.height = `${targetH}px`;
+                frameBox.style.minHeight = `${targetH}px`;
                 window.updateDocPagination();
             }
         } catch (e) {}
@@ -1125,7 +1135,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div id="doc-viewport" class="doc-canvas-viewport">
                 <div id="doc-frame-wrapper" style="display: inline-block; transform-origin: top center;">
                     <div id="doc-frame-box" class="doc-page-frame-container">
-                        <iframe id="doc-active-iframe" class="doc-page-iframe" title="Document WYSIWYG View"></iframe>
+                        <iframe id="doc-active-iframe" class="doc-page-iframe" scrolling="no" frameborder="0" title="Document WYSIWYG View"></iframe>
                     </div>
                 </div>
             </div>
@@ -1160,9 +1170,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 html, body {
                     cursor: text !important;
                     outline: none !important;
-                    min-height: 100vh !important;
                     background: #ffffff !important;
-                    padding-bottom: 80px !important;
+                    padding-bottom: 60px !important;
+                    overflow: hidden !important;
+                    overflow-x: hidden !important;
+                    overflow-y: hidden !important;
+                    scrollbar-width: none !important;
+                    -ms-overflow-style: none !important;
+                    margin: 0 !important;
+                }
+                ::-webkit-scrollbar {
+                    display: none !important;
+                    width: 0 !important;
+                    height: 0 !important;
                 }
                 table {
                     border-collapse: collapse !important;
@@ -1218,6 +1238,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (iDoc.body) {
             iDoc.body.contentEditable = 'true';
         }
+
+        // Auto-observe size changes so page height is always exact without any inner scrollbar
+        if (window.ResizeObserver && iDoc.body) {
+            try {
+                const ro = new ResizeObserver(() => {
+                    window.adjustIframeHeight(true);
+                });
+                ro.observe(iDoc.body);
+            } catch (roErr) {}
+        }
+
+        // Forward mouse wheel events to outer workspace viewport (unified Word-style scrolling)
+        iDoc.addEventListener('wheel', (e) => {
+            if (viewport) {
+                viewport.scrollTop += e.deltaY;
+                viewport.scrollLeft += e.deltaX;
+            }
+        }, { passive: true });
 
         // Selection and node tracking inside iframe
         iDoc.addEventListener('selectionchange', () => {
@@ -2038,117 +2076,478 @@ document.addEventListener('DOMContentLoaded', () => {
     // ─────────────────────────────────────────────────────────────
     // 2. AI ASSISTANT VIEW (Tool 7)
     // ─────────────────────────────────────────────────────────────
+    // 2. AI PEDAGOGICAL STUDIO (Clear, Intuitive, 7 Special Tools)
+    // ─────────────────────────────────────────────────────────────
+    const AI_STUDIO_TOOLS = [
+        {
+            id: 'lesson',
+            title: "Dars Rejasi (Konspekt)",
+            shortTitle: "Dars Rejasi",
+            badge: "Konspekt",
+            icon: "book-open",
+            color: "from-blue-600 to-indigo-600",
+            bgActive: "bg-blue-600 text-white shadow-blue-500/25",
+            desc: "Fan, mavzu va sinfni kiriting. AI 45 daqiqalik darsning har bir bosqichini to'liq pedagogik konspekt qilib beradi.",
+            label: "Fan va Mavzuni kiriting:",
+            placeholder: "Masalan: Matematika — Kvadrat tenglamalarni diskriminant orqali yechish",
+            chips: [
+                "5-sinf Matematika — Oddiy kasrlar ustida amallar",
+                "8-sinf Fizika — Nyutonning 2-qonuni va formulasi",
+                "7-sinf Ingliz tili — Present Perfect zamoni",
+                "9-sinf Kimyo — Davriy qonun va elementlar",
+                "6-sinf Tarix — Qadimgi Baqtriya davlati"
+            ]
+        },
+        {
+            id: 'quiz',
+            title: "Test & Savollar Tuzish",
+            shortTitle: "Test Tuzish",
+            badge: "A/B/C/D",
+            icon: "help-circle",
+            color: "from-amber-500 to-orange-600",
+            bgActive: "bg-amber-600 text-white shadow-amber-500/25",
+            desc: "Mavzu bo'yicha to'g'ri va noto'g'ri variantli (A/B/C/D), javob izohlari bilan tayyor testlar tuzadi.",
+            label: "Qaysi mavzudan test tuzish kerak?",
+            placeholder: "Masalan: 5 ta test: O'zbekistonning daryolari va tabiiy boyliklari",
+            chips: [
+                "5 ta test: 8-sinf Biologiya — Hujayra tuzilishi",
+                "5 ta test: O'zbekiston tarixi — Amir Temur davri",
+                "5 ta test: 9-sinf Geometriya — Pifagor teoremasi",
+                "5 ta test: Ona tili — Ot so'z turkumi va uning yasalishi"
+            ]
+        },
+        {
+            id: 'summarize',
+            title: "Katta Matnni Xulosa Qilish",
+            shortTitle: "Xulosa",
+            badge: "Tezislar",
+            icon: "file-text",
+            color: "from-emerald-500 to-teal-600",
+            bgActive: "bg-emerald-600 text-white shadow-emerald-500/25",
+            desc: "Katta maqola, qonun hujjati yoki mavzudan eng muhim nuqta, tezis va xulosalarni ajratib beradi.",
+            label: "Xulosa qilinadigan matnni kiriting:",
+            placeholder: "Maqola, matn yoki darslik parchasini shu yerga yozing...",
+            chips: [
+                "O'qituvchilarning yangi milliy baholash tizimi va mezonlari",
+                "Zamonaviy interaktiv pedagogik metodlar va ularning samaradorligi",
+                "STEAM ta'limining maktabdagi asosiy tamoyillari"
+            ]
+        },
+        {
+            id: 'explain',
+            title: "Mavzuni Sodda Tushuntirish",
+            shortTitle: "Tushuntirish",
+            badge: "Sodda til",
+            icon: "lightbulb",
+            color: "from-violet-500 to-purple-600",
+            bgActive: "bg-purple-600 text-white shadow-purple-500/25",
+            desc: "Murakkab ilmiy tushunchalarni o'quvchilar tez va oson tushunishi uchun qiziqarli hayotiy misollar bilan tushuntiradi.",
+            label: "Qaysi murakkab mavzuni tushuntirish kerak?",
+            placeholder: "Masalan: Nima uchun samolyot havoda uchadi va tushib ketmaydi?",
+            chips: [
+                "Fotosintez jarayoni o'zi nima va u qanday sodir bo'ladi?",
+                "Sun'iy intellekt (AI) inson hayotiga qanday ta'sir qilmoqda?",
+                "Yerning tortishish kuchi (Gravitatsiya) qanday ishlaydi?",
+                "Nima uchun osmon kunduzi ko'k, quyosh botganda qizil ko'rinadi?"
+            ]
+        },
+        {
+            id: 'grammar',
+            title: "Grammatika & Imlo Tekshiruvi",
+            shortTitle: "Grammatika",
+            badge: "Xatosiz",
+            icon: "check-circle",
+            color: "from-rose-500 to-red-600",
+            bgActive: "bg-rose-600 text-white shadow-rose-500/25",
+            desc: "Matndagi harflar, tinish belgilari va grammatik xatolarni topib, to'g'irlangan variantini ko'rsatadi.",
+            label: "Tekshiriladigan matnni kiriting:",
+            placeholder: "Imlosi tekshirilishi kerak bo'lgan matnni shu yerga yozing...",
+            chips: [
+                "Maktab ma'muriyatiga taqdim etiladigan rasmiy hisobot matni",
+                "Dars ishlanmasi matnini imlo xatolaridan tozalash"
+            ]
+        },
+        {
+            id: 'translate',
+            title: "Professional Tarjima",
+            shortTitle: "Tarjima",
+            badge: "3 ta til",
+            icon: "languages",
+            color: "from-sky-500 to-blue-600",
+            bgActive: "bg-sky-600 text-white shadow-sky-500/25",
+            desc: "Akademik va pedagogik atamalarni saqlagan holda O'zbekcha, Ruscha va Inglizcha tillarga tarjima qiladi.",
+            label: "Tarjima qilinadigan matnni kiriting:",
+            placeholder: "Tarjima qilinadigan matnni shu yerga yozing...",
+            chips: [
+                "Ta'lim berish jarayonida interaktiv metodlardan foydalanish afzalliklari",
+                "O'quvchilarning mantiqiy va tanqidiy fikrlashini rivojlantirish yo'llari",
+                "Innovative methods in modern primary school education"
+            ]
+        },
+        {
+            id: 'improve',
+            title: "Matnni Sayqallash & Boyitish",
+            shortTitle: "Sayqallash",
+            badge: "Pedagogik",
+            icon: "wand-2",
+            color: "from-fuchsia-500 to-pink-600",
+            bgActive: "bg-fuchsia-600 text-white shadow-fuchsia-500/25",
+            desc: "Matn mazmunini saqlagan holda, yanada jozibador, rasmiy va professional pedagogik uslubda qayta yozadi.",
+            label: "Sayqallanadigan matnni kiriting:",
+            placeholder: "Oddiy tilda yozilgan matningizni shu yerga kiriting...",
+            chips: [
+                "Ota-onalar majlisi uchun nutq matnini yaxshilash va ta'sirchan qilish",
+                "A'lochi o'quvchiga beriladigan tavsifnomani chiroyli boyitish"
+            ]
+        }
+    ];
+
+    function renderMarkdownToHtml(md) {
+        if (!md) return '';
+        let html = md
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/^### (.*$)/gim, '<h3 class="text-sm font-bold text-slate-900 dark:text-white mt-3 mb-1">$1</h3>')
+            .replace(/^## (.*$)/gim, '<h2 class="text-base font-bold text-slate-900 dark:text-white mt-4 mb-1.5 pb-1 border-b border-slate-200 dark:border-slate-800">$1</h2>')
+            .replace(/^# (.*$)/gim, '<h1 class="text-lg font-black text-slate-900 dark:text-white mt-4 mb-2 pb-1 border-b-2 border-indigo-500">$1</h1>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-slate-900 dark:text-white">$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em class="italic text-slate-700 dark:text-slate-300">$1</em>')
+            .replace(/^\s*[•\-\*]\s+(.*$)/gim, '<li class="ml-4 list-disc text-slate-800 dark:text-slate-200 my-0.5">$1</li>')
+            .replace(/^\s*(\d+)\.\s+(.*$)/gim, '<li class="ml-4 list-decimal text-slate-800 dark:text-slate-200 my-0.5"><span class="font-bold text-indigo-600 dark:text-indigo-400">$1.</span> $2</li>')
+            .replace(/\n\n/g, '<div class="h-2"></div>')
+            .replace(/\n/g, '<br>');
+        return html;
+    }
+
     function renderAI() {
+        let activeToolId = window.activeAiToolId || 'lesson';
+        let targetLanguage = window.aiTargetLang || 'uz';
+
         appDiv.innerHTML = `
-            <div class="space-y-4 animate-fade-in">
-                <div>
-                    <h2 class="text-lg font-bold text-slate-900 tracking-tight">AI Pedagogik Yordamchi</h2>
-                    <p class="text-xs text-slate-500">Google Gemini 2.0 Flash texnologiyasi asosida</p>
+            <div class="space-y-4 animate-fade-in pb-4">
+                <!-- Header Banner -->
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">AI Pedagogik Studiya</h2>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-sm shadow-brand-500/20">Gemini 2.0</span>
+                        </div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Dars rejalari, testlar, tarjima va tushuntirishlarni bir zumda tayyorlaydi</p>
+                    </div>
                 </div>
 
-                <div class="grid grid-cols-4 gap-1.5 liquid-glass-pill p-1.5 rounded-2xl">
-                    <button id="ai-tab-summarize" onclick="switchAITool('summarize')" class="ai-tool-tab py-2 px-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-brand-600 to-indigo-600 shadow-sm transition-all">
-                        Xulosa
-                    </button>
-                    <button id="ai-tab-lesson" onclick="switchAITool('lesson')" class="ai-tool-tab py-2 px-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 transition-all">
-                        Dars rejasi
-                    </button>
-                    <button id="ai-tab-translate" onclick="switchAITool('translate')" class="ai-tool-tab py-2 px-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 transition-all">
-                        Tarjima
-                    </button>
-                    <button id="ai-tab-explain" onclick="switchAITool('explain')" class="ai-tool-tab py-2 px-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 transition-all">
-                        Tushuntirish
-                    </button>
+                <!-- Horizontal Tool Selector Bar (Sleek & Scrollable) -->
+                <div class="overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-none">
+                    <div class="flex gap-2 min-w-max p-1 liquid-glass-pill rounded-2xl">
+                        ${AI_STUDIO_TOOLS.map(tool => {
+                            const isActive = tool.id === activeToolId;
+                            return `
+                                <button onclick="selectAiStudioTool('${tool.id}')" class="ai-tool-pill px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${isActive ? tool.bgActive + ' shadow-md' : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-slate-800/40'}">
+                                    <i data-lucide="${tool.icon}" class="w-3.5 h-3.5"></i>
+                                    <span>${tool.shortTitle}</span>
+                                </button>
+                            `;
+                        }).join('')}
+                    </div>
                 </div>
 
-                <div class="liquid-glass-card p-4 space-y-3">
-                    <div class="flex items-center justify-between">
-                        <label id="ai-tool-label" class="text-xs font-bold text-slate-800">Matnni kiriting:</label>
-                        <span class="text-[11px] text-brand-600 font-mono font-semibold liquid-glass-pill px-2 py-0.5 rounded-md">Gemini 2.0</span>
+                <!-- Dynamic Active Tool Card -->
+                <div id="ai-active-card-container" class="liquid-glass-card p-4 sm:p-5 space-y-4">
+                    <!-- Injected dynamically by updateAiToolView() -->
+                </div>
+
+                <!-- AI Output Result Section -->
+                <div id="ai-output-box" class="hidden liquid-glass-card p-4 sm:p-5 space-y-3 border-brand-500/30">
+                    <div class="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800 pb-3">
+                        <div class="flex items-center gap-2">
+                            <div class="w-7 h-7 rounded-lg bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center font-bold">
+                                <i data-lucide="sparkles" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <span id="ai-output-title" class="text-xs font-bold text-slate-900 dark:text-white">Tayyorlangan Natija</span>
+                                <span class="block text-[10px] text-emerald-600 font-bold">Muvaffaqiyatli yakunlandi ✓</span>
+                            </div>
+                        </div>
+
+                        <!-- Action Toolbar -->
+                        <div class="flex items-center gap-1.5">
+                            <button id="ai-btn-copy" onclick="copyAiOutput()" class="liquid-glass-pill px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600 transition-all flex items-center gap-1 cursor-pointer" title="Nusxa olish">
+                                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                                <span class="hidden xs:inline text-[11px]">Nusxalash</span>
+                            </button>
+                            <button id="ai-btn-docx" onclick="exportAiDocx()" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 active:scale-95 text-white transition-all flex items-center gap-1 cursor-pointer shadow-sm shadow-blue-500/25" title="Word (.docx) qilib yuklab olish">
+                                <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                                <span class="text-[11px]">Word</span>
+                            </button>
+                            <button id="ai-btn-telegram" onclick="sendAiToTelegram()" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-sky-500 hover:bg-sky-600 active:scale-95 text-white transition-all flex items-center gap-1 cursor-pointer shadow-sm shadow-sky-500/25" title="Telegram shaxsiy chatiga yuborish">
+                                <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                <span class="text-[11px]">Telegram</span>
+                            </button>
+                        </div>
                     </div>
 
-                    <textarea id="ai-textarea" rows="5" class="w-full rounded-xl border border-white/80 bg-white/50 backdrop-blur-sm p-3 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-500 focus:bg-white/85 shadow-inner transition-all resize-none" placeholder="Matnni shu yerga yozing yoki kiriting..."></textarea>
+                    <!-- Rendered HTML Content -->
+                    <div id="ai-output-rendered" class="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-sans max-h-[600px] overflow-y-auto pr-1"></div>
 
-                    <button id="ai-run-btn" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 text-white text-xs font-bold shadow-md shadow-brand-500/25 transition-all inline-flex items-center justify-center gap-2">
-                        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Tahlil qilish
-                    </button>
-                </div>
-
-                <div id="ai-output-box" class="hidden liquid-glass-card p-4 space-y-2">
-                    <div class="flex items-center justify-between border-b border-white/60 pb-2">
-                        <span class="text-xs font-bold text-slate-800 inline-flex items-center gap-1.5">
-                            <i data-lucide="bot" class="w-3.5 h-3.5 text-brand-600"></i> AI Natijasi
-                        </span>
-                        <button onclick="navigator.clipboard.writeText(document.getElementById('ai-output-text').innerText); TelegramApp.showAlert('Nusxa olindi!')" class="text-[11px] text-brand-600 font-semibold inline-flex items-center gap-1 liquid-glass-pill px-2.5 py-1 rounded-lg hover:bg-white transition-colors">
-                            <i data-lucide="copy" class="w-3 h-3"></i> Nusxalash
+                    <!-- Reset button -->
+                    <div class="flex justify-end pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                        <button onclick="clearAiOutput()" class="text-xs text-slate-500 hover:text-rose-500 font-semibold transition-colors flex items-center gap-1 cursor-pointer">
+                            <i data-lucide="trash-2" class="w-3 h-3"></i> Natijani tozalash
                         </button>
                     </div>
-                    <div id="ai-output-text" class="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap"></div>
                 </div>
             </div>
         `;
         refreshIcons();
 
-        window.currentTool = 'summarize';
+        function updateAiToolView() {
+            const container = document.getElementById('ai-active-card-container');
+            if (!container) return;
+            const current = AI_STUDIO_TOOLS.find(t => t.id === activeToolId) || AI_STUDIO_TOOLS[0];
 
-        window.switchAITool = (tool) => {
+            let extraOptionsHtml = '';
+            if (current.id === 'translate') {
+                extraOptionsHtml = `
+                    <div class="flex items-center gap-2 pt-1">
+                        <span class="text-[11px] font-bold text-slate-500">Qaysi tilga:</span>
+                        <div class="flex gap-1.5">
+                            <button onclick="setAiTargetLang('uz')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${targetLanguage === 'uz' ? 'bg-brand-600 text-white' : 'liquid-glass-pill text-slate-700 dark:text-slate-300'}">🇺🇿 O'zbekcha</button>
+                            <button onclick="setAiTargetLang('ru')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${targetLanguage === 'ru' ? 'bg-brand-600 text-white' : 'liquid-glass-pill text-slate-700 dark:text-slate-300'}">🇷🇺 Ruscha</button>
+                            <button onclick="setAiTargetLang('en')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${targetLanguage === 'en' ? 'bg-brand-600 text-white' : 'liquid-glass-pill text-slate-700 dark:text-slate-300'}">🇬🇧 Inglizcha</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = `
+                <!-- Tool Header Details -->
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr ${current.color} text-white flex items-center justify-center shadow-md shrink-0">
+                            <i data-lucide="${current.icon}" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900 dark:text-white">${current.title}</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">${current.desc}</p>
+                        </div>
+                    </div>
+                    <span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border ${current.pillColor} shrink-0">${current.badge}</span>
+                </div>
+
+                ${extraOptionsHtml}
+
+                <!-- Quick Prompt Chips (One-click instant fill) -->
+                <div>
+                    <div class="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1.5 flex items-center gap-1">
+                        <i data-lucide="zap" class="w-3 h-3 text-amber-500"></i>
+                        <span>Tezkor namunalar (1 marta bosing):</span>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                        ${current.chips.map(chip => `
+                            <button onclick="fillAiChip('${chip.replace(/'/g, "\\'")}')" class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 transition-all border border-slate-200/80 dark:border-slate-700 flex items-center gap-1 text-left">
+                                <span class="text-amber-500 font-bold">⚡</span> ${chip}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <!-- Input Field -->
+                <div class="space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-bold text-slate-800 dark:text-slate-200">${current.label}</label>
+                        <button onclick="document.getElementById('ai-studio-textarea').value=''; document.getElementById('ai-studio-textarea').focus();" class="text-[11px] text-slate-400 hover:text-rose-500 transition-colors">
+                            Tozalash ✕
+                        </button>
+                    </div>
+                    <textarea id="ai-studio-textarea" rows="4" class="w-full rounded-2xl border border-slate-200 dark:border-slate-700/80 bg-white/70 dark:bg-slate-900/80 backdrop-blur-sm p-3 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 shadow-inner transition-all resize-none" placeholder="${current.placeholder}"></textarea>
+                </div>
+
+                <!-- Action Button -->
+                <button id="ai-generate-btn" onclick="executeAiStudio()" class="w-full py-3 rounded-2xl bg-gradient-to-r from-brand-600 via-indigo-600 to-purple-600 hover:from-brand-700 hover:to-purple-700 active:scale-[0.99] text-white text-xs sm:text-sm font-bold shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer">
+                    <i data-lucide="sparkles" class="w-4 h-4"></i>
+                    <span>Generatsiya qilish</span>
+                </button>
+            `;
+            refreshIcons(container);
+        }
+
+        window.selectAiStudioTool = (toolId) => {
             TelegramApp.hapticFeedback();
-            window.currentTool = tool;
-            document.querySelectorAll('.ai-tool-tab').forEach(b => {
-                b.className = 'ai-tool-tab py-2 px-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 transition-all';
+            activeToolId = toolId;
+            window.activeAiToolId = toolId;
+            document.querySelectorAll('.ai-tool-pill').forEach(b => {
+                b.className = 'ai-tool-pill px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-slate-800/40';
             });
-            document.getElementById(`ai-tab-${tool}`).className = 'ai-tool-tab py-2 px-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-brand-600 via-indigo-600 to-indigo-700 shadow-md shadow-brand-500/30 transition-all';
+            event.currentTarget.className = `ai-tool-pill px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${AI_STUDIO_TOOLS.find(t=>t.id===toolId)?.bgActive || 'bg-brand-600 text-white'} shadow-md`;
+            updateAiToolView();
+        };
 
-            const lbl = document.getElementById('ai-tool-label');
-            const txt = document.getElementById('ai-textarea');
-            if (tool === 'summarize') {
-                lbl.innerText = "Xulosa qilinadigan matn:";
-                txt.placeholder = "Katta matn yoki maqolani kiriting...";
-            } else if (tool === 'lesson') {
-                lbl.innerText = "Fan va Mavzu:";
-                txt.placeholder = "Masalan: Kimyo — Davriy qonun va elementlar sistemasi";
-            } else if (tool === 'translate') {
-                lbl.innerText = "Tarjima qilinadigan matn:";
-                txt.placeholder = "O'zbek, ingliz yoki rus tilidagi matn...";
-            } else if (tool === 'explain') {
-                lbl.innerText = "Murakkab tushuncha yoki savol:";
-                txt.placeholder = "Masalan: Neyron tarmoqlari qanday ishlaydi?";
+        window.setAiTargetLang = (lang) => {
+            TelegramApp.hapticFeedback();
+            targetLanguage = lang;
+            window.aiTargetLang = lang;
+            updateAiToolView();
+        };
+
+        window.fillAiChip = (text) => {
+            TelegramApp.hapticFeedback('light');
+            const txt = document.getElementById('ai-studio-textarea');
+            if (txt) {
+                txt.value = text;
+                txt.focus();
             }
         };
 
-        document.getElementById('ai-run-btn').onclick = async () => {
-            const inputVal = document.getElementById('ai-textarea').value.trim();
-            if (!inputVal) {
-                TelegramApp.showAlert("Iltimos, matn kiriting!");
+        let lastAiTitle = '';
+        let lastAiRawResult = '';
+
+        window.executeAiStudio = async () => {
+            const inputEl = document.getElementById('ai-studio-textarea');
+            const textVal = inputEl ? inputEl.value.trim() : '';
+            if (!textVal) {
+                TelegramApp.showAlert("Iltimos, mavzu yoki matnni kiriting!");
+                if (inputEl) inputEl.focus();
                 return;
             }
 
-            const btn = document.getElementById('ai-run-btn');
+            const btn = document.getElementById('ai-generate-btn');
             const box = document.getElementById('ai-output-box');
-            const out = document.getElementById('ai-output-text');
+            const outRendered = document.getElementById('ai-output-rendered');
+            const outTitle = document.getElementById('ai-output-title');
+            const current = AI_STUDIO_TOOLS.find(t => t.id === activeToolId) || AI_STUDIO_TOOLS[0];
 
-            btn.innerText = "AI tahlil qilmoqda...";
             btn.disabled = true;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> <span>AI fikrlamoqda va yozmoqda...</span>`;
+            refreshIcons(btn);
+
             box.classList.remove('hidden');
-            out.innerText = "⏳ Javob shakllantirilmoqda...";
+            outRendered.innerHTML = `
+                <div class="py-8 flex flex-col items-center justify-center text-center space-y-3 text-slate-500">
+                    <div class="w-12 h-12 rounded-2xl bg-brand-500/10 text-brand-600 flex items-center justify-center animate-pulse">
+                        <i data-lucide="bot" class="w-6 h-6"></i>
+                    </div>
+                    <p class="text-xs font-semibold">Google Gemini 2.0 Flash dars ishlanmasini tayyorlamoqda...</p>
+                </div>
+            `;
+            refreshIcons(outRendered);
+            box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
             try {
                 let res;
-                if (window.currentTool === 'summarize') res = await api.summarizeText(inputVal);
-                else if (window.currentTool === 'lesson') res = await api.lessonPlan(inputVal);
-                else if (window.currentTool === 'translate') res = await api.translateText(inputVal);
-                else if (window.currentTool === 'explain') res = await api.explainTopic(inputVal);
+                if (activeToolId === 'lesson') {
+                    res = await api.lessonPlan(textVal);
+                } else if (activeToolId === 'quiz') {
+                    res = await api.createQuizAI(textVal);
+                } else if (activeToolId === 'summarize') {
+                    res = await api.summarizeText(textVal);
+                } else if (activeToolId === 'explain') {
+                    res = await api.explainTopic(textVal);
+                } else if (activeToolId === 'grammar') {
+                    res = await api.checkGrammar(textVal);
+                } else if (activeToolId === 'translate') {
+                    res = await api.translateText(textVal, targetLanguage);
+                } else if (activeToolId === 'improve') {
+                    res = await api.improveText(textVal);
+                }
 
-                out.innerText = res.result;
+                lastAiTitle = `${current.title}: ${textVal.substring(0, 30)}`;
+                lastAiRawResult = res.result || '';
+
+                if (outTitle) outTitle.innerText = lastAiTitle;
+                outRendered.innerHTML = renderMarkdownToHtml(lastAiRawResult);
                 TelegramApp.hapticFeedback('medium');
-            } catch (e) {
-                out.innerText = `Xatolik: ${e.message}`;
+            } catch (err) {
+                outRendered.innerHTML = `
+                    <div class="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 text-xs">
+                        <strong>Xatolik:</strong> ${err.message}
+                    </div>
+                `;
             } finally {
-                btn.innerHTML = `<i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Tahlil qilish`;
                 btn.disabled = false;
-                refreshIcons();
+                btn.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4"></i> <span>Qayta generatsiya qilish</span>`;
+                refreshIcons(btn);
             }
         };
+
+        window.copyAiOutput = () => {
+            if (!lastAiRawResult) return;
+            navigator.clipboard.writeText(lastAiRawResult).then(() => {
+                TelegramApp.hapticFeedback('light');
+                TelegramApp.showAlert("Natija buferga nusxalandi!");
+            }).catch(() => {
+                TelegramApp.showAlert("Nusxa olindi!");
+            });
+        };
+
+        window.exportAiDocx = async () => {
+            if (!lastAiRawResult) return;
+            const btn = document.getElementById('ai-btn-docx');
+            const originalText = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> <span>Kutilmoqda...</span>`;
+                refreshIcons(btn);
+            }
+
+            try {
+                const res = await api.exportAIDocx(lastAiTitle || "Dars_Rejasi", lastAiRawResult);
+                if (res && res.download_url) {
+                    TelegramApp.hapticFeedback('medium');
+                    // Trigger native browser download
+                    const link = document.createElement('a');
+                    link.href = res.download_url;
+                    link.download = res.file_name;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    TelegramApp.showAlert("Word (.docx) hujjati tayyorlandi va yuklab olindi!");
+                }
+            } catch (err) {
+                TelegramApp.showAlert(`Word eksport xatosi: ${err.message}`);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                    refreshIcons(btn);
+                }
+            }
+        };
+
+        window.sendAiToTelegram = async () => {
+            if (!lastAiRawResult) return;
+            const btn = document.getElementById('ai-btn-telegram');
+            const originalText = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> <span>Yuborilmoqda...</span>`;
+                refreshIcons(btn);
+            }
+
+            try {
+                const res = await api.sendAIToTelegram(lastAiTitle || "AI Natijasi", lastAiRawResult, "file");
+                TelegramApp.hapticFeedback('medium');
+                TelegramApp.showAlert(res.message || "Hujjat Telegramingizga yuborildi!");
+            } catch (err) {
+                TelegramApp.showAlert(`Telegramga yuborishda xatolik: ${err.message}`);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                    refreshIcons(btn);
+                }
+            }
+        };
+
+        window.clearAiOutput = () => {
+            TelegramApp.hapticFeedback('light');
+            lastAiRawResult = '';
+            lastAiTitle = '';
+            const box = document.getElementById('ai-output-box');
+            if (box) box.classList.add('hidden');
+        };
+
+        updateAiToolView();
     }
 
     // ─────────────────────────────────────────────────────────────

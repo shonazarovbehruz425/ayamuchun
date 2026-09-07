@@ -90,9 +90,37 @@ async def get_current_user(authorization: str = Header(None)):
 
     return user_data
 
+async def get_admin_user(authorization: str = Header(None)) -> dict:
+    """Strict dependency for admin endpoints. Verifies admin Telegram ID or valid admin secret key."""
+    if authorization:
+        parts = authorization.split(" ")
+        if len(parts) == 2:
+            scheme, token = parts[0], parts[1]
+            # Check for direct Admin Secret Key bearer token
+            if scheme == "Bearer" and settings.ADMIN_SECRET_KEY and token == settings.ADMIN_SECRET_KEY:
+                return {
+                    "telegram_id": settings.ADMIN_IDS[0] if settings.ADMIN_IDS else 1,
+                    "first_name": "Admin",
+                    "username": "admin",
+                    "is_admin": True
+                }
+
+    # Fall back to Telegram user validation and check is_admin
+    user = await get_current_user(authorization)
+    if not user.get("is_admin"):
+        raise HTTPException(
+            status_code=403,
+            detail="Kirish taqiqlangan: Ushbu amal uchun Administrator huquqi talab qilinadi"
+        )
+    return user
+
 @router.get("/avatar")
-async def get_telegram_avatar(uid: int):
-    """Fetch user's actual profile photo via Telegram Bot API and stream it as image/jpeg."""
+async def get_telegram_avatar(uid: int, current_user: dict = Depends(get_current_user)):
+    """Fetch user's actual profile photo via Telegram Bot API and stream it as image/jpeg. Requires authenticated user."""
+    # Only allow fetching one's own avatar unless admin
+    if not current_user.get("is_admin") and current_user.get("telegram_id") != uid:
+        raise HTTPException(status_code=403, detail="Faqat o'zingizning profilingiz rasmini yuklashingiz mumkin")
+
     if not settings.BOT_TOKEN or settings.BOT_TOKEN in ("your_bot_token_here", "local_dev_preview_token"):
         raise HTTPException(status_code=404, detail="Bot token unavailable for avatar fetch")
 
@@ -126,10 +154,23 @@ async def validate_auth(authorization: str = Header(None)):
     user = await get_current_user(authorization)
     return {"status": "ok", "user": user, "is_admin": user.get("is_admin", False)}
 
-from pydantic import BaseModel
+import re
+from pydantic import BaseModel, field_validator
 
 class PhoneUpdateRequest(BaseModel):
     phone_number: str
+
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        # Strip all whitespace, dashes, parentheses
+        v_clean = v.strip()
+        # Strictly allow format like +998901234567 or 998901234567
+        # Digits with optional single leading +
+        digits = re.sub(r'[\s\-\(\)]', '', v_clean)
+        if not re.match(r'^\+?[0-9]{7,18}$', digits):
+            raise ValueError("Noto'g'ri telefon raqami formati. Masalan: +998901234567")
+        return digits
 
 @router.post("/update-phone")
 async def update_phone(req: PhoneUpdateRequest, authorization: str = Header(None)):

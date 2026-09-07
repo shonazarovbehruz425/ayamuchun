@@ -3658,11 +3658,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
             }
 
+            const escapeHtml = (s) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
             return `
                 <div class="flex justify-end animate-fade-in pl-8">
                     <div class="chat-bubble-user px-4 py-3 text-xs sm:text-sm max-w-[85%] leading-relaxed break-words shadow-sm">
                         ${filesHtml}
-                        ${msg.content ? msg.content.replace(/\n/g, '<br>') : ''}
+                        ${msg.content ? escapeHtml(msg.content).replace(/\n/g, '<br>') : ''}
                     </div>
                 </div>
             `;

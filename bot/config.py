@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     # Telegram Bot
     BOT_TOKEN: str = "local_dev_preview_token"
     ADMIN_IDS: List[int] = []
+    ADMIN_SECRET_KEY: str = os.getenv("ADMIN_SECRET_KEY", "edubot_admin_secret_2026_superkey")
 
     # AI Engine Settings (Multi-provider: OpenAI, Gemini, DeepSeek, Claude, Groq, Custom)
     AI_PROVIDER: str = os.getenv("AI_PROVIDER", "gemini")  # "gemini" | "openai" | "deepseek" | "custom"

@@ -19,6 +19,10 @@ from bot.processors.word_processor import WordProcessor
 from bot.processors.pdf_processor import PDFProcessor
 from bot.processors.image_processor import ImageProcessor
 from bot.utils.helpers import sanitize_filename, generate_unique_filename
+from PIL import Image
+
+# Prevent decompression bomb attacks globally in files.py
+Image.MAX_IMAGE_PIXELS = 25_000_000
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -27,6 +31,30 @@ converter = FileConverter()
 word_processor = WordProcessor()
 pdf_processor = PDFProcessor()
 image_processor = ImageProcessor()
+
+MAX_UPLOAD_SIZE = 35 * 1024 * 1024  # 35 MB
+
+async def save_upload_stream_safely(upload_file: UploadFile, dest_path: str, max_bytes: int = MAX_UPLOAD_SIZE) -> int:
+    """Stream chunks to disk without loading entire file into RAM, enforcing maximum size limit."""
+    total_written = 0
+    chunk_size = 1024 * 512  # 512KB chunks
+    with open(dest_path, "wb") as out_f:
+        while True:
+            chunk = await upload_file.read(chunk_size)
+            if not chunk:
+                break
+            total_written += len(chunk)
+            if total_written > max_bytes:
+                out_f.close()
+                if os.path.exists(dest_path):
+                    try: os.remove(dest_path)
+                    except Exception: pass
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Fayl hajmi ruxsat etilgan limitdan ({max_bytes // (1024*1024)} MB) oshib ketdi."
+                )
+            out_f.write(chunk)
+    return total_written
 
 
 def format_file_size_human(size_bytes: int) -> str:
@@ -147,10 +175,7 @@ async def upload_file(
         safe_name = generate_unique_filename(file.filename)
         dest_path = os.path.join(user_dir, safe_name)
         
-        content = await file.read()
-        file_size = len(content)
-        with open(dest_path, "wb") as f:
-            f.write(content)
+        file_size = await save_upload_stream_safely(file, dest_path)
             
         ext = os.path.splitext(file.filename)[1].lower().lstrip(".")
         
@@ -261,6 +286,22 @@ async def download_file(file_id: int, user: dict = Depends(get_current_user)):
         )
 
 
+@router.delete("/clear-all")
+async def clear_all_files(user: dict = Depends(get_current_user)):
+    """Foydalanuvchining barcha fayllarini (ham diskdan, ham DB dan) tozalaydi."""
+    async with get_session() as session:
+        db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
+        files = await crud.get_user_files(session, db_user.id)
+        for f in files:
+            if f.local_path and os.path.exists(f.local_path):
+                try:
+                    os.remove(f.local_path)
+                except Exception as e:
+                    logger.warning(f"Could not delete physical file: {e}")
+            await crud.delete_file_record(session, f.id)
+        return {"status": "ok", "message": "Barcha fayllar tozalandi"}
+
+
 @router.delete("/{file_id}")
 async def delete_file(file_id: int, user: dict = Depends(get_current_user)):
     async with get_session() as session:
@@ -279,22 +320,6 @@ async def delete_file(file_id: int, user: dict = Depends(get_current_user)):
                 
         await crud.delete_file_record(session, file_id)
         return {"message": "Fayl muvaffaqiyatli o'chirildi"}
-
-
-@router.delete("/clear-all")
-async def clear_all_files(user: dict = Depends(get_current_user)):
-    """Foydalanuvchining barcha fayllarini (ham diskdan, ham DB dan) tozalaydi."""
-    async with get_session() as session:
-        db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
-        files = await crud.get_user_files(session, db_user.id)
-        for f in files:
-            if f.local_path and os.path.exists(f.local_path):
-                try:
-                    os.remove(f.local_path)
-                except Exception as e:
-                    logger.warning(f"Could not delete physical file: {e}")
-            await crud.delete_file_record(session, f.id)
-        return {"status": "ok", "message": "Barcha fayllar tozalandi"}
 
 
 @router.get("/{file_id}/content")
@@ -776,9 +801,11 @@ async def get_file_html(
             elif ext == '.pdf':
                 html = await asyncio.to_thread(pdf_to_filtered_html, target.local_path, settings.processed_dir)
             else:
+                import html as py_html
                 with open(target.local_path, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
-                html = f"<html><head><meta charset='utf-8'></head><body><pre style='white-space: pre-wrap; font-family: monospace;'>{content}</pre></body></html>"
+                escaped_content = py_html.escape(content)
+                html = f"<html><head><meta charset='utf-8'></head><body><pre style='white-space: pre-wrap; font-family: monospace;'>{escaped_content}</pre></body></html>"
 
             return {
                 "file_id": target.id,
@@ -900,9 +927,7 @@ async def images_to_pdf(
 
         for uploaded in files:
             temp_path = os.path.join(user_dir, sanitize_filename(uploaded.filename))
-            content = await uploaded.read()
-            with open(temp_path, "wb") as f:
-                f.write(content)
+            await save_upload_stream_safely(uploaded, temp_path)
             img = Image.open(temp_path)
             
             # EXIF rotation auto-correction
@@ -1098,9 +1123,7 @@ async def merge_pdfs_endpoint(
             if ext != '.pdf':
                 raise HTTPException(status_code=400, detail=f"'{file.filename}' PDF formatida emas")
             t_path = os.path.join(settings.upload_dir, f"merge_in_{timestamp}_{idx}.pdf")
-            content = await file.read()
-            with open(t_path, "wb") as f:
-                f.write(content)
+            await save_upload_stream_safely(file, t_path)
             temp_paths.append(t_path)
 
         out_name = f"birlashtirilgan_hujjat_{timestamp}.pdf"
@@ -1165,9 +1188,7 @@ async def split_pdf_endpoint(
             db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
             if file and file.filename:
                 src_path = os.path.join(settings.upload_dir, f"split_in_{timestamp}.pdf")
-                content = await file.read()
-                with open(src_path, "wb") as f:
-                    f.write(content)
+                await save_upload_stream_safely(file, src_path)
                 is_temp = True
             elif file_id:
                 files = await crud.get_user_files(session, db_user.id)
@@ -1255,9 +1276,7 @@ async def compress_pdf_endpoint(
             if file and file.filename:
                 orig_name = file.filename
                 src_path = os.path.join(settings.upload_dir, f"compress_in_{timestamp}.pdf")
-                content = await file.read()
-                with open(src_path, "wb") as f:
-                    f.write(content)
+                await save_upload_stream_safely(file, src_path)
                 is_temp = True
             elif file_id:
                 files = await crud.get_user_files(session, db_user.id)
@@ -1351,9 +1370,7 @@ async def watermark_pdf_endpoint(
             if file and file.filename:
                 orig_name = file.filename
                 src_path = os.path.join(settings.upload_dir, f"wm_in_{timestamp}.pdf")
-                content = await file.read()
-                with open(src_path, "wb") as f:
-                    f.write(content)
+                await save_upload_stream_safely(file, src_path)
                 is_temp = True
             elif file_id:
                 files = await crud.get_user_files(session, db_user.id)
@@ -1368,9 +1385,7 @@ async def watermark_pdf_endpoint(
             if mode == "image" and logo and logo.filename:
                 logo_ext = os.path.splitext(logo.filename)[1].lower()
                 temp_logo_path = os.path.join(settings.upload_dir, f"logo_{timestamp}{logo_ext}")
-                logo_bytes = await logo.read()
-                with open(temp_logo_path, "wb") as f:
-                    f.write(logo_bytes)
+                await save_upload_stream_safely(logo, temp_logo_path)
 
             base = os.path.splitext(orig_name)[0]
             clean_base = re.sub(r'(_watermark.*|_tahrirlangan.*)', '', base)
@@ -1456,9 +1471,7 @@ async def create_photo_3x4_endpoint(
                 orig_name = file.filename
                 ext = os.path.splitext(orig_name)[1].lower() or ".jpg"
                 src_path = os.path.join(settings.upload_dir, f"photo3x4_in_{timestamp}{ext}")
-                content_bytes = await file.read()
-                with open(src_path, "wb") as f:
-                    f.write(content_bytes)
+                await save_upload_stream_safely(file, src_path)
                 is_temp = True
             elif file_id:
                 files = await crud.get_user_files(session, db_user.id)

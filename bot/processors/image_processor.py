@@ -5,6 +5,9 @@ from datetime import datetime
 from PIL import Image, ImageDraw, ImageOps, ImageFilter, ImageEnhance
 import numpy as np
 
+# Prevent image decompression bombs (DOS via huge dimension images)
+Image.MAX_IMAGE_PIXELS = 25_000_000
+
 class ImageProcessor:
     """
     Professional Document & ID Photo (3x4 cm) Processor.

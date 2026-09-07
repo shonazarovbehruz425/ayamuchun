@@ -12,13 +12,12 @@ from ..schemas.responses import AIRequest, AIResponse
 from bot.services.ai_service import get_ai_service
 from bot.config import get_settings
 from bot.database.engine import get_session
-from bot.database import crud
-from .files import send_file_to_telegram, save_and_backup_user_file, build_file_caption
 from bot.processors.converter import FileConverter
 from bot.processors.word_processor import WordProcessor
 from bot.processors.pdf_processor import PDFProcessor
 from bot.processors.image_processor import ImageProcessor
 from bot.utils.helpers import sanitize_filename
+from .files import send_file_to_telegram, save_and_backup_user_file, build_file_caption, save_upload_stream_safely
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -362,9 +361,7 @@ async def chat_with_files(
             clean_name = f"{sanitize_filename(base_part)}{ext}"
             save_path = os.path.join(user_upload_dir, f"ai_input_{timestamp}_{idx}_{clean_name}")
             
-            content = await u_file.read()
-            with open(save_path, "wb") as f_out:
-                f_out.write(content)
+            await save_upload_stream_safely(u_file, save_path)
 
             is_img = ext in (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".heic")
             is_pdf = ext == ".pdf"

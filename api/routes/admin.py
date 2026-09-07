@@ -5,15 +5,16 @@ import logging
 import platform
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from bot.config import get_settings
 from bot.database.engine import get_session
 from bot.database import crud
+from api.routes.auth import get_admin_user
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(get_admin_user)])
 settings = get_settings()
 SERVER_START_TIME = time.time()
 

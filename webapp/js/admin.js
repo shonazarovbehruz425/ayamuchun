@@ -8,7 +8,57 @@ const AdminApp = {
     cachedUsers: [],
     selectedUserId: null,
 
+    getAuthToken() {
+        // Priority 1: Telegram WebApp initData if inside Telegram
+        if (window.TelegramApp && window.TelegramApp.getInitData()) {
+            return window.TelegramApp.getInitData();
+        }
+        // Priority 2: URL query param token e.g. ?token=... or ?admin_key=...
+        const urlParams = new URLSearchParams(window.location.search);
+        const queryToken = urlParams.get('token') || urlParams.get('key') || urlParams.get('admin_key');
+        if (queryToken) {
+            sessionStorage.setItem('edubot_admin_token', queryToken);
+            return queryToken;
+        }
+        // Priority 3: Stored token from session/localStorage
+        const stored = sessionStorage.getItem('edubot_admin_token') || localStorage.getItem('edubot_admin_token');
+        if (stored) return stored;
+
+        return '';
+    },
+
+    async apiFetch(url, options = {}) {
+        let token = this.getAuthToken();
+        if (!token) {
+            token = prompt("Administrator paroli / maxfiy kalitini kiriting (Admin Secret Key):");
+            if (token) {
+                token = token.trim();
+                sessionStorage.setItem('edubot_admin_token', token);
+            }
+        }
+
+        const headers = {
+            'Authorization': `Bearer ${token || ''}`,
+            ...(options.headers || {})
+        };
+
+        const res = await fetch(url, { ...options, headers });
+        if (res.status === 401 || res.status === 403) {
+            sessionStorage.removeItem('edubot_admin_token');
+            const retryKey = prompt("Kirish huquqi yo'q yoki kalit noto'g'ri! Iltimos, to'g'ri Administrator kalitini kiriting:");
+            if (retryKey) {
+                sessionStorage.setItem('edubot_admin_token', retryKey.trim());
+                headers['Authorization'] = `Bearer ${retryKey.trim()}`;
+                return fetch(url, { ...options, headers });
+            }
+        }
+        return res;
+    },
+
     init() {
+        if (window.TelegramApp) {
+            try { window.TelegramApp.init(); } catch (e) {}
+        }
         this.initTheme();
         this.initLucide();
         this.refreshAll();
@@ -101,7 +151,7 @@ const AdminApp = {
 
     async loadStats() {
         try {
-            const res = await fetch('/api/admin/stats');
+            const res = await this.apiFetch('/api/admin/stats');
             const data = await res.json();
             if (data.status === 'ok') {
                 const ov = data.overview;
@@ -146,7 +196,7 @@ const AdminApp = {
 
         try {
             const url = search ? `/api/admin/users?search=${encodeURIComponent(search)}` : '/api/admin/users';
-            const res = await fetch(url);
+            const res = await this.apiFetch(url);
             const data = await res.json();
 
             if (data.status === 'ok') {
@@ -213,7 +263,7 @@ const AdminApp = {
         if (!container) return;
 
         try {
-            const res = await fetch('/api/admin/files');
+            const res = await this.apiFetch('/api/admin/files');
             const data = await res.json();
 
             if (data.status === 'ok') {
@@ -254,21 +304,33 @@ const AdminApp = {
         }
     },
 
-    downloadBackup() {
-        const link = document.createElement('a');
-        link.href = '/api/admin/backup-db';
-        link.download = `edubot_backup_${new Date().toISOString().slice(0,10)}.db`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        this.showToast("📥 Baza zaxira fayli yuklab olinmoqda...");
+    async downloadBackup() {
+        try {
+            const res = await this.apiFetch('/api/admin/backup-db');
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                alert("Zaxira yuklab olishda xatolik: " + (err.detail || res.statusText));
+                return;
+            }
+            const blob = await res.blob();
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `edubot_backup_${new Date().toISOString().slice(0,10)}.db`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+            this.showToast("📥 Baza zaxira fayli yuklab olindi!");
+        } catch (e) {
+            alert("Yuklab olishda xatolik yuz berdi: " + e.message);
+        }
     },
 
     async cleanupStorage() {
         if (!confirm("Haqiqatdan ham 48 soatdan eski vaqtinchalik konvertatsiya keshlarini tozalamoqchimisiz?")) return;
         
         try {
-            const res = await fetch('/api/admin/cleanup', { method: 'POST' });
+            const res = await this.apiFetch('/api/admin/cleanup', { method: 'POST' });
             const data = await res.json();
             if (data.status === 'ok') {
                 this.showToast(`🧹 ${data.deleted_files} ta eski fayl o'chirildi, ${data.freed_formatted} joy bo'shatildi!`);
@@ -295,7 +357,7 @@ const AdminApp = {
         if (btn) btn.disabled = true;
 
         try {
-            const res = await fetch('/api/admin/broadcast', {
+            const res = await this.apiFetch('/api/admin/broadcast', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: txt })
@@ -358,7 +420,7 @@ const AdminApp = {
         if (btn) btn.disabled = true;
 
         try {
-            const res = await fetch('/api/admin/send-message', {
+            const res = await this.apiFetch('/api/admin/send-message', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ telegram_id: this.selectedUserId, message: msg })

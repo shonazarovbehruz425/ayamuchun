@@ -40,6 +40,13 @@ async def init_db():
                         cursor.execute("ALTER TABLE users ADD COLUMN photo_url VARCHAR")
                     except Exception:
                         pass
+                cursor.execute("PRAGMA table_info(files)")
+                f_cols = [row[1] for row in cursor.fetchall()]
+                if 'channel_message_id' not in f_cols:
+                    try:
+                        cursor.execute("ALTER TABLE files ADD COLUMN channel_message_id INTEGER")
+                    except Exception:
+                        pass
                 cursor.close()
             except Exception:
                 pass

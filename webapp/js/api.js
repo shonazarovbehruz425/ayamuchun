@@ -57,6 +57,12 @@ const api = {
             body: { messages, system_prompt: systemPrompt }
         });
     },
+    sendChatWithFiles(formData) {
+        return this.fetchWithAuth('/ai/chat-with-files', {
+            method: 'POST',
+            body: formData
+        });
+    },
     
     // Auth & Profile
     getMe() { return this.fetchWithAuth('/auth/me'); },

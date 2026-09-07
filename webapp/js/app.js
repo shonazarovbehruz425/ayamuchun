@@ -3515,11 +3515,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
 
                 <!-- Sticky Bottom Input Composer Bar (WhatsApp / Telegram / ChatGPT layout) -->
-                <div class="chat-input-bar p-2 sm:p-2.5 rounded-3xl">
+                <div class="chat-input-bar p-2 sm:p-2.5 rounded-3xl space-y-2">
+                    <!-- Selected Files Preview Tray -->
+                    <div id="ai-attached-files-tray" class="hidden flex items-center gap-2 overflow-x-auto px-1 py-1 scrollbar-none text-xs border-b border-slate-200/60 dark:border-slate-800/80">
+                        <!-- Attached files dynamically injected here -->
+                    </div>
+
                     <div class="flex items-end gap-2">
+                        <!-- File Upload Clip Button -->
+                        <input type="file" id="ai-chat-file-input" multiple class="hidden" onchange="handleAiFilesSelected(this)" accept="image/*,.pdf,.doc,.docx,.xlsx,.xls,.pptx,.ppt,.txt,.csv,.json">
+                        <button type="button" onclick="document.getElementById('ai-chat-file-input').click()" title="Fayl biriktirish (Rasmlar, PDF, Word va b.)" class="w-10 h-10 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-700 active:scale-95 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-all cursor-pointer shrink-0 border border-slate-200/80 dark:border-slate-700/80">
+                            <i data-lucide="paperclip" class="w-4 h-4"></i>
+                        </button>
+
                         <div class="flex-1 relative">
-                            <textarea id="ai-chat-input" rows="1" class="w-full bg-transparent px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none resize-none max-h-32 min-h-[42px] leading-relaxed scrollbar-none" placeholder="Savolingizni yozing yoki mavzuni ayting... (Shift+Enter yangi qator)"></textarea>
+                            <textarea id="ai-chat-input" rows="1" class="w-full bg-transparent px-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none resize-none max-h-32 min-h-[40px] leading-relaxed scrollbar-none" placeholder="Vazifani yozing yoki fayl biriktiring..."></textarea>
                         </div>
+
                         <button id="ai-chat-send-btn" onclick="sendUserChatMessage()" class="w-10 h-10 rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 active:scale-95 text-white flex items-center justify-center shadow-md shadow-brand-500/25 transition-all cursor-pointer shrink-0">
                             <i data-lucide="send" class="w-4 h-4"></i>
                         </button>
@@ -3554,14 +3566,69 @@ document.addEventListener('DOMContentLoaded', () => {
         const aiName = window.aiDisplayName || "EduBot AI";
 
         if (isUser) {
+            let filesHtml = '';
+            if (msg.files && msg.files.length > 0) {
+                filesHtml = `
+                    <div class="mb-2 flex flex-wrap gap-1.5">
+                        ${msg.files.map(f => {
+                            const ext = (f.name || '').split('.').pop().toUpperCase();
+                            const isImg = ['JPG', 'JPEG', 'PNG', 'WEBP'].includes(ext);
+                            const icon = isImg ? 'image' : (ext === 'PDF' ? 'file-text' : 'file');
+                            return `
+                                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/20 dark:bg-black/20 text-white text-[11px] font-medium border border-white/25">
+                                    <i data-lucide="${icon}" class="w-3.5 h-3.5"></i>
+                                    <span class="truncate max-w-[140px]">${f.name}</span>
+                                    <span class="opacity-75 text-[10px]">(${ext})</span>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            }
+
             return `
                 <div class="flex justify-end animate-fade-in pl-8">
                     <div class="chat-bubble-user px-4 py-3 text-xs sm:text-sm max-w-[85%] leading-relaxed break-words shadow-sm">
-                        ${msg.content.replace(/\n/g, '<br>')}
+                        ${filesHtml}
+                        ${msg.content ? msg.content.replace(/\n/g, '<br>') : ''}
                     </div>
                 </div>
             `;
         } else {
+            let resultFileHtml = '';
+            if (msg.result_file) {
+                const rf = msg.result_file;
+                const ext = (rf.file_name || '').split('.').pop().toUpperCase();
+                const isPdf = ext === 'PDF';
+                const isWord = ['DOCX', 'DOC'].includes(ext);
+                const isImg = ['JPG', 'JPEG', 'PNG'].includes(ext);
+                const iconName = isPdf ? 'file-text' : (isWord ? 'file' : (isImg ? 'image' : 'download'));
+                const badgeColor = isPdf ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30' : (isWord ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30' : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30');
+                const sizeMb = rf.file_size ? (rf.file_size / (1024 * 1024)).toFixed(2) + ' MB' : '';
+
+                resultFileHtml = `
+                    <div class="p-3 rounded-2xl bg-white/80 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 shadow-xs space-y-2 mt-2">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-9 h-9 rounded-xl ${badgeColor} border flex items-center justify-center shrink-0">
+                                <i data-lucide="${iconName}" class="w-5 h-5"></i>
+                            </div>
+                            <div class="truncate flex-1">
+                                <h4 class="text-xs font-bold text-slate-900 dark:text-white truncate">${rf.file_name}</h4>
+                                <p class="text-[10px] text-slate-500 dark:text-slate-400 font-mono">${ext} ${sizeMb ? '• ' + sizeMb : ''} • Tayyor</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 pt-1">
+                            <a href="${rf.download_url}" target="_blank" class="flex-1 py-1.5 px-3 rounded-xl bg-brand-600 hover:bg-brand-700 active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i> Yuklab olish
+                            </a>
+                            <button onclick="window.sendRecentFileToTg(${rf.id})" class="flex-1 py-1.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer">
+                                <i data-lucide="send" class="w-3.5 h-3.5"></i> Chatga
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
             return `
                 <div class="flex items-start gap-2.5 animate-fade-in pr-4">
                     <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-600 via-indigo-600 to-purple-600 text-white flex items-center justify-center text-xs font-bold shadow-md shrink-0 mt-0.5">
@@ -3573,6 +3640,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="font-sans leading-relaxed text-slate-800 dark:text-slate-200">
                             ${renderMarkdownToHtml(msg.content)}
                         </div>
+
+                        ${resultFileHtml}
 
                         <!-- Micro Toolbar: Copy, Word Export, Telegram Send -->
                         <div class="pt-2 border-t border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
@@ -3613,29 +3682,98 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+
+    // ─────────────────────────────────────────────────────────────
+    // AI CHAT ATTACHMENTS STATE & EVENT HANDLERS
+    // ─────────────────────────────────────────────────────────────
+    window.aiAttachedFiles = [];
+
+    window.handleAiFilesSelected = (input) => {
+        if (!input || !input.files || input.files.length === 0) return;
+        TelegramApp.hapticFeedback('light');
+        const selected = Array.from(input.files);
+        for (const file of selected) {
+            // Avoid exact duplicates
+            if (!window.aiAttachedFiles.some(f => f.name === file.name && f.size === file.size)) {
+                window.aiAttachedFiles.push(file);
+            }
+        }
+        input.value = '';
+        renderAiAttachedTray();
+    };
+
+    window.removeAiAttachedFile = (idx) => {
+        TelegramApp.hapticFeedback('light');
+        window.aiAttachedFiles.splice(idx, 1);
+        renderAiAttachedTray();
+    };
+
+    function renderAiAttachedTray() {
+        const tray = document.getElementById('ai-attached-files-tray');
+        if (!tray) return;
+
+        if (window.aiAttachedFiles.length === 0) {
+            tray.classList.add('hidden');
+            tray.innerHTML = '';
+            return;
+        }
+
+        tray.classList.remove('hidden');
+        tray.innerHTML = window.aiAttachedFiles.map((file, idx) => {
+            const ext = (file.name || '').split('.').pop().toUpperCase();
+            const sizeKb = (file.size / 1024).toFixed(0);
+            const isImg = ['JPG', 'JPEG', 'PNG', 'WEBP'].includes(ext);
+            const iconName = isImg ? 'image' : (ext === 'PDF' ? 'file-text' : 'file');
+
+            return `
+                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shrink-0 shadow-2xs animate-fade-in">
+                    <i data-lucide="${iconName}" class="w-3.5 h-3.5 text-brand-600"></i>
+                    <span class="truncate max-w-[120px] font-medium">${file.name}</span>
+                    <span class="text-[10px] text-slate-400 font-mono">${sizeKb} KB</span>
+                    <button type="button" onclick="removeAiAttachedFile(${idx})" class="p-0.5 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-rose-500 transition-colors">
+                        <i data-lucide="x" class="w-3 h-3"></i>
+                    </button>
+                </div>
+            `;
+        }).join('');
+        refreshIcons(tray);
+    }
+
     window.sendUserChatMessage = async () => {
         const input = document.getElementById('ai-chat-input');
         if (!input || isAiTyping) return;
         const text = input.value.trim();
-        if (!text) return;
+        const hasFiles = window.aiAttachedFiles && window.aiAttachedFiles.length > 0;
+
+        if (!text && !hasFiles) return;
 
         TelegramApp.hapticFeedback('medium');
         input.value = '';
         input.style.height = 'auto';
+
+        // Capture attached files snapshot and reset tray
+        const attachedFiles = [...window.aiAttachedFiles];
+        window.aiAttachedFiles = [];
+        renderAiAttachedTray();
 
         // 1. Hide welcome container if present
         const welcome = document.getElementById('ai-chat-welcome');
         if (welcome) welcome.style.display = 'none';
 
         // 2. Append user message to state
-        window.aiChatMessages.push({ role: 'user', content: text });
+        const userMsgObj = {
+            role: 'user',
+            content: text,
+            files: attachedFiles.map(f => ({ name: f.name, size: f.size }))
+        };
+        window.aiChatMessages.push(userMsgObj);
         saveChatHistory();
 
         // 3. Render into list
         const list = document.getElementById('ai-messages-list');
         if (list) {
             const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = renderMessageBubble({ role: 'user', content: text }, window.aiChatMessages.length - 1);
+            tempDiv.innerHTML = renderMessageBubble(userMsgObj, window.aiChatMessages.length - 1);
             list.appendChild(tempDiv.firstElementChild);
             refreshIcons(list);
         }
@@ -3648,17 +3786,36 @@ document.addEventListener('DOMContentLoaded', () => {
         scrollChatToBottom();
 
         try {
-            // Prepare conversation context (last 12 messages for smooth contextual awareness)
-            const contextMessages = window.aiChatMessages.slice(-12);
-            const res = await api.sendChatMessage(contextMessages);
+            let res;
+            if (hasFiles) {
+                // Multimodal request with files
+                const formData = new FormData();
+                formData.append('prompt', text);
+                for (const file of attachedFiles) {
+                    formData.append('files', file);
+                }
+                res = await api.sendChatWithFiles(formData);
+            } else {
+                // Text-only conversational request
+                const contextMessages = window.aiChatMessages.slice(-12).map(m => ({
+                    role: m.role,
+                    content: m.content
+                }));
+                res = await api.sendChatMessage(contextMessages);
+            }
 
-            const aiReplyText = res.message || "Kechirasiz, javob olishda xatolik yuz berdi.";
-            window.aiChatMessages.push({ role: 'assistant', content: aiReplyText });
+            const aiReplyText = res.message || "Vazifa bajarildi.";
+            const assistantMsgObj = {
+                role: 'assistant',
+                content: aiReplyText,
+                result_file: res.result_file || null
+            };
+            window.aiChatMessages.push(assistantMsgObj);
             saveChatHistory();
 
             if (list) {
                 const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = renderMessageBubble({ role: 'assistant', content: aiReplyText }, window.aiChatMessages.length - 1);
+                tempDiv.innerHTML = renderMessageBubble(assistantMsgObj, window.aiChatMessages.length - 1);
                 list.appendChild(tempDiv.firstElementChild);
                 refreshIcons(list);
             }

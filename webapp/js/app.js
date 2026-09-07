@@ -13,7 +13,21 @@
 document.addEventListener('DOMContentLoaded', () => {
     const appDiv = document.getElementById('app');
 
-    const tgUser = TelegramApp.getUserData() || { first_name: "O'qituvchi", id: "000000" };
+    function cleanDisplayName(str) {
+        if (!str) return "O'qituvchi";
+        try {
+            // Strip combining marks, enclosing marks, dotted circles and special control unicode
+            let cleaned = str.normalize('NFKD')
+                .replace(/[\u0300-\u036f\u20d0-\u20ff\ufe20-\ufe2f\u25cc]/g, '')
+                .trim();
+            return cleaned || str;
+        } catch (e) {
+            return str;
+        }
+    }
+
+    const rawUser = TelegramApp.getUserData() || { first_name: "O'qituvchi", id: "000000" };
+    const tgUser = { ...rawUser, first_name: cleanDisplayName(rawUser.first_name) };
     const headerUserName = document.getElementById('header-user-name');
     if (headerUserName && tgUser.first_name) {
         headerUserName.innerText = tgUser.first_name;

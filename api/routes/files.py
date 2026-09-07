@@ -431,24 +431,52 @@ def docx_to_filtered_html(docx_path: str, temp_dir: str) -> str:
             
         elif tag == 'tbl':
             tbl = docx.table.Table(el, doc)
-            col_count = len(tbl.columns)
-            tbl_html = ['<table style="width: 100%; border-collapse: collapse; margin: 15px 0;">']
+            col_count = len(tbl.columns) if tbl.columns else 1
+            tbl_html = ['<table style="width: 100%; border-collapse: collapse; margin: 12px 0;">']
             for r_idx, row in enumerate(tbl.rows):
                 xml = row._tr.xml
                 is_break = 'lastrenderedpagebreak' in xml.lower()
                 if is_break:
                     page_count += 1
                     tbl_html.append(f'<tr class="page-divider-row"><td colspan="{col_count}" style="padding:0; border:none;"><div class="doc-page-break" data-page="{page_count}"><div class="page-divider-line"></div><span class="page-tag">Sahifa {page_count}</span></div></td></tr>')
+                
                 tbl_html.append('<tr>')
-                for cell in row.cells:
+                # Iterate over true XML tc cells to eliminate python-docx cell duplication on merged/grid columns
+                tc_nodes = row._tr.tc_lst
+                for tc in tc_nodes:
                     is_header = (r_idx == 0)
                     tag_name = 'th' if is_header else 'td'
-                    cell_text = html.escape(cell.text.strip())
-                    cell_text = cell_text.replace('\n', '<br>')
-                    style = 'border: 1px solid #334155; padding: 6px 8px; font-size: 10pt; font-family: "Times New Roman", serif; text-align: left; vertical-align: top;'
+                    
+                    # Colspan from gridSpan
+                    grid_span = tc.xpath('./w:tcPr/w:gridSpan/@w:val')
+                    colspan = int(grid_span[0]) if grid_span else 1
+                    colspan_attr = f' colspan="{colspan}"' if colspan > 1 else ''
+                    
+                    # Skip if vertically merged secondary cell
+                    v_merge = tc.xpath('./w:tcPr/w:vMerge')
+                    if v_merge:
+                        v_val = tc.xpath('./w:tcPr/w:vMerge/@w:val')
+                        if not v_val or v_val[0] != 'restart':
+                            continue
+                    
+                    # Extract paragraphs and formatting inside cell
+                    p_nodes = tc.xpath('./w:p')
+                    cell_p_list = []
+                    for p_node in p_nodes:
+                        t_parts = p_node.xpath('.//w:t/text()')
+                        p_txt = ''.join(t_parts).strip()
+                        if p_txt:
+                            jc = p_node.xpath('./w:pPr/w:jc/@w:val')
+                            p_align = jc[0] if jc else ('center' if is_header else 'left')
+                            bolds = bool(p_node.xpath('.//w:rPr/w:b')) or is_header
+                            bold_css = ' font-weight: bold;' if bolds else ''
+                            cell_p_list.append(f'<div style="text-align: {p_align};{bold_css}">{html.escape(p_txt)}</div>')
+                    
+                    cell_content = ''.join(cell_p_list) if cell_p_list else '&nbsp;'
+                    style = 'border: 1px solid #334155; padding: 5px 8px; font-size: 10pt; font-family: "Times New Roman", serif; vertical-align: middle;'
                     if is_header:
                         style += ' font-weight: bold; background-color: #f1f5f9; text-align: center;'
-                    tbl_html.append(f'<{tag_name} style="{style}">{cell_text}</{tag_name}>')
+                    tbl_html.append(f'<{tag_name}{colspan_attr} style="{style}">{cell_content}</{tag_name}>')
                 tbl_html.append('</tr>')
             tbl_html.append('</table>')
             parts.append(''.join(tbl_html))

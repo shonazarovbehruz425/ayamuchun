@@ -5,11 +5,24 @@ const TelegramApp = {
         if (!tg) return;
         try {
             tg.ready();
-            // Request full screen & expand immediately
-            if (tg.requestFullscreen) {
-                tg.requestFullscreen();
-            }
             tg.expand();
+
+            // Synchronize Telegram Safe Area Insets for notch and status bar
+            const syncSafeArea = () => {
+                const top = tg.contentSafeAreaInset?.top ?? tg.safeAreaInset?.top ?? 0;
+                const bottom = tg.contentSafeAreaInset?.bottom ?? tg.safeAreaInset?.bottom ?? 0;
+                if (top > 0) {
+                    document.documentElement.style.setProperty('--tg-safe-area-inset-top', `${top}px`);
+                    document.documentElement.style.setProperty('--tg-content-safe-area-inset-top', `${top}px`);
+                }
+                if (bottom > 0) {
+                    document.documentElement.style.setProperty('--tg-safe-area-inset-bottom', `${bottom}px`);
+                    document.documentElement.style.setProperty('--tg-content-safe-area-inset-bottom', `${bottom}px`);
+                }
+            };
+            syncSafeArea();
+            tg.onEvent?.('safeAreaChanged', syncSafeArea);
+            tg.onEvent?.('contentSafeAreaChanged', syncSafeArea);
 
             // Set app headers and backgrounds
             if (tg.setHeaderColor) {

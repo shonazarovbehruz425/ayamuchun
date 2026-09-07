@@ -18,7 +18,7 @@ from bot.services.ai_service import get_ai_service
 
 # Conversation states
 WAITING_TEXT = 0
-WAITING_TOPIC = 1
+WAITING_TOPIC = WAITING_TEXT  # Alias for backward compatibility
 
 # Initialize AI service
 _config = get_settings()
@@ -50,7 +50,7 @@ async def handle_lesson_plan(update: Update, context: ContextTypes.DEFAULT_TYPE)
         reply_markup=back_keyboard(),
         parse_mode="HTML"
     )
-    return WAITING_TOPIC
+    return WAITING_TEXT
 
 
 async def handle_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -93,7 +93,7 @@ async def handle_explain(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         reply_markup=back_keyboard(),
         parse_mode="HTML"
     )
-    return WAITING_TOPIC
+    return WAITING_TEXT
 
 
 async def handle_grammar_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -439,8 +439,21 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
     status_msg = await update.message.reply_text("⏳ <i>AI javob tayyorlamoqda...</i>", parse_mode="HTML")
 
     try:
-        # Multi-turn conversational memory for Telegram chat
-        chat_history = context.user_data.setdefault("telegram_chat_history", [])
+        # Multi-turn conversational memory: restore from DB if RAM is empty
+        chat_history = context.user_data.get("telegram_chat_history")
+        if chat_history is None:
+            chat_history = []
+            try:
+                from bot.database.engine import get_session
+                from bot.database import crud
+                async with get_session() as session:
+                    db_user = await crud.get_or_create_user(session, update.effective_user.id, update.effective_user.full_name or "User")
+                    db_msgs = await crud.get_chat_history(session, db_user.id, session_id="telegram", limit=8)
+                    if db_msgs:
+                        chat_history = [{"role": m.role, "content": m.content} for m in db_msgs]
+            except Exception as dbe:
+                logger.warning(f"Could not load chat history from DB: {dbe}")
+            context.user_data["telegram_chat_history"] = chat_history
         
         system_instruction = (
             "Siz EduBot AI — o'qituvchilar, talabalar va barcha foydalanuvchilar uchun "
@@ -453,7 +466,7 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
         chat_history.append({"role": "user", "content": clean_prompt})
         if len(chat_history) > 8:
             chat_history = chat_history[-8:]
-            context.user_data["telegram_chat_history"] = chat_history
+        context.user_data["telegram_chat_history"] = chat_history
 
         ai_reply = await ai_service.generate_chat(
             messages=chat_history,
@@ -462,9 +475,22 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
 
         # Save assistant message to memory
         chat_history.append({"role": "assistant", "content": ai_reply})
+        if len(chat_history) > 8:
+            chat_history = chat_history[-8:]
         context.user_data["telegram_chat_history"] = chat_history
         context.user_data["last_ai_response"] = ai_reply
         context.user_data["last_ai_topic"] = clean_prompt[:35]
+
+        # Persist messages to DB asynchronously
+        try:
+            from bot.database.engine import get_session
+            from bot.database import crud
+            async with get_session() as session:
+                db_user = await crud.get_or_create_user(session, update.effective_user.id, update.effective_user.full_name or "User")
+                await crud.save_chat_message(session, db_user.id, "user", clean_prompt, session_id="telegram")
+                await crud.save_chat_message(session, db_user.id, "assistant", ai_reply, session_id="telegram")
+        except Exception as dbe:
+            logger.warning(f"Could not persist chat message to DB: {dbe}")
 
         # Format reply
         formatted_html = format_ai_response_for_telegram(ai_reply)

@@ -39,9 +39,30 @@ class AIResponse(BaseModel):
     action: str
 
 class QuizCreateRequest(BaseModel):
-    topic: str
-    num_questions: int
-    quiz_type: str
+    topic: str = Field(..., min_length=1, max_length=15000)
+    num_questions: int = Field(5, ge=1, le=50)
+    quiz_type: str = Field("multiple")
+
+    @field_validator("topic")
+    @classmethod
+    def validate_topic(cls, v: str) -> str:
+        clean = v.strip()
+        if not clean:
+            raise ValueError("Test mavzusi bo'sh bo'lishi mumkin emas")
+        if len(clean) > 15000:
+            raise ValueError("Test mavzusi 15 000 belgidan oshmasligi kerak")
+        if is_prompt_injection(clean):
+            raise ValueError("Xavfsizlik qoidalariga zid bo'lgan so'rov aniqlandi")
+        return clean
+
+    @field_validator("quiz_type")
+    @classmethod
+    def validate_quiz_type(cls, v: str) -> str:
+        clean = v.strip().lower()
+        if clean not in ("multiple", "open", "mixed"):
+            return "multiple"
+        return clean
+
 
 class QuizDetailResponse(BaseModel):
     id: int

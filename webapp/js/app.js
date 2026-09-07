@@ -3483,11 +3483,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 localStorage.setItem('edubot_ai_chat_sessions', JSON.stringify(window.aiChatSessions));
             }
-        } catch (e) {}
+        } catch (e) {
+            console.warn("Chat history saqlashda ogohlantirish (localStorage):", e);
+        }
     }
 
     function renderAI() {
         const aiName = window.aiDisplayName || "EduBot AI";
+
+        // Restore chat history from server if localStorage was wiped or in incognito
+        if (!window.hasRestoredServerChat && (!window.aiChatMessages || window.aiChatMessages.length === 0)) {
+            window.hasRestoredServerChat = true;
+            api.getChatHistory('web').then(res => {
+                if (res && res.messages && res.messages.length > 0) {
+                    window.aiChatMessages = res.messages.map(m => ({
+                        role: m.role,
+                        content: m.content,
+                        time: new Date(m.created_at).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })
+                    }));
+                    saveChatHistory();
+                    renderAI();
+                }
+            }).catch(err => {
+                console.warn("Serverdan chat tarixini tiklashda xatolik:", err);
+            });
+        }
 
         appDiv.innerHTML = `
             <div class="chat-container-card space-y-3 animate-fade-in">
@@ -3930,6 +3950,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.setItem('edubot_active_session_id', window.activeSessionId);
                 window.aiChatMessages = [];
                 localStorage.removeItem('edubot_ai_chat_history');
+                try {
+                    api.clearChatHistory('web').catch(() => {});
+                } catch (_) {}
                 renderAI();
                 TelegramApp.showAlert("Tozalandi! Yangi suhbat boshlandi.");
             }

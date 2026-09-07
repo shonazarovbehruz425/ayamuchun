@@ -63,6 +63,14 @@ const api = {
             body: formData
         });
     },
+    getChatHistory(sessionId = 'web') {
+        const q = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
+        return this.fetchWithAuth(`/ai/chat/history${q}`);
+    },
+    clearChatHistory(sessionId = 'web') {
+        const q = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
+        return this.fetchWithAuth(`/ai/chat/history${q}`, { method: 'DELETE' });
+    },
     
     // Auth & Profile
     getMe() { return this.fetchWithAuth('/auth/me'); },

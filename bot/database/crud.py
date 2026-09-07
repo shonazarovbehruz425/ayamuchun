@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
 from datetime import datetime
-from bot.database.models import User, File, Quiz, UsageLog
+from bot.database.models import User, File, Quiz, UsageLog, AIChatMessage
 from typing import Optional, List
 
 async def get_or_create_user(session: AsyncSession, telegram_id: int, full_name: str, username: Optional[str] = None) -> User:
@@ -202,3 +202,57 @@ async def get_admin_recent_files(session: AsyncSession, limit: int = 50) -> list
 async def get_all_user_ids(session: AsyncSession) -> list[int]:
     result = await session.execute(select(User.telegram_id))
     return list(result.scalars().all())
+
+
+async def save_chat_message(
+    session: AsyncSession,
+    user_id: int,
+    role: str,
+    content: str,
+    session_id: Optional[str] = None
+) -> AIChatMessage:
+    """Save a user or assistant chat message to persistent database."""
+    msg = AIChatMessage(
+        user_id=user_id,
+        role=role,
+        content=content,
+        session_id=session_id,
+        created_at=datetime.utcnow()
+    )
+    session.add(msg)
+    await session.commit()
+    await session.refresh(msg)
+    return msg
+
+
+async def get_chat_history(
+    session: AsyncSession,
+    user_id: int,
+    session_id: Optional[str] = None,
+    limit: int = 50
+) -> List[AIChatMessage]:
+    """Retrieve chat history messages for a user, ordered chronologically."""
+    query = select(AIChatMessage).where(AIChatMessage.user_id == user_id)
+    if session_id:
+        query = query.where(AIChatMessage.session_id == session_id)
+    query = query.order_by(AIChatMessage.created_at.desc()).limit(limit)
+    result = await session.execute(query)
+    messages = list(result.scalars().all())
+    messages.reverse()  # chronological order
+    return messages
+
+
+async def clear_chat_history(
+    session: AsyncSession,
+    user_id: int,
+    session_id: Optional[str] = None
+):
+    """Delete all or session-specific chat history for a user."""
+    query = select(AIChatMessage).where(AIChatMessage.user_id == user_id)
+    if session_id:
+        query = query.where(AIChatMessage.session_id == session_id)
+    result = await session.execute(query)
+    for msg in result.scalars().all():
+        await session.delete(msg)
+    await session.commit()
+

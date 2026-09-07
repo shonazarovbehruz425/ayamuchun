@@ -12,6 +12,7 @@ from ..schemas.responses import AIRequest, AIResponse
 from bot.services.ai_service import get_ai_service
 from bot.config import get_settings
 from bot.database.engine import get_session
+from bot.database import crud
 from bot.processors.converter import FileConverter
 from bot.processors.word_processor import WordProcessor
 from bot.processors.pdf_processor import PDFProcessor
@@ -76,15 +77,17 @@ async def chat_with_ai(req: AIChatRequest, user: dict = Depends(get_current_user
         dict_messages = [{"role": m.role, "content": m.content} for m in req.messages]
         reply_text = await ai_service.generate_chat(dict_messages)
 
-        
-        # Log usage in database asynchronously
+        # Persist messages & log usage in database
         try:
             async with get_session() as session:
                 db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "User"))
                 last_user_msg = next((m.content for m in reversed(req.messages) if m.role == "user"), "")
                 await crud.log_usage(session, db_user.id, "ai_chat", last_user_msg[:60])
+                if last_user_msg:
+                    await crud.save_chat_message(session, db_user.id, "user", last_user_msg, session_id="web")
+                await crud.save_chat_message(session, db_user.id, "assistant", reply_text, session_id="web")
         except Exception as log_err:
-            logger.warning(f"Could not log AI chat usage: {log_err}")
+            logger.warning(f"Could not persist chat message: {log_err}")
 
         return AIChatResponse(
             message=reply_text,
@@ -96,15 +99,64 @@ async def chat_with_ai(req: AIChatRequest, user: dict = Depends(get_current_user
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/chat/history")
+async def get_chat_history_endpoint(session_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+    """Fetch persistent chat history for the user from database (survives restart & incognito)."""
+    try:
+        async with get_session() as session:
+            db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "User"))
+            messages = await crud.get_chat_history(session, db_user.id, session_id=session_id or "web", limit=50)
+            return {
+                "status": "ok",
+                "messages": [
+                    {"role": m.role, "content": m.content, "created_at": m.created_at.isoformat()}
+                    for m in messages
+                ]
+            }
+    except Exception as e:
+        logger.error(f"Get chat history error: {e}")
+        return {"status": "ok", "messages": []}
+
+
+@router.delete("/chat/history")
+async def clear_chat_history_endpoint(session_id: Optional[str] = None, user: dict = Depends(get_current_user)):
+    """Clear user chat history from database."""
+    try:
+        async with get_session() as session:
+            db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "User"))
+            await crud.clear_chat_history(session, db_user.id, session_id=session_id or "web")
+            return {"status": "ok", "message": "Suhbatlar tarixi tozalandi"}
+    except Exception as e:
+        logger.error(f"Clear chat history error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 class ActionTelegramRequest(BaseModel):
-    title: str = "EduBot AI Natijasi"
-    text: str
-    action_type: str = "text"
+    title: str = Field("EduBot AI Natijasi", max_length=200)
+    text: str = Field(..., min_length=1, max_length=50000)
+    action_type: str = Field("text")
+
+    @field_validator("title", "text", "action_type")
+    @classmethod
+    def strip_fields(cls, v: str) -> str:
+        clean = v.strip() if isinstance(v, str) else v
+        if not clean:
+            raise ValueError("Maydon bo'sh bo'lishi mumkin emas")
+        return clean
 
 
 class ExportDocxRequest(BaseModel):
-    title: str = "EduBot AI Natijasi"
-    text: str
+    title: str = Field("EduBot AI Natijasi", max_length=200)
+    text: str = Field(..., min_length=1, max_length=50000)
+
+    @field_validator("title", "text")
+    @classmethod
+    def strip_fields(cls, v: str) -> str:
+        clean = v.strip() if isinstance(v, str) else v
+        if not clean:
+            raise ValueError("Maydon bo'sh bo'lishi mumkin emas")
+        return clean
+
 
 
 def create_clean_docx(title: str, text: str, output_path: str) -> str:
@@ -163,7 +215,7 @@ async def translate(req: AIRequest, user: dict = Depends(get_current_user)):
         result = await ai_service.translate_text(req.text, target_lang)
         async with get_session() as session:
             db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
-            await crud.log_usage(session, db_user.id, "ai_translate", f"Lang: {target_lang}")
+            await crud.log_usage(session, db_user.id, "ai_translate", f"[{target_lang}] {req.text[:60]}")
         return AIResponse(result=result, action="translate")
     except Exception as e:
         logger.error(f"AI translate error: {e}")
@@ -317,26 +369,49 @@ async def send_ai_to_telegram(req: ActionTelegramRequest, user: dict = Depends(g
             
         clean_text = req.text.replace('**', '*').replace('###', '📌').replace('##', '📌')
         msg_text = f"🧠 *{req.title}*\n\n{clean_text}\n\n_EduBot AI Pedagogik Yordamchi_"
+
+        def _chunk_text(text: str, max_size: int = 3900) -> List[str]:
+            if len(text) <= max_size:
+                return [text]
+            res = []
+            remaining = text
+            while len(remaining) > max_size:
+                split_idx = remaining.rfind("\n", 0, max_size)
+                if split_idx == -1 or split_idx < max_size // 2:
+                    split_idx = remaining.rfind(" ", 0, max_size)
+                if split_idx == -1 or split_idx < max_size // 2:
+                    split_idx = max_size
+                chunk = remaining[:split_idx].strip()
+                if chunk:
+                    res.append(chunk)
+                remaining = remaining[split_idx:].strip()
+            if remaining:
+                res.append(remaining)
+            return res
+
+        chunks = _chunk_text(msg_text, max_size=3900)
         
         async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(
-                f"https://api.telegram.org/bot{bot_token}/sendMessage",
-                json={
-                    "chat_id": tg_id,
-                    "text": msg_text[:4096],
-                    "parse_mode": "Markdown"
-                }
-            )
-            if not resp.is_success:
-                # Retry with plain text if markdown fails
-                await client.post(
+            for chunk in chunks:
+                resp = await client.post(
                     f"https://api.telegram.org/bot{bot_token}/sendMessage",
                     json={
                         "chat_id": tg_id,
-                        "text": f"🧠 {req.title}\n\n{req.text[:4090]}"
+                        "text": chunk,
+                        "parse_mode": "Markdown"
                     }
                 )
-        return {"success": True, "message": "Xabar Telegramingizga yuborildi!"}
+                if not resp.is_success:
+                    # Retry with plain text if markdown formatting fails
+                    clean_plain = chunk.replace('*', '').replace('_', '').replace('`', '')
+                    await client.post(
+                        f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                        json={
+                            "chat_id": tg_id,
+                            "text": clean_plain
+                        }
+                    )
+        return {"success": True, "message": "Xabar to'liq hajmda Telegramingizga yuborildi!"}
     except Exception as e:
         logger.error(f"Send to telegram error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

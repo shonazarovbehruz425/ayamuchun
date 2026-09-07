@@ -36,7 +36,6 @@ from bot.handlers.ai_handler import (
     handle_chat_ai_callback,
     cancel_ai,
     WAITING_TEXT,
-    WAITING_TOPIC,
 )
 from bot.handlers.quiz_handler import (
     quiz_menu,
@@ -288,10 +287,6 @@ def build_application():
         ],
         states={
             WAITING_TEXT: [
-                MessageHandler(cancel_filter, cancel_ai),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, process_text_input),
-            ],
-            WAITING_TOPIC: [
                 MessageHandler(cancel_filter, cancel_ai),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, process_text_input),
             ],

@@ -58,3 +58,16 @@ class UsageLog(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="usage_logs")
+
+class AIChatMessage(Base):
+    __tablename__ = 'ai_chat_messages'
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    role = Column(String, nullable=False) # 'user' | 'assistant'
+    content = Column(String, nullable=False)
+    session_id = Column(String, nullable=True, index=True) # e.g. 'telegram' or 'session_123'
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", backref="chat_messages")
+

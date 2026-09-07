@@ -41,14 +41,16 @@ class BaseProcessor(ABC):
         _, ext = os.path.splitext(file_path)
         return ext.lower() in self.SUPPORTED_EXTENSIONS
 
-def get_processor(file_path: str) -> BaseProcessor:
+def get_processor(file_path: str) -> BaseProcessor | None:
     """
     Fayl kengaytmasiga qarab tegishli protsessorni qaytaradi.
+    Qo'llab-quvvatlanmaydigan fayllar uchun None qaytaradi.
     """
     from .pdf_processor import PDFProcessor
     from .word_processor import WordProcessor
     from .excel_processor import ExcelProcessor
     from .pptx_processor import PptxProcessor
+    from .csv_processor import CSVProcessor
     
     _, ext = os.path.splitext(file_path)
     ext = ext.lower()
@@ -61,5 +63,7 @@ def get_processor(file_path: str) -> BaseProcessor:
         return ExcelProcessor()
     elif ext in PptxProcessor.SUPPORTED_EXTENSIONS:
         return PptxProcessor()
+    elif ext in CSVProcessor.SUPPORTED_EXTENSIONS:
+        return CSVProcessor()
     else:
-        raise ValueError(f"Fayl formati qo'llab-quvvatlanmaydi: {ext}")
+        return None

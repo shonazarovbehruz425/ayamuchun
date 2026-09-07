@@ -39,6 +39,26 @@ def file_actions_keyboard(file_type: str) -> InlineKeyboardMarkup:
         keyboard.append([
             InlineKeyboardButton("🧠 AI tahlil", callback_data="file_ai_analyze")
         ])
+    elif file_type in ('xlsx', 'xls', 'xlsm'):
+        keyboard.append([
+            InlineKeyboardButton("📊 Statistika", callback_data="file_stats"),
+            InlineKeyboardButton("🔄 PDF ga", callback_data="file_to_pdf")
+        ])
+        keyboard.append([
+            InlineKeyboardButton("📋 CSV ga", callback_data="file_to_csv"),
+            InlineKeyboardButton("📖 Matn olish", callback_data="file_extract_text")
+        ])
+        keyboard.append([
+            InlineKeyboardButton("🧠 AI tahlil", callback_data="file_ai_analyze")
+        ])
+    elif file_type == 'csv':
+        keyboard.append([
+            InlineKeyboardButton("📊 Statistika", callback_data="file_stats"),
+            InlineKeyboardButton("📖 Matn olish", callback_data="file_extract_text")
+        ])
+        keyboard.append([
+            InlineKeyboardButton("🧠 AI tahlil", callback_data="file_ai_analyze")
+        ])
     else:
         keyboard.append([
             InlineKeyboardButton("📖 Matn olish", callback_data="file_extract_text"),

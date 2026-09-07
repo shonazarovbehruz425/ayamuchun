@@ -480,20 +480,34 @@ async def _convert_to_csv(msg, query, file_path: str, file_name: str) -> None:
 
 
 async def _show_stats(msg, query, file_path: str) -> None:
-    """Show Excel statistics."""
+    """Show Excel / CSV statistics."""
     from bot.processors.excel_processor import ExcelProcessor
 
     processor = ExcelProcessor()
     try:
         stats = await processor.calculate_stats(file_path)
-        text = "📊 Statistika:\n\n"
-        for col_name, col_stats in stats.items():
-            text += f"📌 {col_name}:\n"
-            for key, value in col_stats.items():
-                text += f"  • {key}: {value}\n"
-            text += "\n"
-        await msg.edit_text(text if text.strip() != "📊 Statistika:" else "⚠️ Raqamli ma'lumotlar topilmadi.")
+        if not stats:
+            await msg.edit_text("⚠️ Raqamli ma'lumotlar topilmadi.")
+            return
+
+        text = "📊 <b>Statistika:</b>\n\n"
+
+        # Check if stats is a nested dict of columns or a single flat dict
+        first_val = next(iter(stats.values())) if stats else None
+        if isinstance(first_val, dict):
+            for col_name, col_stats in stats.items():
+                text += f"📌 <b>{col_name}</b>:\n"
+                for key, value in col_stats.items():
+                    text += f"  • {key}: <code>{value}</code>\n"
+                text += "\n"
+        else:
+            # Flat dictionary
+            for key, value in stats.items():
+                text += f"  • {key}: <code>{value}</code>\n"
+
+        await msg.edit_text(text, parse_mode="HTML")
     except Exception as e:
+        logger.error(f"Error in _show_stats: {e}")
         await msg.edit_text(f"❌ Statistika olishda xatolik: {str(e)}")
 
 

@@ -3,6 +3,7 @@ from .pdf_processor import PDFProcessor
 from .word_processor import WordProcessor
 from .excel_processor import ExcelProcessor
 from .pptx_processor import PptxProcessor
+from .csv_processor import CSVProcessor
 from .converter import FileConverter
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     'WordProcessor',
     'ExcelProcessor',
     'PptxProcessor',
+    'CSVProcessor',
     'FileConverter'
 ]

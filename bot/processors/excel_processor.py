@@ -104,30 +104,71 @@ class ExcelProcessor(BaseProcessor):
             raise
 
     async def calculate_stats(self, file_path: str, column: int = None) -> dict:
-        """Ustun bo'yicha statistika hisoblash."""
+        """Ustunlar bo'yicha statistika hisoblash (barcha raqamli ustunlar yoki ko'rsatilgan ustun)."""
         def _stats():
-            wb = load_workbook(file_path, data_only=True)
-            sheet = wb.active
+            ext = os.path.splitext(file_path)[1].lower()
+            data_rows = []
             
-            # Agar ustun ko'rsatilmagan bo'lsa, 1-ustunni olamiz (1-indexed)
-            col_idx = column if column else 1
-            values = []
-            
-            for row in sheet.iter_rows(min_col=col_idx, max_col=col_idx, min_row=2, values_only=True):
-                val = row[0]
-                if isinstance(val, (int, float)):
-                    values.append(val)
-                    
-            if not values:
-                return {"min": 0, "max": 0, "avg": 0, "count": 0}
+            if ext == '.csv':
+                for enc in ('utf-8-sig', 'utf-8', 'cp1251', 'latin-1'):
+                    try:
+                        with open(file_path, 'r', encoding=enc, errors='replace') as f:
+                            r = csv.reader(f)
+                            for row in r:
+                                data_rows.append(row)
+                        break
+                    except Exception:
+                        continue
+            else:
+                wb = load_workbook(file_path, data_only=True)
+                sheet = wb.active
+                for row in sheet.iter_rows(values_only=True):
+                    data_rows.append(list(row))
+
+            if not data_rows:
+                return {}
+
+            headers = [str(c or f"Ustun {i+1}") for i, c in enumerate(data_rows[0])]
+            rows_data = data_rows[1:] if len(data_rows) > 1 else []
+
+            columns_stats = {}
+
+            if column is not None:
+                target_indices = [column - 1]
+            else:
+                target_indices = list(range(len(headers)))
+
+            for idx in target_indices:
+                if idx < 0 or idx >= len(headers):
+                    continue
+                col_name = headers[idx]
+                num_values = []
+                for row in rows_data:
+                    if idx < len(row):
+                        val = row[idx]
+                        if isinstance(val, (int, float)):
+                            num_values.append(float(val))
+                        elif isinstance(val, str):
+                            val_str = val.strip().replace(',', '.')
+                            try:
+                                num_values.append(float(val_str))
+                            except ValueError:
+                                pass
                 
-            return {
-                "min": min(values),
-                "max": max(values),
-                "avg": sum(values) / len(values),
-                "count": len(values)
-            }
-            
+                if num_values:
+                    columns_stats[col_name] = {
+                        "Eng kichik (min)": min(num_values),
+                        "Eng katta (max)": max(num_values),
+                        "O'rtacha (avg)": round(sum(num_values) / len(num_values), 2),
+                        "Jami yig'indi (sum)": round(sum(num_values), 2),
+                        "Raqamlar soni": len(num_values)
+                    }
+
+            if not columns_stats and column is not None:
+                return {"min": 0, "max": 0, "avg": 0, "count": 0}
+
+            return columns_stats
+
         try:
             return await asyncio.to_thread(_stats)
         except Exception as e:

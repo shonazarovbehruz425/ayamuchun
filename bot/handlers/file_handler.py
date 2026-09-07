@@ -24,6 +24,8 @@ converter = FileConverter()
 
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle incoming document uploads."""
+    expected_tool = context.user_data.pop("expected_tool", None)
+    context.user_data.pop("ai_action", None)
     document = update.message.document
 
     # Check file size (20 MB limit for Telegram Bot API downloads)
@@ -146,7 +148,6 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 )
                 return
 
-        expected_tool = context.user_data.pop("expected_tool", None)
         if expected_tool == "pdf_to_word" and ext_lower == "pdf":
             await msg.edit_text("⏳ PDF ni Word (DOCX) ga aylantirish boshlandi...")
             await _convert_to_docx(msg, update, local_path, file_name)

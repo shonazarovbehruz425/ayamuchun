@@ -17,7 +17,7 @@ from bot.processors.converter import FileConverter
 from bot.processors.word_processor import WordProcessor
 from bot.processors.pdf_processor import PDFProcessor
 from bot.processors.image_processor import ImageProcessor
-from bot.utils.helpers import sanitize_filename
+from bot.utils.helpers import sanitize_filename, parse_lesson_subject_topic
 from bot.utils.validators import is_prompt_injection
 from .files import send_file_to_telegram, save_and_backup_user_file, build_file_caption, save_upload_stream_safely
 
@@ -94,9 +94,11 @@ async def chat_with_ai(req: AIChatRequest, user: dict = Depends(get_current_user
             role="assistant",
             model=getattr(ai_service, "model_name", "ai")
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"AI chat error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="AI xizmatida xatolik yuz berdi. Iltimos, qayta urinib ko'ring.")
 
 
 @router.get("/chat/history")
@@ -128,7 +130,7 @@ async def clear_chat_history_endpoint(session_id: Optional[str] = None, user: di
             return {"status": "ok", "message": "Suhbatlar tarixi tozalandi"}
     except Exception as e:
         logger.error(f"Clear chat history error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Suhbatlar tarixini tozalashda xatolik yuz berdi.")
 
 
 class ActionTelegramRequest(BaseModel):
@@ -156,7 +158,6 @@ class ExportDocxRequest(BaseModel):
         if not clean:
             raise ValueError("Maydon bo'sh bo'lishi mumkin emas")
         return clean
-
 
 
 def create_clean_docx(title: str, text: str, output_path: str) -> str:
@@ -204,8 +205,8 @@ async def summarize(req: AIRequest, user: dict = Depends(get_current_user)):
             await crud.log_usage(session, db_user.id, "ai_summarize", req.text[:50])
         return AIResponse(result=result, action="summarize")
     except Exception as e:
-        logger.error(f"AI summarize error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"AI summarize error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Xulosa tayyorlashda xatolik yuz berdi.")
 
 
 @router.post("/translate", response_model=AIResponse)
@@ -218,60 +219,62 @@ async def translate(req: AIRequest, user: dict = Depends(get_current_user)):
             await crud.log_usage(session, db_user.id, "ai_translate", f"[{target_lang}] {req.text[:60]}")
         return AIResponse(result=result, action="translate")
     except Exception as e:
-        logger.error(f"AI translate error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"AI translate error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Tarjima qilishda xatolik yuz berdi.")
 
 
 @router.post("/lesson-plan", response_model=AIResponse)
 async def lesson_plan(req: AIRequest, user: dict = Depends(get_current_user)):
     try:
-        subject = "Umumiy"
-        topic = req.text
-        if "—" in req.text:
-            parts = req.text.split("—", 1)
-            subject, topic = parts[0].strip(), parts[1].strip()
-        elif "-" in req.text:
-            parts = req.text.split("-", 1)
-            subject, topic = parts[0].strip(), parts[1].strip()
-            
+        subject, topic = parse_lesson_subject_topic(req.text)
         result = await ai_service.generate_lesson_plan(subject, topic, language=req.language)
         async with get_session() as session:
             db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
-            await crud.log_usage(session, db_user.id, "ai_lesson_plan", topic[:50])
+            await crud.log_usage(session, db_user.id, "ai_lesson_plan", f"{subject} — {topic}"[:60])
         return AIResponse(result=result, action="lesson-plan")
     except Exception as e:
-        logger.error(f"AI lesson plan error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"AI lesson plan error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Dars rejasi yaratishda xatolik yuz berdi.")
 
 
 @router.post("/grammar", response_model=AIResponse)
 async def grammar(req: AIRequest, user: dict = Depends(get_current_user)):
     try:
         result = await ai_service.check_grammar(req.text)
+        async with get_session() as session:
+            db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
+            await crud.log_usage(session, db_user.id, "ai_grammar", req.text[:50])
         return AIResponse(result=result, action="grammar")
     except Exception as e:
-        logger.error(f"AI grammar error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"AI grammar error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Grammatika tekshirishda xatolik yuz berdi.")
 
 
 @router.post("/improve", response_model=AIResponse)
 async def improve(req: AIRequest, user: dict = Depends(get_current_user)):
     try:
         result = await ai_service.improve_text(req.text, req.language)
+        async with get_session() as session:
+            db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
+            await crud.log_usage(session, db_user.id, "ai_improve", req.text[:50])
         return AIResponse(result=result, action="improve")
     except Exception as e:
-        logger.error(f"AI improve error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"AI improve error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Matnni yaxshilashda xatolik yuz berdi.")
 
 
 @router.post("/explain", response_model=AIResponse)
 async def explain(req: AIRequest, user: dict = Depends(get_current_user)):
     try:
         result = await ai_service.explain_topic(req.text, req.language)
+        async with get_session() as session:
+            db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
+            await crud.log_usage(session, db_user.id, "ai_explain", req.text[:50])
         return AIResponse(result=result, action="explain")
     except Exception as e:
-        logger.error(f"AI explain error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"AI explain error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Mavzuni tushuntirishda xatolik yuz berdi.")
+
 
 
 @router.post("/quiz", response_model=AIResponse)
@@ -304,8 +307,9 @@ async def create_quiz_ai(req: AIRequest, user: dict = Depends(get_current_user))
             
         return AIResponse(result="\n".join(lines), action="quiz")
     except Exception as e:
-        logger.error(f"AI quiz error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"AI quiz error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Test savollarini tuzishda xatolik yuz berdi.")
+
 
 
 @router.post("/export-docx")
@@ -822,12 +826,24 @@ async def chat_with_files(
             {"role": "user", "content": f"Foydalanuvchi quyidagi fayllarni yukladi: {file_names_str}.\nFoydalanuvchi so'rovi: {fallback_prompt}"}
         ])
 
+        # Log usage to DB
+        try:
+            async with get_session() as session:
+                db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "User"))
+                file_cnt = len(saved_files)
+                await crud.log_usage(session, db_user.id, "ai_chat_with_files", f"{file_cnt} ta fayl: {prompt[:40]}")
+        except Exception as log_err:
+            logger.warning(f"Could not log chat-with-files usage: {log_err}")
+
         return {
             "message": reply_text,
             "role": "assistant",
             "result_file": None
         }
 
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error(f"Chat with files error: {exc}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Fayllar bilan ishlashda xatolik yuz berdi.")
+

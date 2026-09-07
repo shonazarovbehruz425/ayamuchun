@@ -3,6 +3,7 @@ Supports Google Gemini, OpenAI, DeepSeek, OpenRouter, Groq, Claude, Ollama, and 
 Configuration is fully managed via server environment variables (AI_PROVIDER, AI_API_KEY, AI_BASE_URL, AI_MODEL, AI_DISPLAY_NAME).
 Clean user-facing branding replaces third-party vendor names with custom mini app AI identity."""
 
+import asyncio
 import json
 import logging
 from typing import Optional, List, Dict, Any
@@ -31,7 +32,6 @@ class AIService:
         self.display_name = (display_name or settings.AI_DISPLAY_NAME or "EduBot AI").strip()
 
         # Intelligent provider normalization:
-        # If user entered "openrouter", "openai", "custom", "ai" (with a base_url or non-gemini model), route through OpenAI-compatible REST
         if "openrouter" in raw_provider or "openrouter" in self.base_url.lower():
             self.provider = "openrouter"
             if not self.base_url:
@@ -69,7 +69,10 @@ class AIService:
             try:
                 import google.generativeai as genai
                 genai.configure(api_key=self.api_key)
-                self.gemini_model = genai.GenerativeModel(self.model_name)
+                self.gemini_model = genai.GenerativeModel(
+                    self.model_name,
+                    generation_config={"max_output_tokens": 4096}
+                )
                 logger.info(f"AIService: Gemini engine initialized (model={self.model_name})")
             except Exception as e:
                 logger.error(f"Failed to configure Gemini engine: {e}")
@@ -83,7 +86,7 @@ class AIService:
 
     async def _generate(self, prompt: str) -> str:
         """Execute text generation through configured AI provider."""
-        return await self.generate_chat([{"role": "user", "content": prompt}])
+        return await self.generate_chat([{"role": "user", "content": prompt[:15000]}])
 
     async def generate_chat(self, messages: List[Dict[str, str]], system_prompt: Optional[str] = None) -> str:
         """
@@ -92,8 +95,7 @@ class AIService:
         """
         if not self.api_key:
             raise RuntimeError(
-                f"{self.display_name} API kaliti sozlanmagan. Iltimos, server muhit o'zgaruvchilariga "
-                "AI_API_KEY yoki GEMINI_API_KEY kiriting."
+                f"{self.display_name} API kaliti sozlanmagan. Iltimos, server sozlamalarini tekshiring."
             )
 
         default_sys = (
@@ -111,34 +113,58 @@ class AIService:
                 try:
                     import google.generativeai as genai
                     genai.configure(api_key=self.api_key)
-                    self.gemini_model = genai.GenerativeModel(self.model_name)
+                    self.gemini_model = genai.GenerativeModel(
+                        self.model_name,
+                        generation_config={"max_output_tokens": 4096}
+                    )
                 except Exception as ce:
-                    raise RuntimeError(f"{self.display_name} sozlanmadi: {ce}")
-            try:
-                # Format conversation history for Gemini
-                gemini_contents = []
-                for m in messages:
-                    role = "user" if m.get("role") in ("user", "system") else "model"
-                    gemini_contents.append({"role": role, "parts": [m.get("content", "")]})
-                
-                # Prepend system instruction if possible
-                if effective_sys and gemini_contents:
-                    gemini_contents[0]["parts"].insert(0, f"[Yo'riqnoma: {effective_sys}]\n\n")
+                    logger.error(f"Gemini config error: {ce}")
+                    raise RuntimeError("AI xizmatini ishga tushirib bo'lmadi.")
 
-                response = await self.gemini_model.generate_content_async(gemini_contents)
-                return response.text
-            except Exception as e:
-                logger.error(f"Gemini API error: {e}")
-                if self.base_url:
-                    logger.info("Attempting OpenAI-compatible fallback...")
-                    return await self._chat_openai_compatible(messages, effective_sys)
-                raise RuntimeError(f"{self.display_name} xizmati vaqtincha javob bermayapti: {e}")
+            # Format conversation history for Gemini
+            gemini_contents = []
+            for m in messages:
+                role = "user" if m.get("role") in ("user", "system") else "model"
+                gemini_contents.append({"role": role, "parts": [m.get("content", "")[:15000]]})
+            
+            # Prepend system instruction if possible
+            if effective_sys and gemini_contents:
+                gemini_contents[0]["parts"].insert(0, f"[Yo'riqnoma: {effective_sys}]\n\n")
+
+            # Retry with exponential backoff on 429/rate-limit
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    response = await self.gemini_model.generate_content_async(gemini_contents)
+                    return response.text
+                except Exception as e:
+                    err_str = str(e).lower()
+                    # If 401 or Invalid API key -> fail immediately, do not retry
+                    if "401" in err_str or "unauthenticated" in err_str or "invalid api key" in err_str or "api_key_invalid" in err_str:
+                        logger.error(f"Gemini auth error: {e}")
+                        raise RuntimeError("AI autentifikatsiya xatosi: API kalit yaroqsiz.")
+                    # If 429 (ResourceExhausted / Rate limit) -> retry with backoff
+                    if ("429" in err_str or "resourceexhausted" in err_str or "quota" in err_str) and attempt < max_retries - 1:
+                        backoff = (2 ** attempt) * 1.5
+                        logger.warning(f"Gemini rate limited (429), retrying in {backoff}s (attempt {attempt + 1}/{max_retries})...")
+                        await asyncio.sleep(backoff)
+                        continue
+                    # If timeout -> raise friendly timeout error
+                    if "timeout" in err_str or "deadline" in err_str:
+                        logger.error(f"Gemini timeout error: {e}")
+                        raise RuntimeError("AI xizmati javob berish vaqti tugadi (timeout). Iltimos, qayta urinib ko'ring.")
+                    
+                    logger.error(f"Gemini API error on attempt {attempt + 1}: {e}")
+                    if self.base_url:
+                        logger.info("Attempting OpenAI-compatible fallback...")
+                        return await self._chat_openai_compatible(messages, effective_sys)
+                    raise RuntimeError("AI xizmati vaqtincha javob bermayapti. Iltimos, birozdan so'ng qayta urinib ko'ring.")
 
         # 2. OpenAI / OpenRouter / DeepSeek / Custom Endpoint Flow
         return await self._chat_openai_compatible(messages, effective_sys)
 
     async def _chat_openai_compatible(self, messages: List[Dict[str, str]], system_prompt: str) -> str:
-        """Send chat messages to an OpenAI-compatible REST endpoint (OpenRouter, OpenAI, DeepSeek, Groq, local LLM)."""
+        """Send chat messages to an OpenAI-compatible REST endpoint with retry and backoff."""
         base = (self.base_url or "https://api.openai.com/v1").rstrip("/")
         url = f"{base}/chat/completions"
 
@@ -146,7 +172,6 @@ class AIService:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
-        # OpenRouter-specific friendly headers
         if "openrouter" in base:
             headers["HTTP-Referer"] = "https://ayamuchun.onrender.com"
             headers["X-Title"] = self.display_name
@@ -154,43 +179,63 @@ class AIService:
         chat_messages = [{"role": "system", "content": system_prompt}]
         for m in messages:
             r = m.get("role", "user")
-            c = m.get("content", "")
+            c = (m.get("content", "") or "").strip()
             if c:
-                chat_messages.append({"role": r, "content": c})
+                chat_messages.append({"role": r, "content": c[:15000]})
 
         payload = {
             "model": self.model_name,
             "messages": chat_messages,
-            "temperature": 0.7
+            "temperature": 0.7,
+            "max_tokens": 4096
         }
 
-        try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                res = await client.post(url, headers=headers, json=payload)
-                if res.status_code == 200:
-                    data = res.json()
-                    choices = data.get("choices", [])
-                    if choices and "message" in choices[0]:
-                        return choices[0]["message"].get("content", "").strip()
-                    return ""
-                else:
-                    err_msg = f"HTTP {res.status_code}: {res.text}"
-                    logger.error(f"OpenAI-compatible AI error ({self.provider}): {err_msg}")
-                    raise RuntimeError(f"{self.display_name} so'rovi muvaffaqiyatsiz bo'ldi ({res.status_code}): {res.text[:150]}")
-        except Exception as e:
-            logger.error(f"OpenAI-compatible chat error: {e}", exc_info=True)
-            raise RuntimeError(f"{self.display_name} xizmatida xatolik: {e}")
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                async with httpx.AsyncClient(timeout=120.0) as client:
+                    res = await client.post(url, headers=headers, json=payload)
+                    if res.status_code == 200:
+                        data = res.json()
+                        choices = data.get("choices", [])
+                        if choices and "message" in choices[0]:
+                            return choices[0]["message"].get("content", "").strip()
+                        return ""
+                    elif res.status_code == 401:
+                        logger.error(f"OpenAI-compatible 401 Unauthorized: {res.text}")
+                        raise RuntimeError("AI autentifikatsiya xatosi: API kalit yaroqsiz.")
+                    elif res.status_code == 429 and attempt < max_retries - 1:
+                        backoff = (2 ** attempt) * 1.5
+                        logger.warning(f"OpenAI-compatible 429 Rate Limit, retrying in {backoff}s...")
+                        await asyncio.sleep(backoff)
+                        continue
+                    else:
+                        logger.error(f"OpenAI-compatible error ({res.status_code}): {res.text}")
+                        raise RuntimeError(f"AI xizmati xatolik qaytardi ({res.status_code}).")
+            except httpx.TimeoutException:
+                logger.error("OpenAI-compatible timeout")
+                raise RuntimeError("AI xizmati javob berish vaqti tugadi (timeout).")
+            except RuntimeError:
+                raise
+            except Exception as e:
+                logger.error(f"OpenAI-compatible chat error: {e}", exc_info=True)
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1.5)
+                    continue
+                raise RuntimeError("AI xizmatiga ulanishda xatolik yuz berdi.")
+
+        return ""
 
     # ── Convenience helper methods ─────────────────────────────────────
 
     async def summarize_text(self, text: str, language: str = "uz") -> str:
-        """Summarize the given text."""
+        """Summarize the given text with input limit."""
         lang_map = {"uz": "o'zbek", "ru": "русский", "en": "English"}
         lang = lang_map.get(language, "o'zbek")
         prompt = (
             f"Quyidagi matnni {lang} tilida qisqacha xulosa qilib ber. "
             f"Asosiy g'oyalarni ajratib ko'rsat.\n\n"
-            f"Matn:\n{text}"
+            f"Matn:\n{text[:15000]}"
         )
         return await self._generate(prompt)
 
@@ -201,7 +246,7 @@ class AIService:
         quiz_type: str = "multiple",
         language: str = "uz",
     ) -> list[dict]:
-        """Generate quiz questions from text."""
+        """Generate quiz questions from text and validate structure."""
         lang_map = {"uz": "o'zbek", "ru": "русский", "en": "English"}
         lang = lang_map.get(language, "o'zbek")
 
@@ -238,28 +283,42 @@ class AIService:
                 if lines and lines[-1].startswith("```"):
                     lines = lines[:-1]
                 text_clean = "\n".join(lines).strip()
-            return json.loads(text_clean)
-        except json.JSONDecodeError:
-            logger.warning("Failed to parse quiz JSON, returning raw text")
-            return [{"question": response, "options": [], "correct_answer": "", "explanation": ""}]
+            parsed = json.loads(text_clean)
+            if isinstance(parsed, list) and len(parsed) > 0 and isinstance(parsed[0], dict) and "question" in parsed[0]:
+                return parsed
+            raise ValueError("JSON tuzilmasi test formatiga mos kelmadi")
+        except Exception as e:
+            logger.warning(f"Failed to parse valid quiz JSON: {e}, raw response: {response[:200]}")
+            raise RuntimeError("AI test savollarini to'g'ri shakllantira olmadi. Iltimos, qayta urinib ko'ring.")
 
-    async def translate_text(self, text: str, target_lang: str = "en") -> str:
-        """Translate text to the target language."""
-        lang_map = {"uz": "o'zbek", "ru": "русский", "en": "English"}
-        lang = lang_map.get(target_lang, target_lang)
-        prompt = (
-            f"Quyidagi matnni {lang} tiliga professional darajada tarjima qil. "
-            f"Faqat tarjimani yoz, boshqa hech qanday izoh qo'shma.\n\n"
-            f"Matn:\n{text}"
-        )
+    async def translate_text(self, text: str, target_lang: Optional[str] = None) -> str:
+        """Translate text with auto-detection or to specified target language."""
+        clean_text = text[:15000]
+        # If target_lang is not specified or set to auto
+        if not target_lang or target_lang in ("auto", ""):
+            prompt = (
+                "Quyidagi matnni tahlil qil va uning tilini aniqlab tarjima qil:\n"
+                "- Agar matn o'zbek tilida bo'lsa, uni Ruscha va Inglizcha variantlarini alohida bo'limlar bilan ber.\n"
+                "- Agar matn rus yoki ingliz yoki boshqa tilda bo'lsa, uni O'zbek tiliga mukammal pedagogik tarjima qilib ber.\n\n"
+                f"Matn:\n{clean_text}"
+            )
+        else:
+            lang_map = {"uz": "o'zbek", "ru": "русский", "en": "English"}
+            lang = lang_map.get(target_lang, target_lang)
+            prompt = (
+                f"Quyidagi matnni {lang} tiliga professional darajada tarjima qil. "
+                f"Faqat tarjimani yoz, boshqa hech qanday ortiqcha gap qo'shma.\n\n"
+                f"Matn:\n{clean_text}"
+            )
         return await self._generate(prompt)
+
 
     async def check_grammar(self, text: str) -> str:
         """Check grammar and suggest corrections."""
         prompt = (
             "Quyidagi matndagi grammatik, imlo va uslubiy xatolarni top va to'g'rilangan variantini ber. "
             "Har bir xatoni aniq ko'rsat va tushuntir.\n\n"
-            f"Matn:\n{text}"
+            f"Matn:\n{text[:15000]}"
         )
         return await self._generate(prompt)
 
@@ -268,7 +327,7 @@ class AIService:
         lang_map = {"uz": "o'zbek", "ru": "русский", "en": "English"}
         lang = lang_map.get(language, "o'zbek")
         prompt = (
-            f"'{topic}' mavzusini {lang} tilida sodda va tushunarli qilib tushuntir. "
+            f"'{topic[:5000]}' mavzusini {lang} tilida sodda va tushunarli qilib tushuntir. "
             f"Mavzuni quyidagi tuzilmada ber:\n"
             f"1. Qisqa ta'rif\n"
             f"2. Asosiy tushunchalar\n"
@@ -289,8 +348,8 @@ class AIService:
         lang = lang_map.get(language, "o'zbek")
         prompt = (
             f"Quyidagi ma'lumotlar asosida zamonaviy dars ishlanmasi (konspekt) tuz.\n"
-            f"Fan: {subject}\n"
-            f"Mavzu: {topic}\n"
+            f"Fan: {subject[:200]}\n"
+            f"Mavzu: {topic[:2000]}\n"
             f"Davomiyligi: {duration}\n"
             f"Til: {lang}\n\n"
             f"Dars rejasi quyidagilarni to'liq o'z ichiga olsin:\n"
@@ -307,7 +366,7 @@ class AIService:
         prompt = (
             "Quyidagi matnni yaxshila va rasmiy, professional uslubda qayta yoz. "
             "Avval yaxshilangan matnni ber, keyin nimalar o'zgartirilganini qisqacha ko'rsat.\n\n"
-            f"Matn:\n{text}"
+            f"Matn:\n{text[:15000]}"
         )
         return await self._generate(prompt)
 
@@ -316,9 +375,10 @@ class AIService:
         prompt = (
             "Quyidagi matndan eng muhim asosiy fikrlarni ajratib ber. "
             "Har bir fikrni alohida punkt sifatida ko'rsat.\n\n"
-            f"Matn:\n{text}"
+            f"Matn:\n{text[:15000]}"
         )
         return await self._generate(prompt)
+
 
     async def analyze_document(self, text: str, language: str = "uz") -> str:
         """Analyze a document and provide comprehensive pedagogical review."""

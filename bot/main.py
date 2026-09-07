@@ -32,6 +32,9 @@ from bot.handlers.ai_handler import (
     handle_explain,
     handle_quiz,
     process_text_input,
+    handle_non_text_in_ai,
+    handle_file_during_ai,
+    handle_photo_during_ai,
     handle_smart_chat_message,
     handle_chat_ai_callback,
     cancel_ai,
@@ -288,7 +291,10 @@ def build_application():
         states={
             WAITING_TEXT: [
                 MessageHandler(cancel_filter, cancel_ai),
+                MessageHandler(filters.Document.ALL, handle_file_during_ai),
+                MessageHandler(filters.PHOTO, handle_photo_during_ai),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, process_text_input),
+                MessageHandler(~filters.COMMAND, handle_non_text_in_ai),
             ],
         },
         fallbacks=[

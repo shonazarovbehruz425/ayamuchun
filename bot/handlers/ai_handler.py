@@ -11,10 +11,14 @@ from bot.keyboards.reply import ai_menu_keyboard, back_keyboard, main_menu_keybo
 from bot.services.ai_service import AIService
 from bot.processors.word_processor import WordProcessor
 from bot.utils.validators import is_prompt_injection
+from bot.utils.helpers import parse_lesson_subject_topic, split_html_message
+from bot.database.engine import get_session
+from bot.database import crud
 
 logger = logging.getLogger(__name__)
 
 from bot.services.ai_service import get_ai_service
+
 
 # Conversation states
 WAITING_TEXT = 0
@@ -144,6 +148,33 @@ async def cancel_ai(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 
+async def handle_non_text_in_ai(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Catch stickers, audio, voice, or unexpected media during active AI state without hanging."""
+    await update.message.reply_text(
+        "⚠️ Iltimos, faqat matn yuboring yoki bekor qilish uchun <b>🔙 Orqaga</b> tugmasini bosing.",
+        reply_markup=back_keyboard(),
+        parse_mode="HTML"
+    )
+    return WAITING_TEXT
+
+
+async def handle_file_during_ai(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """If user sends a file during AI conversation, exit AI state cleanly and process the file."""
+    context.user_data.pop("ai_action", None)
+    from bot.handlers.file_handler import handle_file
+    await handle_file(update, context)
+    return ConversationHandler.END
+
+
+async def handle_photo_during_ai(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """If user sends a photo during AI conversation, exit AI state cleanly and process the photo."""
+    context.user_data.pop("ai_action", None)
+    from bot.handlers.photo_handler import handle_photo
+    await handle_photo(update, context)
+    return ConversationHandler.END
+
+
+
 async def process_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Process the user's text input based on the selected AI action."""
     raw_text = update.message.text or ""
@@ -151,6 +182,29 @@ async def process_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # Check if user wants to cancel or go back
     if raw_text.strip() in ("🔙 Orqaga", "❌ Bekor qilish", "/cancel"):
         return await cancel_ai(update, context)
+
+    # B9 fix: If user pressed another AI menu button or main menu button while state is open
+    ai_menu_routes = {
+        "📝 Dars rejasi": handle_lesson_plan,
+        "❓ Test & Savollar": handle_quiz,
+        "📋 Xulosa qilish": handle_summarize,
+        "💡 Tushuntirish": handle_explain,
+        "🔍 Grammatika tekshirish": handle_grammar_check,
+        "🔄 Tarjima": handle_translate,
+        "✏️ Matn yaxshilash": handle_improve_text,
+    }
+    if raw_text.strip() in ai_menu_routes:
+        return await ai_menu_routes[raw_text.strip()](update, context)
+
+    main_menu_buttons = {
+        "📄 Fayl asboblari", "🧠 AI yordamchi", "📝 Test yaratish",
+        "📊 Baholar jadvali", "⚙️ Sozlamalar", "📱 Mini App"
+    }
+    if raw_text.strip() in main_menu_buttons:
+        context.user_data.pop("ai_action", None)
+        from bot.main import handle_menu_text
+        await handle_menu_text(update, context)
+        return ConversationHandler.END
 
     # Check if text is empty or only whitespace
     clean_text = raw_text.strip()
@@ -211,14 +265,7 @@ async def process_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             header = "💡 <b>Sodda Tushuntirish:</b>"
             title = f"{text[:30]} — Tushuntirish"
         elif action == "lesson_plan":
-            if "—" in text:
-                parts = text.split("—", 1)
-                subject, topic = parts[0].strip(), parts[1].strip()
-            elif "-" in text:
-                parts = text.split("-", 1)
-                subject, topic = parts[0].strip(), parts[1].strip()
-            else:
-                subject, topic = "Umumiy", text.strip()
+            subject, topic = parse_lesson_subject_topic(text)
             result = await ai_service.generate_lesson_plan(subject, topic)
             header = "📝 <b>Dars Rejasi (Konspekt):</b>"
             title = f"{subject} — {topic} (Konspekt)"
@@ -252,6 +299,14 @@ async def process_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             header = "📋 <b>Natija:</b>"
             title = "AI Natijasi"
 
+        # Log usage to DB
+        try:
+            async with get_session() as session:
+                db_user = await crud.get_or_create_user(session, update.effective_user.id, update.effective_user.full_name or "User")
+                await crud.log_usage(session, db_user.id, f"ai_{action}", text[:60])
+        except Exception as log_err:
+            logger.warning(f"Could not log AI usage to DB: {log_err}")
+
         full_response = f"{header}\n\n{result}"
 
         # If result is large, generate a Word docx as well so teacher can directly download it!
@@ -266,16 +321,18 @@ async def process_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             logger.warning(f"Could not generate docx preview for AI message: {doc_err}")
             doc_path = None
 
-        if len(full_response) > 4000:
-            chunks = [full_response[i:i + 4000] for i in range(0, len(full_response), 4000)]
-            await msg.edit_text(chunks[0], parse_mode="HTML" if "<b" in chunks[0] else None)
-            for chunk in chunks[1:]:
-                await update.message.reply_text(chunk)
-        else:
+        chunks = split_html_message(full_response, max_len=3800)
+        # Edit first chunk into status message
+        try:
+            await msg.edit_text(chunks[0], parse_mode="HTML")
+        except Exception:
+            await msg.edit_text(chunks[0])
+
+        for chunk in chunks[1:]:
             try:
-                await msg.edit_text(full_response, parse_mode="HTML")
+                await update.message.reply_text(chunk, parse_mode="HTML")
             except Exception:
-                await msg.edit_text(full_response)
+                await update.message.reply_text(chunk)
 
         # Send .docx document if generated
         if doc_path and os.path.exists(doc_path):
@@ -294,8 +351,7 @@ async def process_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except Exception as e:
         logger.error(f"AI processing error: {e}", exc_info=True)
         await msg.edit_text(
-            f"❌ Xatolik yuz berdi: {str(e)}\n"
-            "Iltimos, qayta urinib ko'ring."
+            "❌ Xatolik yuz berdi. Iltimos, qayta urinib ko'ring."
         )
 
     await update.message.reply_text(
@@ -303,6 +359,7 @@ async def process_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         reply_markup=main_menu_keyboard(),
     )
     return ConversationHandler.END
+
 
 
 
@@ -530,13 +587,13 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
     except Exception as e:
         logger.error(f"Error in handle_smart_chat_message: {e}", exc_info=True)
         err_text = (
-            f"⚠️ <b>Javob berishda xatolik yuz berdi:</b>\n<i>{str(e)[:160]}</i>\n\n"
-            f"Iltimos, qayta urinib ko'ring yoki savolingizni boshqacharoq yozing."
+            "⚠️ <b>Javob berishda xatolik yuz berdi.</b>\n"
+            "Iltimos, qayta urinib ko'ring yoki savolingizni boshqacharoq yozing."
         )
         try:
             await status_msg.edit_text(err_text, parse_mode="HTML")
         except Exception:
-            await update.message.reply_text(f"⚠️ Xatolik yuz berdi: {str(e)[:160]}")
+            await update.message.reply_text("⚠️ Xatolik yuz berdi. Iltimos, qayta urinib ko'ring.")
 
 
 async def handle_chat_ai_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -575,8 +632,8 @@ async def handle_chat_ai_callback(update: Update, context: ContextTypes.DEFAULT_
             except Exception:
                 pass
         except Exception as err:
-            logger.error(f"Word docx export error: {err}")
-            await wait_msg.edit_text(f"❌ Word fayl yaratishda xatolik: {err}")
+            logger.error(f"Word docx export error: {err}", exc_info=True)
+            await wait_msg.edit_text("❌ Word fayl yaratishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.")
 
     elif action == "chat_ai_quiz":
         prompt_topic = last_topic or last_response[:200]
@@ -604,8 +661,8 @@ async def handle_chat_ai_callback(update: Update, context: ContextTypes.DEFAULT_
             await wait_msg.delete()
             await query.message.reply_text(quiz_text, reply_markup=keyboard, parse_mode="HTML")
         except Exception as err:
-            logger.error(f"Quiz generation error: {err}")
-            await wait_msg.edit_text(f"❌ Test tuzishda xatolik: {err}")
+            logger.error(f"Quiz generation error: {err}", exc_info=True)
+            await wait_msg.edit_text("❌ Test tuzishda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.")
 
     elif action == "chat_ai_summarize":
         if not last_response:
@@ -624,7 +681,8 @@ async def handle_chat_ai_callback(update: Update, context: ContextTypes.DEFAULT_
                 parse_mode="HTML"
             )
         except Exception as err:
-            await wait_msg.edit_text(f"❌ Xulosa qilishda xatolik: {err}")
+            logger.error(f"Summarize callback error: {err}", exc_info=True)
+            await wait_msg.edit_text("❌ Xulosa qilishda xatolik yuz berdi.")
 
     elif action == "chat_ai_translate":
         if not last_response:
@@ -645,7 +703,9 @@ async def handle_chat_ai_callback(update: Update, context: ContextTypes.DEFAULT_
                 reply_markup=keyboard
             )
         except Exception as err:
-            await wait_msg.edit_text(f"❌ Tarjima qilishda xatolik: {err}")
+            logger.error(f"Translate callback error: {err}", exc_info=True)
+            await wait_msg.edit_text("❌ Tarjima qilishda xatolik yuz berdi.")
+
 
     elif action == "chat_ai_clear":
         context.user_data["telegram_chat_history"] = []

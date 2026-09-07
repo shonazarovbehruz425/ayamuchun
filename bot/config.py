@@ -8,8 +8,13 @@ class Settings(BaseSettings):
     BOT_TOKEN: str = "local_dev_preview_token"
     ADMIN_IDS: List[int] = []
 
-    # AI (Google Gemini) - Optional
-    GEMINI_API_KEY: str = ""
+    # AI Engine Settings (Multi-provider: OpenAI, Gemini, DeepSeek, Claude, Groq, Custom)
+    AI_PROVIDER: str = os.getenv("AI_PROVIDER", "gemini")  # "gemini" | "openai" | "deepseek" | "custom"
+    AI_API_KEY: str = os.getenv("AI_API_KEY", "")
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")  # Backward compatibility fallback
+    AI_BASE_URL: str = os.getenv("AI_BASE_URL", "")        # Custom endpoint e.g. "https://api.openai.com/v1" or "https://api.deepseek.com/v1"
+    AI_MODEL: str = os.getenv("AI_MODEL", "")              # e.g. "gemini-2.0-flash", "gpt-4o-mini", "deepseek-chat"
+    AI_DISPLAY_NAME: str = os.getenv("AI_DISPLAY_NAME", "EduBot AI")  # Public user-facing name (no third-party brand)
 
     # Telegram Channel Vault & Database (Cloud storage)
     CHANNEL_DB_ID: int = -1003745209875

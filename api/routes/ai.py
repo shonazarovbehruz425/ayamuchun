@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from .auth import get_current_user
 from ..schemas.responses import AIRequest, AIResponse
-from bot.services.ai_service import AIService
+from bot.services.ai_service import get_ai_service
 from bot.config import get_settings
 from bot.database.engine import get_session
 from bot.database import crud
@@ -17,7 +17,16 @@ from .files import send_file_to_telegram
 logger = logging.getLogger(__name__)
 router = APIRouter()
 settings = get_settings()
-ai_service = AIService(api_key=settings.GEMINI_API_KEY)
+ai_service = get_ai_service()
+
+
+@router.get("/config")
+async def get_ai_config():
+    """Foydalanuvchilarga ko'rinadigan AI tizim nomi va holati (hech qanday xorijiy brendsiz)."""
+    return {
+        "display_name": settings.AI_DISPLAY_NAME or "EduBot AI",
+        "is_configured": ai_service.is_configured
+    }
 
 
 class ActionTelegramRequest(BaseModel):

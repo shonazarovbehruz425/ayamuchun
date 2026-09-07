@@ -13,9 +13,11 @@ from bot.keyboards.reply import back_keyboard, main_menu_keyboard
 from bot.services.ai_service import AIService
 from bot.services.quiz_service import QuizService
 
+from bot.services.ai_service import get_ai_service
+
 logger = logging.getLogger(__name__)
 config = get_settings()
-ai_service = AIService(api_key=config.GEMINI_API_KEY)
+ai_service = get_ai_service()
 quiz_service = QuizService(ai_service)
 
 # Conversation states

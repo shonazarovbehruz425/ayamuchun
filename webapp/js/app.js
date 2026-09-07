@@ -7,7 +7,7 @@
  * 4. PDF tahrirlash (Matn tahrirlash & So'z almashtirish)
  * 5. Rasmlarni PDF qilish (A4 standart birlashtirish)
  * 6. PDF rasmlarini olish (ZIP)
- * 7. AI Yordamchi (Gemini 2.0 Flash)
+ * 7. AI Pedagogik Yordamchi (EduBot AI)
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -52,6 +52,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (window.location.hash === '#/settings') {
                 renderSettings();
             }
+        }
+    }).catch(() => {});
+
+    window.aiDisplayName = "EduBot AI";
+    api.getAiConfig().then(cfg => {
+        if (cfg && cfg.display_name) {
+            window.aiDisplayName = cfg.display_name;
+            // Update any existing AI badges or labels
+            const badges = document.querySelectorAll('.ai-brand-badge');
+            badges.forEach(b => { b.innerText = window.aiDisplayName; });
         }
     }).catch(() => {});
 
@@ -479,7 +489,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <div>
                                         <div class="flex items-center gap-1.5">
                                             <h4 class="text-sm font-bold text-slate-900 dark:text-white">AI Pedagogik Yordamchi</h4>
-                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-purple-600 to-indigo-600 text-white">Gemini 2.0</span>
+                                            <span class="ai-brand-badge px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-purple-600 to-indigo-600 text-white">${window.aiDisplayName || "EduBot AI"}</span>
                                         </div>
                                         <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Xulosa qilish, dars rejasi tuzish, tarjima va savollarga javob</p>
                                     </div>
@@ -3466,7 +3476,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div>
                         <div class="flex items-center gap-2">
                             <h2 class="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">AI Pedagogik Studiya</h2>
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-sm shadow-brand-500/20">Gemini 2.0</span>
+                            <span class="ai-brand-badge px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-sm shadow-brand-500/20">${window.aiDisplayName || "EduBot AI"}</span>
                         </div>
                         <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Dars rejalari, testlar, tarjima va tushuntirishlarni bir zumda tayyorlaydi</p>
                     </div>
@@ -3662,7 +3672,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="w-12 h-12 rounded-2xl bg-brand-500/10 text-brand-600 flex items-center justify-center animate-pulse">
                         <i data-lucide="bot" class="w-6 h-6"></i>
                     </div>
-                    <p class="text-xs font-semibold">Google Gemini 2.0 Flash dars ishlanmasini tayyorlamoqda...</p>
+                    <p class="text-xs font-semibold"><span class="ai-brand-badge font-bold">${window.aiDisplayName || "EduBot AI"}</span> dars ishlanmasini tayyorlamoqda...</p>
                 </div>
             `;
             refreshIcons(outRendered);

@@ -126,9 +126,13 @@ const AdminApp = {
                 }
 
                 const aiEl = document.getElementById('sys-ai-status');
+                const aiLabel = document.getElementById('sys-ai-label');
+                if (aiLabel && sys.ai_display_name) {
+                    aiLabel.innerText = `${sys.ai_display_name} (${(sys.ai_provider || 'AI').toUpperCase()})`;
+                }
                 if (aiEl) {
-                    aiEl.innerText = sys.gemini_configured ? "Faol (Gemini 2.0 ✓)" : "API Key Kutilyapti";
-                    aiEl.className = sys.gemini_configured ? "font-bold text-emerald-600 text-xs sm:text-sm" : "font-bold text-amber-500 text-xs sm:text-sm";
+                    aiEl.innerText = sys.ai_configured ? `Faol (${sys.ai_model || 'Ulangan'} ✓)` : "API Key Kutilyapti";
+                    aiEl.className = sys.ai_configured ? "font-bold text-emerald-600 text-xs sm:text-sm" : "font-bold text-amber-500 text-xs sm:text-sm";
                 }
             }
         } catch (e) {

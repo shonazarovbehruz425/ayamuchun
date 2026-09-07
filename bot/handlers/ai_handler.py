@@ -13,20 +13,23 @@ from bot.processors.word_processor import WordProcessor
 
 logger = logging.getLogger(__name__)
 
+from bot.services.ai_service import get_ai_service
+
 # Conversation states
 WAITING_TEXT = 0
 WAITING_TOPIC = 1
 
 # Initialize AI service
 _config = get_settings()
-ai_service = AIService(api_key=_config.GEMINI_API_KEY)
+ai_service = get_ai_service()
 word_processor = WordProcessor()
 
 
 async def ai_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show the AI tools submenu."""
+    ai_title = _config.AI_DISPLAY_NAME or "EduBot AI"
     await update.message.reply_text(
-        "🧠 <b>AI Pedagogik Yordamchi (Gemini 2.0 Flash)</b>\n\n"
+        f"🧠 <b>{ai_title} — Pedagogik Yordamchi</b>\n\n"
         "O'qituvchi va murabbiylar uchun maxsus moslashtirilgan sun'iy intellekt xizmatlari.\n"
         "Quyidagi asboblardan birini tanlang:",
         reply_markup=ai_menu_keyboard(),

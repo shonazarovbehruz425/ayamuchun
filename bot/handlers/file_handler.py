@@ -14,9 +14,11 @@ from bot.processors.converter import FileConverter
 from bot.services.ai_service import AIService
 from bot.utils.helpers import format_file_size, get_file_extension, generate_unique_filename
 
+from bot.services.ai_service import get_ai_service
+
 logger = logging.getLogger(__name__)
 config = get_settings()
-ai_service = AIService(api_key=config.GEMINI_API_KEY)
+ai_service = get_ai_service()
 converter = FileConverter()
 
 

@@ -56,7 +56,7 @@ async def get_stats():
         db_stats = await crud.get_admin_overview(session)
 
     bot_configured = bool(settings.BOT_TOKEN and settings.BOT_TOKEN not in ("your_bot_token_here", "local_dev_preview_token"))
-    gemini_configured = bool(settings.GEMINI_API_KEY)
+    ai_configured = bool(settings.AI_API_KEY or settings.GEMINI_API_KEY)
 
     return {
         "status": "ok",
@@ -77,7 +77,11 @@ async def get_stats():
             "python_version": platform.python_version(),
             "os": f"{platform.system()} {platform.release()}",
             "bot_configured": bot_configured,
-            "gemini_configured": gemini_configured,
+            "ai_configured": ai_configured,
+            "gemini_configured": ai_configured,
+            "ai_display_name": settings.AI_DISPLAY_NAME or "EduBot AI",
+            "ai_provider": settings.AI_PROVIDER,
+            "ai_model": settings.AI_MODEL or "standart",
             "webapp_url": settings.WEBAPP_URL,
             "server_time": datetime.utcnow().strftime("%d.%m.%Y %H:%M:%S UTC")
         }

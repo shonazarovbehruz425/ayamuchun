@@ -12,11 +12,13 @@ from bot.config import get_settings
 from bot.database.engine import get_session
 from bot.database import crud
 
+from bot.services.ai_service import get_ai_service
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 settings = get_settings()
 
-ai_service = AIService(api_key=settings.GEMINI_API_KEY)
+ai_service = get_ai_service()
 quiz_service = QuizService(ai_service=ai_service)
 
 @router.get("/list", response_model=List[QuizResponse])

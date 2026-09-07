@@ -280,10 +280,10 @@ document.addEventListener('DOMContentLoaded', () => {
     window.filterTools = (category, btn) => {
         TelegramApp.hapticFeedback('light');
         document.querySelectorAll('.tool-filter-chip').forEach(el => {
-            el.className = 'tool-filter-chip px-3 py-1.5 rounded-xl text-xs font-bold bg-white/70 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all whitespace-nowrap border border-slate-200/60 dark:border-slate-700/60';
+            el.className = 'tool-filter-chip inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white/70 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all whitespace-nowrap border border-slate-200/60 dark:border-slate-700/60';
         });
         if (btn) {
-            btn.className = 'tool-filter-chip px-3 py-1.5 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm transition-all whitespace-nowrap active-chip';
+            btn.className = 'tool-filter-chip inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm transition-all whitespace-nowrap active-chip';
         }
         
         document.querySelectorAll('#tools-grid > div[data-category]').forEach(card => {
@@ -324,17 +324,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     <!-- Filter Tabs for Quick Navigation -->
                     <div class="flex items-center gap-1.5 overflow-x-auto pb-2 no-scrollbar mb-3">
-                        <button onclick="filterTools('all', this)" class="tool-filter-chip px-3 py-1.5 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm transition-all whitespace-nowrap active-chip">
-                            Barchasi (12)
+                        <button onclick="filterTools('all', this)" class="tool-filter-chip inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm transition-all whitespace-nowrap active-chip">
+                            <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                            <span>Barchasi (12)</span>
                         </button>
-                        <button onclick="filterTools('pdf', this)" class="tool-filter-chip px-3 py-1.5 rounded-xl text-xs font-bold bg-white/70 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all whitespace-nowrap border border-slate-200/60 dark:border-slate-700/60">
-                            🟥 PDF Vositalari (6)
+                        <button onclick="filterTools('pdf', this)" class="tool-filter-chip inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white/70 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all whitespace-nowrap border border-slate-200/60 dark:border-slate-700/60">
+                            <i data-lucide="file-text" class="w-3.5 h-3.5 text-rose-500"></i>
+                            <span>PDF Vositalari (6)</span>
                         </button>
-                        <button onclick="filterTools('word', this)" class="tool-filter-chip px-3 py-1.5 rounded-xl text-xs font-bold bg-white/70 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all whitespace-nowrap border border-slate-200/60 dark:border-slate-700/60">
-                            📝 Word & Doc (3)
+                        <button onclick="filterTools('word', this)" class="tool-filter-chip inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white/70 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all whitespace-nowrap border border-slate-200/60 dark:border-slate-700/60">
+                            <i data-lucide="file-edit" class="w-3.5 h-3.5 text-blue-500"></i>
+                            <span>Word & Doc (3)</span>
                         </button>
-                        <button onclick="filterTools('media', this)" class="tool-filter-chip px-3 py-1.5 rounded-xl text-xs font-bold bg-white/70 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all whitespace-nowrap border border-slate-200/60 dark:border-slate-700/60">
-                            🎨 Surat & 3×4 (3)
+                        <button onclick="filterTools('media', this)" class="tool-filter-chip inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white/70 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all whitespace-nowrap border border-slate-200/60 dark:border-slate-700/60">
+                            <i data-lucide="image" class="w-3.5 h-3.5 text-purple-500"></i>
+                            <span>Surat & 3×4 (3)</span>
                         </button>
                     </div>
 
@@ -411,7 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                                 <div class="min-w-0">
                                     <div class="flex items-center gap-1.5">
-                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">🟥 PDF birlashtirish</h4>
+                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">PDF birlashtirish</h4>
                                         <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-600 dark:text-red-400">Merge</span>
                                     </div>
                                     <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">Bir nechta PDF ni tartibli bitta faylga ulash</p>
@@ -427,7 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                                 <div class="min-w-0">
                                     <div class="flex items-center gap-1.5">
-                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">🟧 PDF bo'lish</h4>
+                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">PDF bo'lish</h4>
                                         <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400">Split</span>
                                     </div>
                                     <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">Sahifalarni ajratish yoki ZIP qilib kesish</p>
@@ -443,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                                 <div class="min-w-0">
                                     <div class="flex items-center gap-1.5">
-                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">🟪 PDF kichraytirish</h4>
+                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">PDF kichraytirish</h4>
                                         <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400">-80%</span>
                                     </div>
                                     <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">Fayl hajmini sifatli qisqartirish (Siqish)</p>
@@ -459,7 +463,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                                 <div class="min-w-0">
                                     <div class="flex items-center gap-1.5">
-                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">🟦 PDF suv belgisi</h4>
+                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">PDF suv belgisi</h4>
                                         <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">Watermark</span>
                                     </div>
                                     <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">Matn yoki logotip himoyasi qo'yish</p>
@@ -475,7 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <div class="flex items-center gap-1.5">
-                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">📸 Hujjat foto (3×4)</h4>
+                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">Hujjat foto (3×4)</h4>
                                         <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30">300 DPI</span>
                                     </div>
                                     <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">Pasport, viza, oq/ko'k fon, 6 talik varaq</p>
@@ -3504,20 +3508,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
                             <!-- Quick Starter Prompts -->
                             <div class="w-full max-w-lg pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
-                                <button onclick="quickSendPrompt('5-sinf Matematika fanidan oddiy kasrlar mavzusida to\'liq 45 daqiqalik dars rejasi tuzib ber')" class="liquid-glass-interactive p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-800 dark:text-slate-200 hover:border-brand-500/50 transition-all flex items-start gap-2 cursor-pointer">
-                                    <span class="text-brand-600 text-sm">📚</span>
+                                <button onclick="quickSendPrompt('5-sinf Matematika fanidan oddiy kasrlar mavzusida to\'liq 45 daqiqalik dars rejasi tuzib ber')" class="liquid-glass-interactive p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-800 dark:text-slate-200 hover:border-brand-500/50 transition-all flex items-start gap-2.5 cursor-pointer group">
+                                    <div class="w-6 h-6 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 mt-0.5">
+                                        <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                                    </div>
                                     <span>45 daqiqalik dars rejasi (konspekt)</span>
                                 </button>
-                                <button onclick="quickSendPrompt('8-sinf Fizika Nyuton qonunlari bo\'yicha 5 ta variantli (A,B,C,D) test tuzib ber')" class="liquid-glass-interactive p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-800 dark:text-slate-200 hover:border-brand-500/50 transition-all flex items-start gap-2 cursor-pointer">
-                                    <span class="text-amber-500 text-sm">❓</span>
+                                <button onclick="quickSendPrompt('8-sinf Fizika Nyuton qonunlari bo\'yicha 5 ta variantli (A,B,C,D) test tuzib ber')" class="liquid-glass-interactive p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-800 dark:text-slate-200 hover:border-brand-500/50 transition-all flex items-start gap-2.5 cursor-pointer group">
+                                    <div class="w-6 h-6 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+                                        <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
+                                    </div>
                                     <span>5 ta variantli test (A/B/C/D) tuzish</span>
                                 </button>
-                                <button onclick="quickSendPrompt('Nima uchun samolyot havoda uchadi va og\'ir bo\'lsa ham tushib ketmaydi? Sodda tushuntir')" class="liquid-glass-interactive p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-800 dark:text-slate-200 hover:border-brand-500/50 transition-all flex items-start gap-2 cursor-pointer">
-                                    <span class="text-purple-500 text-sm">💡</span>
+                                <button onclick="quickSendPrompt('Nima uchun samolyot havoda uchadi va og\'ir bo\'lsa ham tushib ketmaydi? Sodda tushuntir')" class="liquid-glass-interactive p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-800 dark:text-slate-200 hover:border-brand-500/50 transition-all flex items-start gap-2.5 cursor-pointer group">
+                                    <div class="w-6 h-6 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
+                                        <i data-lucide="lightbulb" class="w-3.5 h-3.5"></i>
+                                    </div>
                                     <span>Murakkab mavzuni sodda tushuntirish</span>
                                 </button>
-                                <button onclick="quickSendPrompt('Bugun darsda o\'quvchilar bilan qanday qiziqarli interaktiv o\'yin o\'tkazsam bo\'ladi?')" class="liquid-glass-interactive p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-800 dark:text-slate-200 hover:border-brand-500/50 transition-all flex items-start gap-2 cursor-pointer">
-                                    <span class="text-emerald-500 text-sm">🎮</span>
+                                <button onclick="quickSendPrompt('Bugun darsda o\'quvchilar bilan qanday qiziqarli interaktiv o\'yin o\'tkazsam bo\'ladi?')" class="liquid-glass-interactive p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-800 dark:text-slate-200 hover:border-brand-500/50 transition-all flex items-start gap-2.5 cursor-pointer group">
+                                    <div class="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                                        <i data-lucide="gamepad-2" class="w-3.5 h-3.5"></i>
+                                    </div>
                                     <span>Interaktiv metodlar va dars o\'yinlari</span>
                                 </button>
                             </div>
@@ -4250,8 +4262,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2 flex-wrap">
                             <h3 class="text-base sm:text-lg font-bold text-slate-900 dark:text-white truncate">${fullName}</h3>
-                            <span class="liquid-glass-pill px-2 py-0.5 rounded-md text-[10px] font-bold ${isCurrentUserAdmin ? 'text-emerald-600 bg-emerald-500/10 border-emerald-500/20' : (isPremium ? 'text-amber-600 bg-amber-500/10 border-amber-500/20' : 'text-brand-600 bg-brand-500/10 border-brand-500/20')} border">
-                                ${isCurrentUserAdmin ? '🛡️ Admin' : (isPremium ? '⭐ Premium' : 'Foydalanuvchi')}
+                            <span class="liquid-glass-pill inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${isCurrentUserAdmin ? 'text-emerald-600 bg-emerald-500/10 border-emerald-500/20' : (isPremium ? 'text-amber-600 bg-amber-500/10 border-amber-500/20' : 'text-brand-600 bg-brand-500/10 border-brand-500/20')} border">
+                                ${isCurrentUserAdmin ? '<i data-lucide="shield-check" class="w-3 h-3"></i> Admin' : (isPremium ? '<i data-lucide="star" class="w-3 h-3 fill-current"></i> Premium' : 'Foydalanuvchi')}
                             </span>
                         </div>
                         <p class="text-xs text-brand-600 dark:text-brand-400 font-semibold mt-1 flex items-center gap-1 truncate">

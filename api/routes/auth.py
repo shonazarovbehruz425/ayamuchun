@@ -2,9 +2,14 @@ import hmac
 import hashlib
 import json
 import logging
+import httpx
 from urllib.parse import parse_qsl
 from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi.responses import Response
 from bot.config import get_settings
+from bot.database.engine import get_session
+from bot.database.models import User
+from sqlalchemy.future import select
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -65,7 +70,55 @@ async def get_current_user(authorization: str = Header(None)):
                 raise HTTPException(status_code=401, detail="Noto'g'ri Telegram autentifikatsiya ma'lumoti")
 
     user_data["is_admin"] = user_data["telegram_id"] in settings.ADMIN_IDS
+
+    # Check database to see if phone_number or photo_url is already saved
+    try:
+        async with get_session() as session:
+            result = await session.execute(select(User).where(User.telegram_id == user_data["telegram_id"]))
+            db_user = result.scalar_one_or_none()
+            if db_user:
+                if getattr(db_user, "phone_number", None):
+                    user_data["phone_number"] = db_user.phone_number
+                if getattr(db_user, "photo_url", None):
+                    user_data["photo_url"] = db_user.photo_url
+    except Exception as e:
+        logger.warning(f"Error querying user from db: {e}")
+
+    # If photo_url is still empty, set it to the avatar proxy endpoint
+    if not user_data.get("photo_url"):
+        user_data["photo_url"] = f"/api/auth/avatar?uid={user_data['telegram_id']}"
+
     return user_data
+
+@router.get("/avatar")
+async def get_telegram_avatar(uid: int):
+    """Fetch user's actual profile photo via Telegram Bot API and stream it as image/jpeg."""
+    if not settings.BOT_TOKEN or settings.BOT_TOKEN in ("your_bot_token_here", "local_dev_preview_token"):
+        raise HTTPException(status_code=404, detail="Bot token unavailable for avatar fetch")
+
+    try:
+        url = f"https://api.telegram.org/bot{settings.BOT_TOKEN}/getUserProfilePhotos?user_id={uid}&limit=1"
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("ok") and data.get("result", {}).get("total_count", 0) > 0:
+                    photos = data["result"]["photos"][0]
+                    # Select largest photo
+                    file_id = photos[-1]["file_id"]
+                    file_resp = await client.get(f"https://api.telegram.org/bot{settings.BOT_TOKEN}/getFile?file_id={file_id}")
+                    if file_resp.status_code == 200:
+                        file_data = file_resp.json()
+                        if file_data.get("ok"):
+                            file_path = file_data["result"]["file_path"]
+                            img_url = f"https://api.telegram.org/file/bot{settings.BOT_TOKEN}/{file_path}"
+                            img_resp = await client.get(img_url)
+                            if img_resp.status_code == 200:
+                                return Response(content=img_resp.content, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
+    except Exception as e:
+        logger.warning(f"Failed to fetch telegram avatar for uid={uid}: {e}")
+
+    raise HTTPException(status_code=404, detail="Avatar not found")
 
 @router.get("/me")
 @router.post("/validate")
@@ -81,6 +134,17 @@ class PhoneUpdateRequest(BaseModel):
 @router.post("/update-phone")
 async def update_phone(req: PhoneUpdateRequest, authorization: str = Header(None)):
     user = await get_current_user(authorization)
-    # Return updated user info with phone
     user["phone_number"] = req.phone_number
+
+    # Persist to database
+    try:
+        async with get_session() as session:
+            result = await session.execute(select(User).where(User.telegram_id == user["telegram_id"]))
+            db_user = result.scalar_one_or_none()
+            if db_user:
+                db_user.phone_number = req.phone_number
+                await session.commit()
+    except Exception as e:
+        logger.warning(f"Error persisting phone to DB: {e}")
+
     return {"status": "ok", "phone_number": req.phone_number, "user": user}

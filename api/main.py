@@ -26,10 +26,12 @@ class CacheControlMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response: Response = await call_next(request)
         path = request.url.path
-        if any(path.endswith(ext) for ext in [".js", ".css", ".png", ".jpg", ".jpeg", ".svg", ".ico", ".woff", ".woff2", ".ttf"]):
-            response.headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=43200"
-        elif path == "/" or path.endswith(".html"):
+        if path.endswith(".js") or path.endswith(".css") or path.endswith(".html") or path == "/":
             response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        elif any(path.endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".svg", ".ico", ".woff", ".woff2", ".ttf"]):
+            response.headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=43200"
         return response
 
 app.add_middleware(CacheControlMiddleware)

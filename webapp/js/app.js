@@ -34,11 +34,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let isCurrentUserAdmin = false;
+    window.activeUserProfile = null;
     api.getMe().then(res => {
+        if (res && res.user) {
+            window.activeUserProfile = res.user;
+            if (res.user.phone_number) {
+                localStorage.setItem('edubot_user_phone', res.user.phone_number);
+            }
+            if (window.location.hash === '#/settings') {
+                renderSettings();
+            }
+        }
         if (res && res.is_admin) {
             isCurrentUserAdmin = true;
             const badge = document.getElementById('header-user-name');
             if (badge) badge.innerText = `${tgUser.first_name || "Admin"} (Admin)`;
+            if (window.location.hash === '#/settings') {
+                renderSettings();
+            }
         }
     }).catch(() => {});
 
@@ -3711,7 +3724,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const existing = document.getElementById('phone-modal');
         if (existing) existing.remove();
 
-        const current = localStorage.getItem('edubot_user_phone') || '';
+        const current = localStorage.getItem('edubot_user_phone') || '+998 ';
         const modal = document.createElement('div');
         modal.id = 'phone-modal';
         modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in';
@@ -3720,7 +3733,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-sm">
                         <i data-lucide="phone" class="w-4 h-4 text-brand-600"></i>
-                        <span>Telefon raqamni saqlash</span>
+                        <span>Telefon raqamni ulash</span>
                     </div>
                     <button onclick="document.getElementById('phone-modal').remove()" class="text-slate-400 hover:text-slate-600 p-1">
                         <i data-lucide="x" class="w-4 h-4"></i>
@@ -3734,10 +3747,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/80 text-slate-900 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50" />
                 </div>
                 <div class="flex gap-2 pt-1">
-                    <button onclick="document.getElementById('phone-modal').remove()" class="flex-1 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
+                    <button onclick="document.getElementById('phone-modal').remove()" class="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
                         Bekor qilish
                     </button>
-                    <button onclick="saveUserPhone()" class="flex-1 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs shadow-md shadow-brand-500/20 transition-colors">
+                    <button onclick="saveUserPhone()" class="flex-1 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs shadow-md shadow-brand-500/20 transition-colors">
                         Saqlash ✓
                     </button>
                 </div>
@@ -3747,7 +3760,11 @@ document.addEventListener('DOMContentLoaded', () => {
         refreshIcons(modal);
         setTimeout(() => {
             const inp = document.getElementById('user-phone-input');
-            if (inp) inp.focus();
+            if (inp) {
+                inp.focus();
+                const len = inp.value.length;
+                inp.setSelectionRange(len, len);
+            }
         }, 100);
     };
 
@@ -3774,43 +3791,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.connectTelegramPhone = () => {
         TelegramApp.hapticFeedback('medium');
-        const triggered = TelegramApp.requestContact((sent, event) => {
-            if (sent && event && event.response_unpacked && event.response_unpacked.contact) {
-                const phone = event.response_unpacked.contact.phone_number;
-                if (phone) {
-                    const formatted = phone.startsWith('+') ? phone : ('+' + phone);
-                    localStorage.setItem('edubot_user_phone', formatted);
-                    api.updatePhone(formatted).catch(() => {});
-                    TelegramApp.showAlert(`✅ Telegram telefon raqamingiz muvaffaqiyatli ulandi: ${formatted}`);
-                    renderSettings();
-                    return;
-                }
-            }
-            openPhoneModal();
-        });
-
-        if (!triggered) {
-            openPhoneModal();
-        }
+        openPhoneModal();
     };
 
     function renderSettings() {
+        const profile = window.activeUserProfile || {};
         const currentTgUser = TelegramApp.getUserData() || tgUser || {};
-        const firstName = currentTgUser.first_name || tgUser.first_name || "O'qituvchi";
-        const lastName = currentTgUser.last_name || tgUser.last_name || "";
-        const fullName = `${firstName} ${lastName}`.trim();
-        const username = currentTgUser.username || tgUser.username || "";
-        const userId = currentTgUser.id || tgUser.id || "Nomaʼlum";
-        const photoUrl = currentTgUser.photo_url || tgUser.photo_url || "";
-        const isPremium = Boolean(currentTgUser.is_premium || tgUser.is_premium);
-        const langCode = (currentTgUser.language_code || tgUser.language_code || "uz").toLowerCase();
+        const firstName = currentTgUser.first_name || profile.first_name || tgUser.first_name || "O'qituvchi";
+        const lastName = currentTgUser.last_name || profile.last_name || tgUser.last_name || "";
+        const fullName = `${firstName} ${lastName}`.trim() || "O'qituvchi";
+        const username = currentTgUser.username || profile.username || tgUser.username || "";
+        const userId = currentTgUser.id || profile.telegram_id || tgUser.id || "Nomaʼlum";
+        
+        // Use direct Telegram avatar or backend proxy avatar
+        const photoUrl = (currentTgUser.photo_url && currentTgUser.photo_url.startsWith('http')) 
+            ? currentTgUser.photo_url 
+            : `/api/auth/avatar?uid=${userId}`;
+
+        const isPremium = Boolean(currentTgUser.is_premium || profile.is_premium || tgUser.is_premium);
+        const langCode = (currentTgUser.language_code || profile.language_code || tgUser.language_code || "uz").toLowerCase();
         const langNames = {
             'uz': "O'zbekcha 🇺🇿",
             'ru': "Русский 🇷🇺",
             'en': "English 🇬🇧"
         };
         const displayLanguage = langNames[langCode] || `${langCode.toUpperCase()} 🌐`;
-        const userPhone = localStorage.getItem('edubot_user_phone') || currentTgUser.phone_number || "";
+        const userPhone = localStorage.getItem('edubot_user_phone') || profile.phone_number || currentTgUser.phone_number || "";
         const userInitial = (firstName || 'O').charAt(0).toUpperCase();
 
         const adminSection = isCurrentUserAdmin ? `
@@ -3843,19 +3849,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 <!-- 1. ASOSIY TELEGRAM PROFIL KARTASI -->
                 <div class="liquid-glass-card p-4 sm:p-5 flex items-center gap-4">
                     <div class="relative w-15 h-15 sm:w-18 sm:h-18 flex-shrink-0">
-                        ${photoUrl ? `
-                            <img src="${photoUrl}" 
-                                 alt="${fullName}" 
-                                 class="w-full h-full rounded-2xl object-cover shadow-lg shadow-brand-500/20 ring-2 ring-white/90 dark:ring-slate-700" 
-                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
-                            <div style="display:none;" class="w-full h-full rounded-2xl bg-gradient-to-tr from-brand-600 via-indigo-600 to-purple-600 text-white items-center justify-center font-black text-2xl shadow-lg shadow-brand-500/25 ring-2 ring-white/90 dark:ring-slate-700">
-                                ${userInitial}
-                            </div>
-                        ` : `
-                            <div class="w-full h-full rounded-2xl bg-gradient-to-tr from-brand-600 via-indigo-600 to-purple-600 text-white flex items-center justify-center font-black text-2xl shadow-lg shadow-brand-500/25 ring-2 ring-white/90 dark:ring-slate-700">
-                                ${userInitial}
-                            </div>
-                        `}
+                        <img src="${photoUrl}" 
+                             alt="${fullName}" 
+                             class="w-full h-full rounded-2xl object-cover shadow-lg shadow-brand-500/20 ring-2 ring-white/90 dark:ring-slate-700" 
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                        <div style="display:none;" class="w-full h-full rounded-2xl bg-gradient-to-tr from-brand-600 via-indigo-600 to-purple-600 text-white items-center justify-center font-black text-2xl shadow-lg shadow-brand-500/25 ring-2 ring-white/90 dark:ring-slate-700">
+                            ${userInitial}
+                        </div>
                         ${isPremium ? `
                             <div class="absolute -bottom-1 -right-1 bg-gradient-to-tr from-amber-400 to-yellow-500 text-slate-950 p-1 rounded-lg shadow-md border border-white dark:border-slate-800" title="Telegram Premium">
                                 <i data-lucide="star" class="w-3.5 h-3.5 fill-current"></i>

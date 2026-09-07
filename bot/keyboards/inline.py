@@ -9,11 +9,19 @@ def file_actions_keyboard(file_type: str) -> InlineKeyboardMarkup:
     if file_type == 'pdf':
         keyboard.append([
             InlineKeyboardButton("🔄 Word (DOCX) ga", callback_data="file_to_docx"),
-            InlineKeyboardButton("🖼️ Rasmlarni olish (ZIP)", callback_data="file_extract_images")
+            InlineKeyboardButton("🟪 Kichraytirish", callback_data="file_compress")
+        ])
+        keyboard.append([
+            InlineKeyboardButton("🟧 PDF Bo'lish", callback_data="file_split"),
+            InlineKeyboardButton("🟦 Suv belgisi", callback_data="file_watermark")
+        ])
+        keyboard.append([
+            InlineKeyboardButton("🟥 Birlashtirish", callback_data="file_merge"),
+            InlineKeyboardButton("🖼️ Rasmlar (ZIP)", callback_data="file_extract_images")
         ])
         if settings.WEBAPP_URL:
             keyboard.append([
-                InlineKeyboardButton("✏️ PDF tahrirlash (Mini App)", web_app=WebAppInfo(url=f"{settings.WEBAPP_URL}#/"))
+                InlineKeyboardButton("📱 Mini App'da barcha asboblar", web_app=WebAppInfo(url=f"{settings.WEBAPP_URL}#/"))
             ])
         keyboard.append([
             InlineKeyboardButton("📖 Matn olish", callback_data="file_extract_text"),

@@ -4,9 +4,11 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
     keyboard = [
         ['🔄 PDF ➔ Word', '🔄 Word ➔ PDF'],
         ['📝 Doc tahrirlash', '✏️ PDF tahrirlash'],
-        ['🖼️ Rasmlarni PDF qilish', '📦 PDF rasmlarini olish'],
-        ['🧠 AI yordamchi', '📱 Mini App'],
-        ['⚙️ Sozlamalar']
+        ['🟥 PDF birlashtirish', '🟧 PDF bo\'lish'],
+        ['🟪 PDF kichraytirish', '🟦 PDF suv belgisi'],
+        ['🖼️ Rasmlarni PDF qilish', '📸 Hujjat foto (3×4)'],
+        ['📦 PDF rasmlarini olish', '🧠 AI yordamchi'],
+        ['📱 Mini App', '⚙️ Sozlamalar']
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 

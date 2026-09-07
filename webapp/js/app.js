@@ -153,6 +153,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.closeModal = closeModal;
 
+    window.filterTools = (category, btn) => {
+        TelegramApp.hapticFeedback('light');
+        document.querySelectorAll('.tool-filter-chip').forEach(el => {
+            el.className = 'tool-filter-chip px-3 py-1.5 rounded-xl text-xs font-bold bg-white/70 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all whitespace-nowrap border border-slate-200/60 dark:border-slate-700/60';
+        });
+        if (btn) {
+            btn.className = 'tool-filter-chip px-3 py-1.5 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm transition-all whitespace-nowrap active-chip';
+        }
+        
+        document.querySelectorAll('#tools-grid > div[data-category]').forEach(card => {
+            const cat = card.getAttribute('data-category');
+            if (category === 'all' || cat === category || cat === 'all') {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    };
+
+
     // ─────────────────────────────────────────────────────────────
     // 1. DASHBOARD VIEW (Interactive Hub for All 7 Tools)
     // ─────────────────────────────────────────────────────────────
@@ -171,14 +191,30 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
 
-                <!-- 11 CORE TOOLS DIRECT ACTIONS -->
+                <!-- 12 CORE TOOLS DIRECT ACTIONS -->
                 <div>
-                    <div class="flex items-center justify-between mb-3 px-0.5">
-                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Asosiy Asboblar</h3>
-                        <span class="text-[11px] text-emerald-600 font-bold font-mono">12 ta asbob ✓</span>
+                    <div class="flex items-center justify-between mb-2.5 px-0.5">
+                        <h3 class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Asosiy Asboblar</h3>
+                        <span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold font-mono">12 ta asbob ✓</span>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- Filter Tabs for Quick Navigation -->
+                    <div class="flex items-center gap-1.5 overflow-x-auto pb-2 no-scrollbar mb-3">
+                        <button onclick="filterTools('all', this)" class="tool-filter-chip px-3 py-1.5 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm transition-all whitespace-nowrap active-chip">
+                            Barchasi (12)
+                        </button>
+                        <button onclick="filterTools('pdf', this)" class="tool-filter-chip px-3 py-1.5 rounded-xl text-xs font-bold bg-white/70 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all whitespace-nowrap border border-slate-200/60 dark:border-slate-700/60">
+                            🟥 PDF Vositalari (6)
+                        </button>
+                        <button onclick="filterTools('word', this)" class="tool-filter-chip px-3 py-1.5 rounded-xl text-xs font-bold bg-white/70 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all whitespace-nowrap border border-slate-200/60 dark:border-slate-700/60">
+                            📝 Word & Doc (3)
+                        </button>
+                        <button onclick="filterTools('media', this)" class="tool-filter-chip px-3 py-1.5 rounded-xl text-xs font-bold bg-white/70 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all whitespace-nowrap border border-slate-200/60 dark:border-slate-700/60">
+                            🎨 Surat & 3×4 (3)
+                        </button>
+                    </div>
+
+                    <div id="tools-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <!-- Tool 1: PDF to Word -->
                         <div onclick="openPdfToWordModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-rose-400/50 transition-all">
                             <div class="flex items-center gap-3">
@@ -4005,6 +4041,34 @@ document.addEventListener('DOMContentLoaded', () => {
         const hash = window.location.hash || '#/';
         TelegramApp.hapticFeedback();
         updateNav(hash);
+
+        const search = window.location.search || '';
+
+        if (hash.startsWith('#/merge') || search.includes('tool=merge')) {
+            renderDashboard();
+            setTimeout(() => { if (window.openPdfMergeModal) window.openPdfMergeModal(); }, 200);
+            return;
+        }
+        if (hash.startsWith('#/split') || search.includes('tool=split')) {
+            renderDashboard();
+            setTimeout(() => { if (window.openPdfSplitModal) window.openPdfSplitModal(); }, 200);
+            return;
+        }
+        if (hash.startsWith('#/compress') || search.includes('tool=compress')) {
+            renderDashboard();
+            setTimeout(() => { if (window.openPdfCompressModal) window.openPdfCompressModal(); }, 200);
+            return;
+        }
+        if (hash.startsWith('#/watermark') || search.includes('tool=watermark')) {
+            renderDashboard();
+            setTimeout(() => { if (window.openPdfWatermarkModal) window.openPdfWatermarkModal(); }, 200);
+            return;
+        }
+        if (hash.startsWith('#/photo3x4') || search.includes('tool=photo3x4')) {
+            renderDashboard();
+            setTimeout(() => { if (window.openPhoto3x4Modal) window.openPhoto3x4Modal(); }, 200);
+            return;
+        }
 
         switch (hash) {
             case '#/ai': renderAI(); break;

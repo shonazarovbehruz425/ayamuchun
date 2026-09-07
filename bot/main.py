@@ -129,6 +129,83 @@ async def handle_menu_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             "Menga <b>PDF fayl</b> yuboring. Men uning ichidagi barcha fotosuratlarni sifatini yo'qotmagan holda bitta ZIP arxiv qilib yuboraman.",
             parse_mode="HTML"
         )
+    elif text in ("🟥 PDF birlashtirish", "PDF birlashtirish"):
+        context.user_data["expected_tool"] = "pdf_merge"
+        context.user_data["merge_mode"] = True
+        context.user_data["merge_files"] = []
+        keyboard = []
+        if config.WEBAPP_URL:
+            keyboard.append([
+                InlineKeyboardButton("🟥 PDF Birlashtirish (Mini App)", web_app=WebAppInfo(url=f"{config.WEBAPP_URL}#/?tool=merge"))
+            ])
+        await update.message.reply_text(
+            "🟥 <b>PDF birlashtirish (PDF Merge)</b>\n\n"
+            "Bir nechta PDF hujjatlarini bitta faylga birlashtirish uchun:\n"
+            "• Botga ketma-ket 2 yoki undan ortiq PDF fayl yuboring, yoki\n"
+            "• Mini App'da fayllarni erkin surib tartiblash uchun quyidagi tugmani bosing:",
+            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
+            parse_mode="HTML"
+        )
+    elif text in ("🟧 PDF bo'lish", "PDF bo'lish", "PDF bo'lish (Split)"):
+        context.user_data["expected_tool"] = "pdf_split"
+        keyboard = []
+        if config.WEBAPP_URL:
+            keyboard.append([
+                InlineKeyboardButton("🟧 PDF Bo'lish (Mini App)", web_app=WebAppInfo(url=f"{config.WEBAPP_URL}#/?tool=split"))
+            ])
+        await update.message.reply_text(
+            "🟧 <b>PDF bo'lish (PDF Split)</b>\n\n"
+            "Sahifalarni kesib olish (masalan: 1-3, 5) yoki ZIP arxiv qilish uchun:\n"
+            "• Menga <b>PDF fayl</b> yuboring, yoki\n"
+            "• Mini App'dagi qulay sahifa tanlagichdan foydalaning:",
+            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
+            parse_mode="HTML"
+        )
+    elif text in ("🟪 PDF kichraytirish", "PDF kichraytirish", "PDF siqish"):
+        context.user_data["expected_tool"] = "pdf_compress"
+        keyboard = []
+        if config.WEBAPP_URL:
+            keyboard.append([
+                InlineKeyboardButton("🟪 PDF Kichraytirish (Mini App)", web_app=WebAppInfo(url=f"{config.WEBAPP_URL}#/?tool=compress"))
+            ])
+        await update.message.reply_text(
+            "🟪 <b>PDF kichraytirish (PDF Compress)</b>\n\n"
+            "PDF hajmini 50% dan 80% gacha sifatli kamaytirish uchun:\n"
+            "• Menga <b>PDF fayl</b> yuboring, yoki\n"
+            "• Mini App'da 3 xil siqish rejimidan (Yengil, Tavsiya, Kuchli) foydalaning:",
+            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
+            parse_mode="HTML"
+        )
+    elif text in ("🟦 PDF suv belgisi", "PDF suv belgisi", "PDF watermark"):
+        context.user_data["expected_tool"] = "pdf_watermark"
+        keyboard = []
+        if config.WEBAPP_URL:
+            keyboard.append([
+                InlineKeyboardButton("🟦 PDF Suv belgisi (Mini App)", web_app=WebAppInfo(url=f"{config.WEBAPP_URL}#/?tool=watermark"))
+            ])
+        await update.message.reply_text(
+            "🟦 <b>PDF suv belgisi (Watermark)</b>\n\n"
+            "Sahifalarga shaxsiy matn yoki logotip himoyasi o'rnatish uchun:\n"
+            "• Menga <b>PDF fayl</b> yuboring, yoki\n"
+            "• Mini App'da shaffoflik va burchakni aniq sozlash bilan qo'llang:",
+            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
+            parse_mode="HTML"
+        )
+    elif text in ("📸 Hujjat foto (3×4)", "Hujjat foto (3×4)", "Hujjat foto (3x4)"):
+        context.user_data["expected_tool"] = "photo_3x4"
+        keyboard = []
+        if config.WEBAPP_URL:
+            keyboard.append([
+                InlineKeyboardButton("📸 3×4 Foto Studiya (Mini App)", web_app=WebAppInfo(url=f"{config.WEBAPP_URL}#/?tool=photo3x4"))
+            ])
+        await update.message.reply_text(
+            "📸 <b>Hujjat foto (3×4) tayyorlash</b>\n\n"
+            "Pasport, viza yoki abituriyent guvohnomalari uchun fotosurat tayyorlash:\n"
+            "• Menga portret fotosurat yuboring, yoki\n"
+            "• Mini App orqali fonini o'zgartirish va 3×4 formatida yuklab oling:",
+            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
+            parse_mode="HTML"
+        )
     elif text == "📄 Fayl asboblari":
         await update.message.reply_text(
             "📎 Iltimos, menga fayl yuboring.\n"

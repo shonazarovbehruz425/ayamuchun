@@ -183,20 +183,49 @@ async def handle_file_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         elif action == "file_stats":
             await _show_stats(msg, query, file_path)
 
-        elif action == "file_split":
+        elif action == "file_compress":
+            await _compress_pdf(msg, query, file_path, file_name)
+
+        elif action == "file_watermark":
+            from telegram import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+            keyboard = []
+            if config.WEBAPP_URL:
+                keyboard.append([
+                    InlineKeyboardButton("🟦 Suv belgisini Mini App'da sozlash", web_app=WebAppInfo(url=f"{config.WEBAPP_URL}#/?tool=watermark"))
+                ])
             await msg.edit_text(
-                "✂️ Qaysi sahifalarni ajratmoqchisiz?\n"
-                "Boshlanish va tugash sahifasini kiriting.\n"
-                "Format: 1-5\n\n"
-                "(Bu funksiya faqat PDF fayllar uchun ishlaydi)"
+                "🟦 <b>PDF Suv belgisi (Watermark)</b>\n\n"
+                "Matn yoki logotipni aniq shaffoflik va burchak bilan joylashtirish uchun quyidagi Mini App asbobidan foydalaning:",
+                reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
+                parse_mode="HTML"
+            )
+
+        elif action == "file_split":
+            keyboard = []
+            if config.WEBAPP_URL:
+                keyboard.append([
+                    InlineKeyboardButton("🟧 Sahifalarni Mini App'da ajratish", web_app=WebAppInfo(url=f"{config.WEBAPP_URL}#/?tool=split"))
+                ])
+            await msg.edit_text(
+                "🟧 <b>PDF Bo'lish (Sahifalarni ajratish)</b>\n\n"
+                "Qaysi sahifalarni ajratmoqchisiz? Oraliqni kiriting (masalan: 1-5 yoki 1,3,7), yoki Mini App'da vizual ko'ring:",
+                reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
+                parse_mode="HTML"
             )
 
         elif action == "file_merge":
             context.user_data["merge_mode"] = True
             context.user_data["merge_files"] = [file_path]
+            keyboard = []
+            if config.WEBAPP_URL:
+                keyboard.append([
+                    InlineKeyboardButton("🟥 Mini App'da erkin birlashtirish", web_app=WebAppInfo(url=f"{config.WEBAPP_URL}#/?tool=merge"))
+                ])
             await msg.edit_text(
-                "🔗 Birlashtirish rejimi yoqildi!\n"
-                "Yana PDF fayllar yuboring. Tayyor bo'lganda /merge buyrug'ini yuboring."
+                "🟥 <b>Birlashtirish rejimi yoqildi!</b>\n\n"
+                "Birlashtirish uchun yana PDF fayllar yuboring. Tayyor bo'lganda /merge buyrug'ini yuboring yoki Mini App'da oching:",
+                reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
+                parse_mode="HTML"
             )
 
         elif action == "file_protect":
@@ -339,6 +368,39 @@ async def _extract_images(msg, query_or_update, file_path: str, file_name: str) 
             )
     except Exception as e:
         await msg.edit_text(f"❌ Rasmlarni ajratishda xatolik: {str(e)}")
+
+
+async def _compress_pdf(msg, query_or_update, file_path: str, file_name: str) -> None:
+    """Compress PDF file and send back to user."""
+    from bot.processors.pdf_processor import PDFProcessor
+    output_path = os.path.join(
+        config.processed_dir,
+        os.path.splitext(os.path.basename(file_name))[0] + "_siqilgan.pdf",
+    )
+    reply_target = query_or_update.message if hasattr(query_or_update, "message") and query_or_update.message else msg
+    try:
+        proc = PDFProcessor()
+        res = await proc.compress_pdf(file_path, output_path, quality_level="medium")
+        saved_pct = res.get("saved_percent", 0)
+        orig_mb = res.get("original_size", 0) / (1024 * 1024)
+        comp_mb = res.get("compressed_size", 0) / (1024 * 1024)
+        await msg.edit_text(f"✅ PDF muvaffaqiyatli siqildi! ({saved_pct}% hajm tejaldi)")
+        with open(output_path, "rb") as f:
+            await reply_target.reply_document(
+                document=f,
+                filename=os.path.basename(output_path),
+                caption=(
+                    f"🟪 <b>PDF siqish natijasi:</b>\n\n"
+                    f"📦 Asl hajm: <b>{orig_mb:.2f} MB</b>\n"
+                    f"✨ Yangi hajm: <b>{comp_mb:.2f} MB</b>\n"
+                    f"📉 Tejaldi: <b>{saved_pct}%</b>\n\n"
+                    f"⚡ <i>EduBot orqali tayyorlandi</i>"
+                ),
+                parse_mode="HTML"
+            )
+    except Exception as e:
+        logger.error(f"Compress PDF error: {e}")
+        await msg.edit_text(f"❌ PDF siqishda xatolik: {str(e)}")
 
 
 async def _convert_to_pdf(msg, query_or_update, file_path: str, file_name: str) -> None:

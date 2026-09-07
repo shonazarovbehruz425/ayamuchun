@@ -68,7 +68,7 @@
         }
     </script>
     
-    <link rel="stylesheet" href="css/style.css?v=6.0">
+    <link rel="stylesheet" href="css/style.css?v=7.0">
 </head>
 <body class="text-slate-900 font-sans antialiased min-h-screen select-none">
 
@@ -123,22 +123,19 @@
                 <!-- Interactive Fresnel Specular Flash -->
                 <div class="specular-glare"></div>
 
-                <!-- 3D Mercury Liquid Indicator Pill -->
-                <div id="mercuryPill" class="mercury-capsule pointer-events-none"></div>
-
                 <!-- ITEM 1: Asosiy (Quad Tiles) -->
-                <a href="#/" class="ios-tab-btn nav-item active-tab flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-[30px] text-xs font-bold text-white" data-route="#/">
+                <a href="#/" onclick="navigateTo('#/'); return false;" class="ios-tab-btn nav-item active-tab flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-[30px] text-xs font-bold text-white cursor-pointer" data-route="#/">
                     <svg class="w-4 h-4 shrink-0 transition-transform duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="3" y="3" width="7" height="7" rx="2.4"></rect>
                         <rect x="14" y="3" width="7" height="7" rx="2.4"></rect>
                         <rect x="14" y="14" width="7" height="7" rx="2.4"></rect>
                         <rect x="3" y="14" width="7" height="7" rx="2.4"></rect>
                     </svg>
-                    <span class="tracking-tight">Asosiy</span>
+                    <span class="tracking-tight font-bold">Asosiy</span>
                 </a>
 
                 <!-- ITEM 2: AI (4-Point Star + Satellite Core) -->
-                <a href="#/ai" class="ios-tab-btn nav-item flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-[30px] text-xs font-semibold text-slate-700" data-route="#/ai">
+                <a href="#/ai" onclick="navigateTo('#/ai'); return false;" class="ios-tab-btn nav-item flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-[30px] text-xs font-semibold text-slate-400 cursor-pointer" data-route="#/ai">
                     <svg class="w-4 h-4 shrink-0 transition-transform duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"></path>
                         <circle cx="19" cy="5" r="1.5" fill="currentColor"></circle>
@@ -148,7 +145,7 @@
                 </a>
 
                 <!-- ITEM 4: Profil (Precision Parameters) -->
-                <a href="#/settings" class="ios-tab-btn nav-item flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-[30px] text-xs font-semibold text-slate-700" data-route="#/settings">
+                <a href="#/settings" onclick="navigateTo('#/settings'); return false;" class="ios-tab-btn nav-item flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-[30px] text-xs font-semibold text-slate-400 cursor-pointer" data-route="#/settings">
                     <svg class="w-4 h-4 shrink-0 transition-transform duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="4" y1="7" x2="13" y2="7"></line>
                         <circle cx="15.5" cy="7" r="2.5"></circle>
@@ -165,8 +162,8 @@
     </div>
 
     <!-- Scripts -->
-    <script src="js/telegram.js?v=6.0"></script>
-    <script src="js/api.js?v=6.0"></script>
-    <script src="js/app.js?v=6.0"></script>
+    <script src="js/telegram.js?v=7.0"></script>
+    <script src="js/api.js?v=7.0"></script>
+    <script src="js/app.js?v=7.0"></script>
 </body>
 </html>

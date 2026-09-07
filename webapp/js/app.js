@@ -102,32 +102,110 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ── iOS 26 Liquid Glass Dock Active Navigation ──
-    function updateNav(hash) {
-        const currentHash = hash || window.location.hash || '#/';
+    // ── Global Tab Navigation with 0ms Visual Response & Telegram URL Normalization ──
+    function getActiveRoute() {
+        const rawHash = window.location.hash || '';
+        
+        // If hash is empty, #, #/ or contains Telegram init parameters, default to '#/'
+        if (!rawHash || rawHash === '#' || rawHash === '#/' || rawHash.includes('tgWebAppData') || rawHash.includes('tgWebAppVersion')) {
+            return '#/';
+        }
+        
+        if (rawHash.startsWith('#/ai') || rawHash.includes('tab=ai') || rawHash.startsWith('#ai')) {
+            return '#/ai';
+        }
+        
+        if (rawHash.startsWith('#/settings') || rawHash.startsWith('#/profile') || rawHash.includes('tab=settings') || rawHash.startsWith('#settings')) {
+            return '#/settings';
+        }
+        
+        if (rawHash.startsWith('#/merge')) return '#/merge';
+        if (rawHash.startsWith('#/split')) return '#/split';
+        if (rawHash.startsWith('#/compress')) return '#/compress';
+        if (rawHash.startsWith('#/watermark')) return '#/watermark';
+        if (rawHash.startsWith('#/photo3x4')) return '#/photo3x4';
+        
+        return '#/';
+    }
+    window.getActiveRoute = getActiveRoute;
+
+    function updateNav(targetRoute) {
+        const activeRoute = targetRoute || getActiveRoute();
+        
+        let mainTab = '#/';
+        if (activeRoute === '#/ai') mainTab = '#/ai';
+        else if (activeRoute === '#/settings') mainTab = '#/settings';
+
         document.querySelectorAll('.nav-item').forEach(item => {
             const route = item.getAttribute('data-route');
-            const isActive = (route === currentHash) || 
-                             ((currentHash === '' || currentHash === '#' || currentHash === '#/') && route === '#/');
+            const isActive = (route === mainTab);
             const icon = item.querySelector('svg');
-            
+            const textSpan = item.querySelector('span');
+
             if (isActive) {
-                item.classList.add('active-tab', 'text-white', 'font-bold');
+                item.classList.add('active-tab');
                 item.classList.remove('text-slate-400', 'text-slate-500', 'text-slate-600', 'text-slate-700');
-                if (icon) icon.classList.add('scale-110');
+                item.style.setProperty('color', '#ffffff', 'important');
+                item.style.setProperty('background', 'linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%)', 'important');
+                item.style.setProperty('box-shadow', '0 8px 24px -2px rgba(79, 70, 229, 0.75), inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.5)', 'important');
+                if (icon) {
+                    icon.style.setProperty('transform', 'scale(1.15)', 'important');
+                    icon.style.setProperty('stroke-width', '2.6', 'important');
+                    icon.style.setProperty('color', '#ffffff', 'important');
+                    icon.style.setProperty('stroke', '#ffffff', 'important');
+                    icon.style.setProperty('opacity', '1', 'important');
+                }
+                if (textSpan) {
+                    textSpan.style.setProperty('color', '#ffffff', 'important');
+                    textSpan.style.setProperty('font-weight', '800', 'important');
+                }
             } else {
-                item.classList.remove('active-tab', 'text-white', 'font-bold');
+                item.classList.remove('active-tab');
                 item.classList.add('text-slate-400');
-                if (icon) icon.classList.remove('scale-110');
+                item.style.removeProperty('background');
+                item.style.removeProperty('box-shadow');
+                item.style.setProperty('color', '#64748b', 'important');
+                if (icon) {
+                    icon.style.removeProperty('transform');
+                    icon.style.setProperty('stroke-width', '2.0', 'important');
+                    icon.style.setProperty('color', '#64748b', 'important');
+                    icon.style.setProperty('stroke', '#64748b', 'important');
+                    icon.style.setProperty('opacity', '0.7', 'important');
+                }
+                if (textSpan) {
+                    textSpan.style.setProperty('color', '#64748b', 'important');
+                    textSpan.style.setProperty('font-weight', '600', 'important');
+                }
             }
         });
     }
+    window.updateNav = updateNav;
+
+    window.navigateTo = (route) => {
+        TelegramApp.hapticFeedback('medium');
+        updateNav(route);
+        try {
+            if (window.location.hash !== route) {
+                window.location.hash = route;
+            }
+        } catch (e) {}
+
+        switch (route) {
+            case '#/ai': renderAI(); break;
+            case '#/settings': renderSettings(); break;
+            default: renderDashboard(); break;
+        }
+        window.scrollTo({ top: 0, behavior: 'instant' });
+    };
 
     // Direct click listeners on nav items for zero-latency active visual response
     document.querySelectorAll('.nav-item').forEach(item => {
-        item.addEventListener('click', () => {
+        item.addEventListener('click', (e) => {
             const route = item.getAttribute('data-route');
-            if (route) updateNav(route);
+            if (route) {
+                e.preventDefault();
+                window.navigateTo(route);
+            }
         });
     });
 
@@ -4038,39 +4116,39 @@ document.addEventListener('DOMContentLoaded', () => {
     // ROUTER
     // ─────────────────────────────────────────────────────────────
     function router() {
-        const hash = window.location.hash || '#/';
-        TelegramApp.hapticFeedback();
-        updateNav(hash);
+        const route = getActiveRoute();
+        TelegramApp.hapticFeedback('light');
+        updateNav(route);
 
         const search = window.location.search || '';
 
-        if (hash.startsWith('#/merge') || search.includes('tool=merge')) {
+        if (route === '#/merge' || search.includes('tool=merge')) {
             renderDashboard();
             setTimeout(() => { if (window.openPdfMergeModal) window.openPdfMergeModal(); }, 200);
             return;
         }
-        if (hash.startsWith('#/split') || search.includes('tool=split')) {
+        if (route === '#/split' || search.includes('tool=split')) {
             renderDashboard();
             setTimeout(() => { if (window.openPdfSplitModal) window.openPdfSplitModal(); }, 200);
             return;
         }
-        if (hash.startsWith('#/compress') || search.includes('tool=compress')) {
+        if (route === '#/compress' || search.includes('tool=compress')) {
             renderDashboard();
             setTimeout(() => { if (window.openPdfCompressModal) window.openPdfCompressModal(); }, 200);
             return;
         }
-        if (hash.startsWith('#/watermark') || search.includes('tool=watermark')) {
+        if (route === '#/watermark' || search.includes('tool=watermark')) {
             renderDashboard();
             setTimeout(() => { if (window.openPdfWatermarkModal) window.openPdfWatermarkModal(); }, 200);
             return;
         }
-        if (hash.startsWith('#/photo3x4') || search.includes('tool=photo3x4')) {
+        if (route === '#/photo3x4' || search.includes('tool=photo3x4')) {
             renderDashboard();
             setTimeout(() => { if (window.openPhoto3x4Modal) window.openPhoto3x4Modal(); }, 200);
             return;
         }
 
-        switch (hash) {
+        switch (route) {
             case '#/ai': renderAI(); break;
             case '#/settings': renderSettings(); break;
             default: renderDashboard(); break;

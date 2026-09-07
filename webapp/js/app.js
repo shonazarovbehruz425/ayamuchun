@@ -3319,134 +3319,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // ─────────────────────────────────────────────────────────────
-    // 2. AI ASSISTANT VIEW (Tool 7)
+    // 2. FULL-FEATURED AI CHATBOT (ChatGPT & Gemini style conversational agent)
     // ─────────────────────────────────────────────────────────────
-    // 2. AI PEDAGOGICAL STUDIO (Clear, Intuitive, 7 Special Tools)
-    // ─────────────────────────────────────────────────────────────
-    const AI_STUDIO_TOOLS = [
-        {
-            id: 'lesson',
-            title: "Dars Rejasi (Konspekt)",
-            shortTitle: "Dars Rejasi",
-            badge: "Konspekt",
-            icon: "book-open",
-            color: "from-blue-600 to-indigo-600",
-            bgActive: "bg-blue-600 text-white shadow-blue-500/25",
-            desc: "Fan, mavzu va sinfni kiriting. AI 45 daqiqalik darsning har bir bosqichini to'liq pedagogik konspekt qilib beradi.",
-            label: "Fan va Mavzuni kiriting:",
-            placeholder: "Masalan: Matematika — Kvadrat tenglamalarni diskriminant orqali yechish",
-            chips: [
-                "5-sinf Matematika — Oddiy kasrlar ustida amallar",
-                "8-sinf Fizika — Nyutonning 2-qonuni va formulasi",
-                "7-sinf Ingliz tili — Present Perfect zamoni",
-                "9-sinf Kimyo — Davriy qonun va elementlar",
-                "6-sinf Tarix — Qadimgi Baqtriya davlati"
-            ]
-        },
-        {
-            id: 'quiz',
-            title: "Test & Savollar Tuzish",
-            shortTitle: "Test Tuzish",
-            badge: "A/B/C/D",
-            icon: "help-circle",
-            color: "from-amber-500 to-orange-600",
-            bgActive: "bg-amber-600 text-white shadow-amber-500/25",
-            desc: "Mavzu bo'yicha to'g'ri va noto'g'ri variantli (A/B/C/D), javob izohlari bilan tayyor testlar tuzadi.",
-            label: "Qaysi mavzudan test tuzish kerak?",
-            placeholder: "Masalan: 5 ta test: O'zbekistonning daryolari va tabiiy boyliklari",
-            chips: [
-                "5 ta test: 8-sinf Biologiya — Hujayra tuzilishi",
-                "5 ta test: O'zbekiston tarixi — Amir Temur davri",
-                "5 ta test: 9-sinf Geometriya — Pifagor teoremasi",
-                "5 ta test: Ona tili — Ot so'z turkumi va uning yasalishi"
-            ]
-        },
-        {
-            id: 'summarize',
-            title: "Katta Matnni Xulosa Qilish",
-            shortTitle: "Xulosa",
-            badge: "Tezislar",
-            icon: "file-text",
-            color: "from-emerald-500 to-teal-600",
-            bgActive: "bg-emerald-600 text-white shadow-emerald-500/25",
-            desc: "Katta maqola, qonun hujjati yoki mavzudan eng muhim nuqta, tezis va xulosalarni ajratib beradi.",
-            label: "Xulosa qilinadigan matnni kiriting:",
-            placeholder: "Maqola, matn yoki darslik parchasini shu yerga yozing...",
-            chips: [
-                "O'qituvchilarning yangi milliy baholash tizimi va mezonlari",
-                "Zamonaviy interaktiv pedagogik metodlar va ularning samaradorligi",
-                "STEAM ta'limining maktabdagi asosiy tamoyillari"
-            ]
-        },
-        {
-            id: 'explain',
-            title: "Mavzuni Sodda Tushuntirish",
-            shortTitle: "Tushuntirish",
-            badge: "Sodda til",
-            icon: "lightbulb",
-            color: "from-violet-500 to-purple-600",
-            bgActive: "bg-purple-600 text-white shadow-purple-500/25",
-            desc: "Murakkab ilmiy tushunchalarni o'quvchilar tez va oson tushunishi uchun qiziqarli hayotiy misollar bilan tushuntiradi.",
-            label: "Qaysi murakkab mavzuni tushuntirish kerak?",
-            placeholder: "Masalan: Nima uchun samolyot havoda uchadi va tushib ketmaydi?",
-            chips: [
-                "Fotosintez jarayoni o'zi nima va u qanday sodir bo'ladi?",
-                "Sun'iy intellekt (AI) inson hayotiga qanday ta'sir qilmoqda?",
-                "Yerning tortishish kuchi (Gravitatsiya) qanday ishlaydi?",
-                "Nima uchun osmon kunduzi ko'k, quyosh botganda qizil ko'rinadi?"
-            ]
-        },
-        {
-            id: 'grammar',
-            title: "Grammatika & Imlo Tekshiruvi",
-            shortTitle: "Grammatika",
-            badge: "Xatosiz",
-            icon: "check-circle",
-            color: "from-rose-500 to-red-600",
-            bgActive: "bg-rose-600 text-white shadow-rose-500/25",
-            desc: "Matndagi harflar, tinish belgilari va grammatik xatolarni topib, to'g'irlangan variantini ko'rsatadi.",
-            label: "Tekshiriladigan matnni kiriting:",
-            placeholder: "Imlosi tekshirilishi kerak bo'lgan matnni shu yerga yozing...",
-            chips: [
-                "Maktab ma'muriyatiga taqdim etiladigan rasmiy hisobot matni",
-                "Dars ishlanmasi matnini imlo xatolaridan tozalash"
-            ]
-        },
-        {
-            id: 'translate',
-            title: "Professional Tarjima",
-            shortTitle: "Tarjima",
-            badge: "3 ta til",
-            icon: "languages",
-            color: "from-sky-500 to-blue-600",
-            bgActive: "bg-sky-600 text-white shadow-sky-500/25",
-            desc: "Akademik va pedagogik atamalarni saqlagan holda O'zbekcha, Ruscha va Inglizcha tillarga tarjima qiladi.",
-            label: "Tarjima qilinadigan matnni kiriting:",
-            placeholder: "Tarjima qilinadigan matnni shu yerga yozing...",
-            chips: [
-                "Ta'lim berish jarayonida interaktiv metodlardan foydalanish afzalliklari",
-                "O'quvchilarning mantiqiy va tanqidiy fikrlashini rivojlantirish yo'llari",
-                "Innovative methods in modern primary school education"
-            ]
-        },
-        {
-            id: 'improve',
-            title: "Matnni Sayqallash & Boyitish",
-            shortTitle: "Sayqallash",
-            badge: "Pedagogik",
-            icon: "wand-2",
-            color: "from-fuchsia-500 to-pink-600",
-            bgActive: "bg-fuchsia-600 text-white shadow-fuchsia-500/25",
-            desc: "Matn mazmunini saqlagan holda, yanada jozibador, rasmiy va professional pedagogik uslubda qayta yozadi.",
-            label: "Sayqallanadigan matnni kiriting:",
-            placeholder: "Oddiy tilda yozilgan matningizni shu yerga kiriting...",
-            chips: [
-                "Ota-onalar majlisi uchun nutq matnini yaxshilash va ta'sirchan qilish",
-                "A'lochi o'quvchiga beriladigan tavsifnomani chiroyli boyitish"
-            ]
-        }
-    ];
-
     function renderMarkdownToHtml(md) {
         if (!md) return '';
         let html = md
@@ -3454,347 +3328,361 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/^### (.*$)/gim, '<h3 class="text-sm font-bold text-slate-900 dark:text-white mt-3 mb-1">$1</h3>')
-            .replace(/^## (.*$)/gim, '<h2 class="text-base font-bold text-slate-900 dark:text-white mt-4 mb-1.5 pb-1 border-b border-slate-200 dark:border-slate-800">$1</h2>')
-            .replace(/^# (.*$)/gim, '<h1 class="text-lg font-black text-slate-900 dark:text-white mt-4 mb-2 pb-1 border-b-2 border-indigo-500">$1</h1>')
+            .replace(/^## (.*$)/gim, '<h2 class="text-base font-bold text-slate-900 dark:text-white mt-3 mb-1 pb-1 border-b border-slate-200 dark:border-slate-800">$1</h2>')
+            .replace(/^# (.*$)/gim, '<h1 class="text-lg font-black text-slate-900 dark:text-white mt-3 mb-1.5 pb-1 border-b-2 border-indigo-500">$1</h1>')
             .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-slate-900 dark:text-white">$1</strong>')
             .replace(/\*(.*?)\*/g, '<em class="italic text-slate-700 dark:text-slate-300">$1</em>')
             .replace(/^\s*[•\-\*]\s+(.*$)/gim, '<li class="ml-4 list-disc text-slate-800 dark:text-slate-200 my-0.5">$1</li>')
             .replace(/^\s*(\d+)\.\s+(.*$)/gim, '<li class="ml-4 list-decimal text-slate-800 dark:text-slate-200 my-0.5"><span class="font-bold text-indigo-600 dark:text-indigo-400">$1.</span> $2</li>')
+            .replace(/```([\s\S]*?)```/g, '<pre class="my-2 p-3 rounded-xl bg-slate-900 text-slate-100 font-mono text-xs overflow-x-auto"><code>$1</code></pre>')
+            .replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 rounded-md bg-slate-200 dark:bg-slate-800 text-brand-600 dark:text-brand-400 font-mono text-xs">$1</code>')
             .replace(/\n\n/g, '<div class="h-2"></div>')
             .replace(/\n/g, '<br>');
         return html;
     }
 
-    function renderAI() {
-        let activeToolId = window.activeAiToolId || 'lesson';
-        let targetLanguage = window.aiTargetLang || 'uz';
+    // Default chat history from localStorage or empty
+    window.aiChatMessages = JSON.parse(localStorage.getItem('edubot_ai_chat_history') || '[]');
+    let isAiTyping = false;
 
-        appDiv.innerHTML = `
-            <div class="space-y-4 animate-fade-in pb-4">
-                <!-- Header Banner -->
-                <div class="flex items-center justify-between">
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <h2 class="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">AI Pedagogik Studiya</h2>
-                            <span class="ai-brand-badge px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-brand-600 to-indigo-600 text-white shadow-sm shadow-brand-500/20">${window.aiDisplayName || "EduBot AI"}</span>
-                        </div>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Dars rejalari, testlar, tarjima va tushuntirishlarni bir zumda tayyorlaydi</p>
-                    </div>
-                </div>
-
-                <!-- Horizontal Tool Selector Bar (Sleek & Scrollable) -->
-                <div class="overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-none">
-                    <div class="flex gap-2 min-w-max p-1 liquid-glass-pill rounded-2xl">
-                        ${AI_STUDIO_TOOLS.map(tool => {
-                            const isActive = tool.id === activeToolId;
-                            return `
-                                <button onclick="selectAiStudioTool('${tool.id}')" class="ai-tool-pill px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${isActive ? tool.bgActive + ' shadow-md' : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-slate-800/40'}">
-                                    <i data-lucide="${tool.icon}" class="w-3.5 h-3.5"></i>
-                                    <span>${tool.shortTitle}</span>
-                                </button>
-                            `;
-                        }).join('')}
-                    </div>
-                </div>
-
-                <!-- Dynamic Active Tool Card -->
-                <div id="ai-active-card-container" class="liquid-glass-card p-4 sm:p-5 space-y-4">
-                    <!-- Injected dynamically by updateAiToolView() -->
-                </div>
-
-                <!-- AI Output Result Section -->
-                <div id="ai-output-box" class="hidden liquid-glass-card p-4 sm:p-5 space-y-3 border-brand-500/30">
-                    <div class="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800 pb-3">
-                        <div class="flex items-center gap-2">
-                            <div class="w-7 h-7 rounded-lg bg-brand-500/10 text-brand-600 dark:text-brand-400 flex items-center justify-center font-bold">
-                                <i data-lucide="sparkles" class="w-4 h-4"></i>
-                            </div>
-                            <div>
-                                <span id="ai-output-title" class="text-xs font-bold text-slate-900 dark:text-white">Tayyorlangan Natija</span>
-                                <span class="block text-[10px] text-emerald-600 font-bold">Muvaffaqiyatli yakunlandi ✓</span>
-                            </div>
-                        </div>
-
-                        <!-- Action Toolbar -->
-                        <div class="flex items-center gap-1.5">
-                            <button id="ai-btn-copy" onclick="copyAiOutput()" class="liquid-glass-pill px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-brand-600 transition-all flex items-center gap-1 cursor-pointer" title="Nusxa olish">
-                                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
-                                <span class="hidden xs:inline text-[11px]">Nusxalash</span>
-                            </button>
-                            <button id="ai-btn-docx" onclick="exportAiDocx()" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 active:scale-95 text-white transition-all flex items-center gap-1 cursor-pointer shadow-sm shadow-blue-500/25" title="Word (.docx) qilib yuklab olish">
-                                <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
-                                <span class="text-[11px]">Word</span>
-                            </button>
-                            <button id="ai-btn-telegram" onclick="sendAiToTelegram()" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-sky-500 hover:bg-sky-600 active:scale-95 text-white transition-all flex items-center gap-1 cursor-pointer shadow-sm shadow-sky-500/25" title="Telegram shaxsiy chatiga yuborish">
-                                <i data-lucide="send" class="w-3.5 h-3.5"></i>
-                                <span class="text-[11px]">Telegram</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Rendered HTML Content -->
-                    <div id="ai-output-rendered" class="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-sans max-h-[600px] overflow-y-auto pr-1"></div>
-
-                    <!-- Reset button -->
-                    <div class="flex justify-end pt-2 border-t border-slate-200/60 dark:border-slate-800">
-                        <button onclick="clearAiOutput()" class="text-xs text-slate-500 hover:text-rose-500 font-semibold transition-colors flex items-center gap-1 cursor-pointer">
-                            <i data-lucide="trash-2" class="w-3 h-3"></i> Natijani tozalash
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-        refreshIcons();
-
-        function updateAiToolView() {
-            const container = document.getElementById('ai-active-card-container');
-            if (!container) return;
-            const current = AI_STUDIO_TOOLS.find(t => t.id === activeToolId) || AI_STUDIO_TOOLS[0];
-
-            let extraOptionsHtml = '';
-            if (current.id === 'translate') {
-                extraOptionsHtml = `
-                    <div class="flex items-center gap-2 pt-1">
-                        <span class="text-[11px] font-bold text-slate-500">Qaysi tilga:</span>
-                        <div class="flex gap-1.5">
-                            <button onclick="setAiTargetLang('uz')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${targetLanguage === 'uz' ? 'bg-brand-600 text-white' : 'liquid-glass-pill text-slate-700 dark:text-slate-300'}">🇺🇿 O'zbekcha</button>
-                            <button onclick="setAiTargetLang('ru')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${targetLanguage === 'ru' ? 'bg-brand-600 text-white' : 'liquid-glass-pill text-slate-700 dark:text-slate-300'}">🇷🇺 Ruscha</button>
-                            <button onclick="setAiTargetLang('en')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${targetLanguage === 'en' ? 'bg-brand-600 text-white' : 'liquid-glass-pill text-slate-700 dark:text-slate-300'}">🇬🇧 Inglizcha</button>
-                        </div>
-                    </div>
-                `;
-            }
-
-            container.innerHTML = `
-                <!-- Tool Header Details -->
-                <div class="flex items-start justify-between gap-3">
-                    <div class="flex items-center gap-2.5">
-                        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr ${current.color} text-white flex items-center justify-center shadow-md shrink-0">
-                            <i data-lucide="${current.icon}" class="w-4 h-4"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900 dark:text-white">${current.title}</h3>
-                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">${current.desc}</p>
-                        </div>
-                    </div>
-                    <span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border ${current.pillColor} shrink-0">${current.badge}</span>
-                </div>
-
-                ${extraOptionsHtml}
-
-                <!-- Quick Prompt Chips (One-click instant fill) -->
-                <div>
-                    <div class="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1.5 flex items-center gap-1">
-                        <i data-lucide="zap" class="w-3 h-3 text-amber-500"></i>
-                        <span>Tezkor namunalar (1 marta bosing):</span>
-                    </div>
-                    <div class="flex flex-wrap gap-1.5">
-                        ${current.chips.map(chip => `
-                            <button onclick="fillAiChip('${chip.replace(/'/g, "\\'")}')" class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 transition-all border border-slate-200/80 dark:border-slate-700 flex items-center gap-1 text-left">
-                                <span class="text-amber-500 font-bold">⚡</span> ${chip}
-                            </button>
-                        `).join('')}
-                    </div>
-                </div>
-
-                <!-- Input Field -->
-                <div class="space-y-1.5">
-                    <div class="flex items-center justify-between">
-                        <label class="text-xs font-bold text-slate-800 dark:text-slate-200">${current.label}</label>
-                        <button onclick="document.getElementById('ai-studio-textarea').value=''; document.getElementById('ai-studio-textarea').focus();" class="text-[11px] text-slate-400 hover:text-rose-500 transition-colors">
-                            Tozalash ✕
-                        </button>
-                    </div>
-                    <textarea id="ai-studio-textarea" rows="4" class="w-full rounded-2xl border border-slate-200 dark:border-slate-700/80 bg-white/70 dark:bg-slate-900/80 backdrop-blur-sm p-3 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 shadow-inner transition-all resize-none" placeholder="${current.placeholder}"></textarea>
-                </div>
-
-                <!-- Action Button -->
-                <button id="ai-generate-btn" onclick="executeAiStudio()" class="w-full py-3 rounded-2xl bg-gradient-to-r from-brand-600 via-indigo-600 to-purple-600 hover:from-brand-700 hover:to-purple-700 active:scale-[0.99] text-white text-xs sm:text-sm font-bold shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer">
-                    <i data-lucide="sparkles" class="w-4 h-4"></i>
-                    <span>Generatsiya qilish</span>
-                </button>
-            `;
-            refreshIcons(container);
-        }
-
-        window.selectAiStudioTool = (toolId) => {
-            TelegramApp.hapticFeedback();
-            activeToolId = toolId;
-            window.activeAiToolId = toolId;
-            document.querySelectorAll('.ai-tool-pill').forEach(b => {
-                b.className = 'ai-tool-pill px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-slate-800/40';
-            });
-            event.currentTarget.className = `ai-tool-pill px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${AI_STUDIO_TOOLS.find(t=>t.id===toolId)?.bgActive || 'bg-brand-600 text-white'} shadow-md`;
-            updateAiToolView();
-        };
-
-        window.setAiTargetLang = (lang) => {
-            TelegramApp.hapticFeedback();
-            targetLanguage = lang;
-            window.aiTargetLang = lang;
-            updateAiToolView();
-        };
-
-        window.fillAiChip = (text) => {
-            TelegramApp.hapticFeedback('light');
-            const txt = document.getElementById('ai-studio-textarea');
-            if (txt) {
-                txt.value = text;
-                txt.focus();
-            }
-        };
-
-        let lastAiTitle = '';
-        let lastAiRawResult = '';
-
-        window.executeAiStudio = async () => {
-            const inputEl = document.getElementById('ai-studio-textarea');
-            const textVal = inputEl ? inputEl.value.trim() : '';
-            if (!textVal) {
-                TelegramApp.showAlert("Iltimos, mavzu yoki matnni kiriting!");
-                if (inputEl) inputEl.focus();
-                return;
-            }
-
-            const btn = document.getElementById('ai-generate-btn');
-            const box = document.getElementById('ai-output-box');
-            const outRendered = document.getElementById('ai-output-rendered');
-            const outTitle = document.getElementById('ai-output-title');
-            const current = AI_STUDIO_TOOLS.find(t => t.id === activeToolId) || AI_STUDIO_TOOLS[0];
-
-            btn.disabled = true;
-            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> <span>AI fikrlamoqda va yozmoqda...</span>`;
-            refreshIcons(btn);
-
-            box.classList.remove('hidden');
-            outRendered.innerHTML = `
-                <div class="py-8 flex flex-col items-center justify-center text-center space-y-3 text-slate-500">
-                    <div class="w-12 h-12 rounded-2xl bg-brand-500/10 text-brand-600 flex items-center justify-center animate-pulse">
-                        <i data-lucide="bot" class="w-6 h-6"></i>
-                    </div>
-                    <p class="text-xs font-semibold"><span class="ai-brand-badge font-bold">${window.aiDisplayName || "EduBot AI"}</span> dars ishlanmasini tayyorlamoqda...</p>
-                </div>
-            `;
-            refreshIcons(outRendered);
-            box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-            try {
-                let res;
-                if (activeToolId === 'lesson') {
-                    res = await api.lessonPlan(textVal);
-                } else if (activeToolId === 'quiz') {
-                    res = await api.createQuizAI(textVal);
-                } else if (activeToolId === 'summarize') {
-                    res = await api.summarizeText(textVal);
-                } else if (activeToolId === 'explain') {
-                    res = await api.explainTopic(textVal);
-                } else if (activeToolId === 'grammar') {
-                    res = await api.checkGrammar(textVal);
-                } else if (activeToolId === 'translate') {
-                    res = await api.translateText(textVal, targetLanguage);
-                } else if (activeToolId === 'improve') {
-                    res = await api.improveText(textVal);
-                }
-
-                lastAiTitle = `${current.title}: ${textVal.substring(0, 30)}`;
-                lastAiRawResult = res.result || '';
-
-                if (outTitle) outTitle.innerText = lastAiTitle;
-                outRendered.innerHTML = renderMarkdownToHtml(lastAiRawResult);
-                TelegramApp.hapticFeedback('medium');
-            } catch (err) {
-                outRendered.innerHTML = `
-                    <div class="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 text-xs">
-                        <strong>Xatolik:</strong> ${err.message}
-                    </div>
-                `;
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4"></i> <span>Qayta generatsiya qilish</span>`;
-                refreshIcons(btn);
-            }
-        };
-
-        window.copyAiOutput = () => {
-            if (!lastAiRawResult) return;
-            navigator.clipboard.writeText(lastAiRawResult).then(() => {
-                TelegramApp.hapticFeedback('light');
-                TelegramApp.showAlert("Natija buferga nusxalandi!");
-            }).catch(() => {
-                TelegramApp.showAlert("Nusxa olindi!");
-            });
-        };
-
-        window.exportAiDocx = async () => {
-            if (!lastAiRawResult) return;
-            const btn = document.getElementById('ai-btn-docx');
-            const originalText = btn ? btn.innerHTML : '';
-            if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> <span>Kutilmoqda...</span>`;
-                refreshIcons(btn);
-            }
-
-            try {
-                const res = await api.exportAIDocx(lastAiTitle || "Dars_Rejasi", lastAiRawResult);
-                if (res && res.download_url) {
-                    TelegramApp.hapticFeedback('medium');
-                    // Trigger native browser download
-                    const link = document.createElement('a');
-                    link.href = res.download_url;
-                    link.download = res.file_name;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    TelegramApp.showAlert("Word (.docx) hujjati tayyorlandi va yuklab olindi!");
-                }
-            } catch (err) {
-                TelegramApp.showAlert(`Word eksport xatosi: ${err.message}`);
-            } finally {
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerHTML = originalText;
-                    refreshIcons(btn);
-                }
-            }
-        };
-
-        window.sendAiToTelegram = async () => {
-            if (!lastAiRawResult) return;
-            const btn = document.getElementById('ai-btn-telegram');
-            const originalText = btn ? btn.innerHTML : '';
-            if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> <span>Yuborilmoqda...</span>`;
-                refreshIcons(btn);
-            }
-
-            try {
-                const res = await api.sendAIToTelegram(lastAiTitle || "AI Natijasi", lastAiRawResult, "file");
-                TelegramApp.hapticFeedback('medium');
-                TelegramApp.showAlert(res.message || "Hujjat Telegramingizga yuborildi!");
-            } catch (err) {
-                TelegramApp.showAlert(`Telegramga yuborishda xatolik: ${err.message}`);
-            } finally {
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerHTML = originalText;
-                    refreshIcons(btn);
-                }
-            }
-        };
-
-        window.clearAiOutput = () => {
-            TelegramApp.hapticFeedback('light');
-            lastAiRawResult = '';
-            lastAiTitle = '';
-            const box = document.getElementById('ai-output-box');
-            if (box) box.classList.add('hidden');
-        };
-
-        updateAiToolView();
+    function saveChatHistory() {
+        try {
+            // Keep last 40 messages to prevent excessive localStorage usage
+            const toSave = window.aiChatMessages.slice(-40);
+            localStorage.setItem('edubot_ai_chat_history', JSON.stringify(toSave));
+        } catch (e) {}
     }
 
+    function renderAI() {
+        const aiName = window.aiDisplayName || "EduBot AI";
+
+        appDiv.innerHTML = `
+            <div class="chat-container-card space-y-3 animate-fade-in pb-4">
+                
+                <!-- Chat Header Bar -->
+                <div class="liquid-glass-card p-3.5 flex items-center justify-between shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-brand-600 via-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-md shadow-brand-500/25 shrink-0 relative">
+                            <i data-lucide="bot" class="w-5 h-5"></i>
+                            <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white dark:border-slate-900 shadow-sm"></span>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h2 class="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white tracking-tight">${aiName}</h2>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Onlayn</span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400">Intellektual suhbatdosh & Pedagogik assistent</p>
+                        </div>
+                    </div>
+
+                    <!-- Top Action Icons -->
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="clearChatConversation()" class="liquid-glass-pill p-2 rounded-xl text-slate-500 hover:text-rose-500 transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer" title="Suhbatni tozalash">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            <span class="hidden sm:inline text-[11px]">Tozalash</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Chat Messages Scroll Stream -->
+                <div id="ai-chat-stream" class="flex-1 overflow-y-auto space-y-3.5 pr-1 min-h-[380px] max-h-[calc(100vh-320px)] sm:max-h-[calc(100vh-340px)] scroll-smooth">
+                    
+                    <!-- Welcome Initial Message if empty -->
+                    ${window.aiChatMessages.length === 0 ? `
+                        <div id="ai-chat-welcome" class="py-8 px-4 flex flex-col items-center justify-center text-center space-y-4 animate-fade-in">
+                            <div class="w-16 h-16 rounded-3xl bg-gradient-to-tr from-brand-600 to-indigo-600 text-white flex items-center justify-center shadow-xl shadow-brand-500/25">
+                                <i data-lucide="sparkles" class="w-8 h-8"></i>
+                            </div>
+                            <div class="max-w-md">
+                                <h3 class="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white">Assalomu alaykum! Men ${aiName}'man</h3>
+                                <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
+                                    Xuddi <b>ChatGPT</b> yoki <b>Gemini</b> kabi har qanday savolingizga javob beraman, dars rejalari, testlar, tarjimalar yoki erkin mavzuda suhbatlashamiz.
+                                </p>
+                            </div>
+
+                            <!-- Quick Starter Prompts -->
+                            <div class="w-full max-w-lg pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
+                                <button onclick="quickSendPrompt('5-sinf Matematika fanidan oddiy kasrlar mavzusida to\'liq 45 daqiqalik dars rejasi tuzib ber')" class="liquid-glass-interactive p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-800 dark:text-slate-200 hover:border-brand-500/50 transition-all flex items-start gap-2 cursor-pointer">
+                                    <span class="text-brand-600 text-sm">📚</span>
+                                    <span>45 daqiqalik dars rejasi (konspekt)</span>
+                                </button>
+                                <button onclick="quickSendPrompt('8-sinf Fizika Nyuton qonunlari bo\'yicha 5 ta variantli (A,B,C,D) test tuzib ber')" class="liquid-glass-interactive p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-800 dark:text-slate-200 hover:border-brand-500/50 transition-all flex items-start gap-2 cursor-pointer">
+                                    <span class="text-amber-500 text-sm">❓</span>
+                                    <span>5 ta variantli test (A/B/C/D) tuzish</span>
+                                </button>
+                                <button onclick="quickSendPrompt('Nima uchun samolyot havoda uchadi va og\'ir bo\'lsa ham tushib ketmaydi? Sodda tushuntir')" class="liquid-glass-interactive p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-800 dark:text-slate-200 hover:border-brand-500/50 transition-all flex items-start gap-2 cursor-pointer">
+                                    <span class="text-purple-500 text-sm">💡</span>
+                                    <span>Murakkab mavzuni sodda tushuntirish</span>
+                                </button>
+                                <button onclick="quickSendPrompt('Bugun darsda o\'quvchilar bilan qanday qiziqarli interaktiv o\'yin o\'tkazsam bo\'ladi?')" class="liquid-glass-interactive p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-800 dark:text-slate-200 hover:border-brand-500/50 transition-all flex items-start gap-2 cursor-pointer">
+                                    <span class="text-emerald-500 text-sm">🎮</span>
+                                    <span>Interaktiv metodlar va dars o\'yinlari</span>
+                                </button>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <!-- Message Bubbles Stream -->
+                    <div id="ai-messages-list" class="space-y-3.5">
+                        ${window.aiChatMessages.map((m, idx) => renderMessageBubble(m, idx)).join('')}
+                    </div>
+
+                    <!-- Typing Indicator Element -->
+                    <div id="ai-typing-indicator" class="hidden flex items-start gap-2.5 animate-fade-in">
+                        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-600 text-white flex items-center justify-center text-xs font-bold shadow-md shrink-0">
+                            <i data-lucide="bot" class="w-4 h-4"></i>
+                        </div>
+                        <div class="chat-bubble-ai px-4 py-3 flex items-center gap-1.5">
+                            <div class="chat-typing-dot"></div>
+                            <div class="chat-typing-dot"></div>
+                            <div class="chat-typing-dot"></div>
+                            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1.5">${aiName} yozmoqda...</span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Sticky Bottom Input Composer Bar (WhatsApp / Telegram / ChatGPT layout) -->
+                <div class="chat-input-bar p-2 sm:p-2.5 rounded-3xl space-y-2">
+                    <div class="flex items-end gap-2">
+                        <div class="flex-1 relative">
+                            <textarea id="ai-chat-input" rows="1" class="w-full bg-transparent px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none resize-none max-h-32 min-h-[42px] leading-relaxed scrollbar-none" placeholder="Savolingizni yozing yoki mavzuni ayting... (Shift+Enter yangi qator)"></textarea>
+                        </div>
+                        <button id="ai-chat-send-btn" onclick="sendUserChatMessage()" class="w-10 h-10 rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 active:scale-95 text-white flex items-center justify-center shadow-md shadow-brand-500/25 transition-all cursor-pointer shrink-0">
+                            <i data-lucide="send" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <!-- Compact Suggested Questions Pill Row -->
+                    <div class="flex items-center gap-1.5 overflow-x-auto pb-1 px-1 scrollbar-none text-[11px]">
+                        <span class="text-slate-400 font-bold shrink-0">⚡ Tezkor:</span>
+                        <button onclick="quickSendPrompt('Konspekt tuz')" class="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 shrink-0 transition-colors">Dars konspekti</button>
+                        <button onclick="quickSendPrompt('5 ta test tuz')" class="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 shrink-0 transition-colors">5 ta Test</button>
+                        <button onclick="quickSendPrompt('Matnni rus tiliga tarjima qil')" class="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 shrink-0 transition-colors">Tarjima</button>
+                        <button onclick="quickSendPrompt('Imlo xatolarini tekshirib to\'g\'irla')" class="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 shrink-0 transition-colors">Grammatika</button>
+                        <button onclick="quickSendPrompt('Oddiy va qiziqarli qilib tushuntir')" class="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 shrink-0 transition-colors">Tushuntirish</button>
+                    </div>
+                </div>
+
+            </div>
+        `;
+
+        refreshIcons();
+        scrollChatToBottom();
+
+        // Auto-expand textarea & handle Enter key to send
+        const textarea = document.getElementById('ai-chat-input');
+        if (textarea) {
+            textarea.focus();
+            textarea.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = (this.scrollHeight) + 'px';
+            });
+            textarea.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendUserChatMessage();
+                }
+            });
+        }
+    }
+
+    function renderMessageBubble(msg, idx) {
+        const isUser = msg.role === 'user';
+        const aiName = window.aiDisplayName || "EduBot AI";
+
+        if (isUser) {
+            return `
+                <div class="flex justify-end animate-fade-in pl-8">
+                    <div class="chat-bubble-user px-4 py-3 text-xs sm:text-sm max-w-[85%] leading-relaxed break-words shadow-sm">
+                        ${msg.content.replace(/\n/g, '<br>')}
+                    </div>
+                </div>
+            `;
+        } else {
+            return `
+                <div class="flex items-start gap-2.5 animate-fade-in pr-4">
+                    <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-600 via-indigo-600 to-purple-600 text-white flex items-center justify-center text-xs font-bold shadow-md shrink-0 mt-0.5">
+                        <i data-lucide="bot" class="w-4 h-4"></i>
+                    </div>
+                    <div class="chat-bubble-ai px-4 py-3.5 text-xs sm:text-sm max-w-[90%] sm:max-w-[85%] space-y-2 leading-relaxed break-words relative group">
+                        
+                        <!-- AI Message Content Rendered with Markdown -->
+                        <div class="font-sans leading-relaxed text-slate-800 dark:text-slate-200">
+                            ${renderMarkdownToHtml(msg.content)}
+                        </div>
+
+                        <!-- Micro Toolbar: Copy, Word Export, Telegram Send -->
+                        <div class="pt-2 border-t border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+                            <span class="text-[10px] font-mono text-slate-400">${aiName}</span>
+                            <div class="flex items-center gap-1">
+                                <button onclick="copyMessageText(${idx})" class="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 hover:text-brand-600 transition-colors cursor-pointer" title="Nusxa olish">
+                                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <button onclick="exportMessageDocx(${idx})" class="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 hover:text-blue-600 transition-colors cursor-pointer" title="Word (.docx) yuklab olish">
+                                    <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <button onclick="sendMessageTelegram(${idx})" class="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 hover:text-sky-500 transition-colors cursor-pointer" title="Telegramga yuborish">
+                                    <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    function scrollChatToBottom() {
+        setTimeout(() => {
+            const stream = document.getElementById('ai-chat-stream');
+            if (stream) {
+                stream.scrollTop = stream.scrollHeight;
+            }
+        }, 50);
+    }
+
+    window.quickSendPrompt = (text) => {
+        TelegramApp.hapticFeedback('light');
+        const input = document.getElementById('ai-chat-input');
+        if (input) {
+            input.value = text;
+            sendUserChatMessage();
+        }
+    };
+
+    window.sendUserChatMessage = async () => {
+        const input = document.getElementById('ai-chat-input');
+        if (!input || isAiTyping) return;
+        const text = input.value.trim();
+        if (!text) return;
+
+        TelegramApp.hapticFeedback('medium');
+        input.value = '';
+        input.style.height = 'auto';
+
+        // 1. Hide welcome container if present
+        const welcome = document.getElementById('ai-chat-welcome');
+        if (welcome) welcome.style.display = 'none';
+
+        // 2. Append user message to state
+        window.aiChatMessages.push({ role: 'user', content: text });
+        saveChatHistory();
+
+        // 3. Render into list
+        const list = document.getElementById('ai-messages-list');
+        if (list) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = renderMessageBubble({ role: 'user', content: text }, window.aiChatMessages.length - 1);
+            list.appendChild(tempDiv.firstElementChild);
+            refreshIcons(list);
+        }
+        scrollChatToBottom();
+
+        // 4. Show typing animation
+        isAiTyping = true;
+        const typingEl = document.getElementById('ai-typing-indicator');
+        if (typingEl) typingEl.classList.remove('hidden');
+        scrollChatToBottom();
+
+        try {
+            // Prepare conversation context (last 12 messages for smooth contextual awareness)
+            const contextMessages = window.aiChatMessages.slice(-12);
+            const res = await api.sendChatMessage(contextMessages);
+
+            const aiReplyText = res.message || "Kechirasiz, javob olishda xatolik yuz berdi.";
+            window.aiChatMessages.push({ role: 'assistant', content: aiReplyText });
+            saveChatHistory();
+
+            if (list) {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = renderMessageBubble({ role: 'assistant', content: aiReplyText }, window.aiChatMessages.length - 1);
+                list.appendChild(tempDiv.firstElementChild);
+                refreshIcons(list);
+            }
+            TelegramApp.hapticFeedback('light');
+        } catch (err) {
+            const errReply = `❌ Xatolik yuz berdi: ${err.message || "Server bilan bog'lanishda uzilish."}`;
+            if (list) {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = `
+                    <div class="flex items-start gap-2.5 animate-fade-in pr-4">
+                        <div class="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center text-xs font-bold shadow-md shrink-0">
+                            <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                        </div>
+                        <div class="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 text-xs">
+                            ${errReply}
+                        </div>
+                    </div>
+                `;
+                list.appendChild(tempDiv.firstElementChild);
+                refreshIcons(list);
+            }
+        } finally {
+            isAiTyping = false;
+            if (typingEl) typingEl.classList.add('hidden');
+            scrollChatToBottom();
+            if (input) input.focus();
+        }
+    };
+
+    window.clearChatConversation = () => {
+        TelegramApp.hapticFeedback('medium');
+        TelegramApp.showConfirm("Barcha yozishmalarni o'chirmoqchimisiz?", (confirmed) => {
+            if (confirmed) {
+                window.aiChatMessages = [];
+                localStorage.removeItem('edubot_ai_chat_history');
+                renderAI();
+                TelegramApp.showAlert("Yozishmalar tozalandi!");
+            }
+        });
+    };
+
+    window.copyMessageText = (idx) => {
+        const msg = window.aiChatMessages[idx];
+        if (!msg) return;
+        TelegramApp.hapticFeedback('light');
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(msg.content).then(() => {
+                TelegramApp.showAlert("Xabar matni buferga nusxalandi!");
+            }).catch(() => {
+                TelegramApp.showAlert("Nusxalandi!");
+            });
+        }
+    };
+
+    window.exportMessageDocx = async (idx) => {
+        const msg = window.aiChatMessages[idx];
+        if (!msg) return;
+        TelegramApp.hapticFeedback('medium');
+        try {
+            const title = "AI_Suhbat_Natijasi";
+            const res = await api.exportAIDocx(title, msg.content);
+            if (res && res.download_url) {
+                const link = document.createElement('a');
+                link.href = res.download_url;
+                link.download = res.file_name;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                TelegramApp.showAlert("Word (.docx) hujjati tayyorlandi!");
+            }
+        } catch (err) {
+            TelegramApp.showAlert(`Word eksport xatosi: ${err.message}`);
+        }
+    };
+
+    window.sendMessageTelegram = async (idx) => {
+        const msg = window.aiChatMessages[idx];
+        if (!msg) return;
+        TelegramApp.hapticFeedback('medium');
+        try {
+            const res = await api.sendAIToTelegram("AI Suhbat Natijasi", msg.content, "file");
+            TelegramApp.showAlert(res.message || "Hujjat Telegramingizga yuborildi!");
+        } catch (err) {
+            TelegramApp.showAlert(`Telegramga yuborishda xatolik: ${err.message}`);
+        }
+    };
     // ─────────────────────────────────────────────────────────────
     // 3. SETTINGS & PROFILE VIEW
     // ─────────────────────────────────────────────────────────────

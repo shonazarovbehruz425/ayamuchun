@@ -1,5 +1,5 @@
 """AI Service — Universal multi-provider AI engine.
-Supports Google Gemini, OpenAI, DeepSeek, Groq, Claude, Ollama, and any OpenAI-compatible custom endpoint.
+Supports Google Gemini, OpenAI, DeepSeek, OpenRouter, Groq, Claude, Ollama, and any OpenAI-compatible custom endpoint.
 Configuration is fully managed via server environment variables (AI_PROVIDER, AI_API_KEY, AI_BASE_URL, AI_MODEL, AI_DISPLAY_NAME).
 Clean user-facing branding replaces third-party vendor names with custom mini app AI identity."""
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class AIService:
-    """Universal Service for AI-powered text processing, summarization, lesson planning and quiz generation."""
+    """Universal Service for AI-powered interactive chat, text processing, summarization, lesson planning and quiz generation."""
 
     def __init__(
         self,
@@ -25,31 +25,45 @@ class AIService:
         display_name: Optional[str] = None
     ) -> None:
         settings = get_settings()
-        # Read parameters with priority: explicit arg -> environment config
         self.api_key = (api_key or settings.AI_API_KEY or settings.GEMINI_API_KEY or "").strip()
-        self.provider = (provider or settings.AI_PROVIDER or "gemini").lower().strip()
+        raw_provider = (provider or settings.AI_PROVIDER or "gemini").lower().strip()
         self.base_url = (base_url or settings.AI_BASE_URL or "").strip()
         self.display_name = (display_name or settings.AI_DISPLAY_NAME or "EduBot AI").strip()
+
+        # Intelligent provider normalization:
+        # If user entered "openrouter", "openai", "custom", "ai" (with a base_url or non-gemini model), route through OpenAI-compatible REST
+        if "openrouter" in raw_provider or "openrouter" in self.base_url.lower():
+            self.provider = "openrouter"
+            if not self.base_url:
+                self.base_url = "https://openrouter.ai/api/v1"
+        elif raw_provider in ("openai", "custom", "ai") or (self.base_url and "gemini" not in self.base_url):
+            self.provider = "openai"
+        elif raw_provider == "deepseek" or "deepseek" in self.base_url.lower():
+            self.provider = "deepseek"
+            if not self.base_url:
+                self.base_url = "https://api.deepseek.com/v1"
+        else:
+            self.provider = "gemini"
 
         # Resolve model name
         explicit_model = (model or settings.AI_MODEL or "").strip()
         if explicit_model:
             self.model_name = explicit_model
-        elif self.provider in ("openai", "custom"):
+        elif self.provider in ("openai", "custom", "openrouter"):
             self.model_name = "gpt-4o-mini"
         elif self.provider == "deepseek":
             self.model_name = "deepseek-chat"
         else:
             self.model_name = "gemini-2.0-flash"
 
-        # Resolve base URL for OpenAI-compatible providers
+        # Resolve base URL fallback
         if not self.base_url:
             if self.provider == "deepseek":
                 self.base_url = "https://api.deepseek.com/v1"
-            elif self.provider == "openai":
+            elif self.provider in ("openai", "custom"):
                 self.base_url = "https://api.openai.com/v1"
 
-        # Initialize Gemini client if selected and available
+        # Initialize Gemini client if selected
         self.gemini_model = None
         if self.provider == "gemini" and self.api_key:
             try:
@@ -59,11 +73,8 @@ class AIService:
                 logger.info(f"AIService: Gemini engine initialized (model={self.model_name})")
             except Exception as e:
                 logger.error(f"Failed to configure Gemini engine: {e}")
-        elif self.provider in ("openai", "deepseek", "custom"):
-            logger.info(f"AIService: OpenAI-compatible engine initialized (provider={self.provider}, model={self.model_name}, endpoint={self.base_url or 'default'})")
         else:
-            if not self.api_key:
-                logger.warning("AIService: AI_API_KEY / GEMINI_API_KEY is not configured. AI features will be limited.")
+            logger.info(f"AIService: REST engine initialized (provider={self.provider}, model={self.model_name}, endpoint={self.base_url or 'default'})")
 
     @property
     def is_configured(self) -> bool:
@@ -72,11 +83,27 @@ class AIService:
 
     async def _generate(self, prompt: str) -> str:
         """Execute text generation through configured AI provider."""
+        return await self.generate_chat([{"role": "user", "content": prompt}])
+
+    async def generate_chat(self, messages: List[Dict[str, str]], system_prompt: Optional[str] = None) -> str:
+        """
+        Interactive multi-turn conversation generation (like ChatGPT / Gemini).
+        Accepts list of {'role': 'user'|'assistant'|'system', 'content': str}.
+        """
         if not self.api_key:
             raise RuntimeError(
                 f"{self.display_name} API kaliti sozlanmagan. Iltimos, server muhit o'zgaruvchilariga "
                 "AI_API_KEY yoki GEMINI_API_KEY kiriting."
             )
+
+        default_sys = (
+            f"Sen {self.display_name} — o'qituvchilar, talabalar, o'quvchilar va barcha foydalanuvchilar uchun "
+            f"yuksak zakovatli, nihoyatda bilimdon, xushmuomala va do'stona virtual sun'iy intellekt yordamchisisan. "
+            f"Foydalanuvchi bilan xuddi ChatGPT yoki Gemini kabi samimiy va erkin chat rejimida suhbatlash. "
+            f"Har qanday mavzuda — ta'lim, fan, texnologiya, kundalik savollar, maslahatlar, kod yozish yoki shunchaki suhbatlashishda "
+            f"o'zbek tilida (yoki foydalanuvchi qaysi tilda yozsa o'sha tilda) aniq, tushunarli, chiroyli va qiziqarli javob ber."
+        )
+        effective_sys = system_prompt or default_sys
 
         # 1. Gemini Native Flow
         if self.provider == "gemini":
@@ -88,39 +115,52 @@ class AIService:
                 except Exception as ce:
                     raise RuntimeError(f"{self.display_name} sozlanmadi: {ce}")
             try:
-                response = await self.gemini_model.generate_content_async(prompt)
+                # Format conversation history for Gemini
+                gemini_contents = []
+                for m in messages:
+                    role = "user" if m.get("role") in ("user", "system") else "model"
+                    gemini_contents.append({"role": role, "parts": [m.get("content", "")]})
+                
+                # Prepend system instruction if possible
+                if effective_sys and gemini_contents:
+                    gemini_contents[0]["parts"].insert(0, f"[Yo'riqnoma: {effective_sys}]\n\n")
+
+                response = await self.gemini_model.generate_content_async(gemini_contents)
                 return response.text
             except Exception as e:
                 logger.error(f"Gemini API error: {e}")
-                # If Gemini fails and custom endpoint or base_url was also provided, try fallback
                 if self.base_url:
                     logger.info("Attempting OpenAI-compatible fallback...")
-                    return await self._generate_openai_compatible(prompt)
+                    return await self._chat_openai_compatible(messages, effective_sys)
                 raise RuntimeError(f"{self.display_name} xizmati vaqtincha javob bermayapti: {e}")
 
-        # 2. OpenAI / DeepSeek / Custom Endpoint Flow
-        return await self._generate_openai_compatible(prompt)
+        # 2. OpenAI / OpenRouter / DeepSeek / Custom Endpoint Flow
+        return await self._chat_openai_compatible(messages, effective_sys)
 
-    async def _generate_openai_compatible(self, prompt: str) -> str:
-        """Send prompt to an OpenAI-compatible REST endpoint (e.g. OpenAI, DeepSeek, Groq, local LLM)."""
-        base = self.base_url.rstrip("/")
-        if not base:
-            base = "https://api.openai.com/v1"
+    async def _chat_openai_compatible(self, messages: List[Dict[str, str]], system_prompt: str) -> str:
+        """Send chat messages to an OpenAI-compatible REST endpoint (OpenRouter, OpenAI, DeepSeek, Groq, local LLM)."""
+        base = (self.base_url or "https://api.openai.com/v1").rstrip("/")
         url = f"{base}/chat/completions"
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
+        # OpenRouter-specific friendly headers
+        if "openrouter" in base:
+            headers["HTTP-Referer"] = "https://ayamuchun.onrender.com"
+            headers["X-Title"] = self.display_name
+
+        chat_messages = [{"role": "system", "content": system_prompt}]
+        for m in messages:
+            r = m.get("role", "user")
+            c = m.get("content", "")
+            if c:
+                chat_messages.append({"role": r, "content": c})
+
         payload = {
             "model": self.model_name,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": f"Sen {self.display_name} — o'qituvchilar, pedagoglar va talabalar uchun oliy darajadagi aqlli intellektual yordamchisan. Javoblaringni doimo o'zbek tilida, aniq, tushunarli, pedagogik talablarga mos va chiroyli formatlangan holda taqdim et."
-                },
-                {"role": "user", "content": prompt}
-            ],
+            "messages": chat_messages,
             "temperature": 0.7
         }
 
@@ -136,12 +176,12 @@ class AIService:
                 else:
                     err_msg = f"HTTP {res.status_code}: {res.text}"
                     logger.error(f"OpenAI-compatible AI error ({self.provider}): {err_msg}")
-                    raise RuntimeError(f"{self.display_name} so'rovi muvaffaqiyatsiz bo'ldi ({res.status_code})")
+                    raise RuntimeError(f"{self.display_name} so'rovi muvaffaqiyatsiz bo'ldi ({res.status_code}): {res.text[:150]}")
         except Exception as e:
-            logger.error(f"OpenAI-compatible generation error: {e}", exc_info=True)
+            logger.error(f"OpenAI-compatible chat error: {e}", exc_info=True)
             raise RuntimeError(f"{self.display_name} xizmatida xatolik: {e}")
 
-    # ── Text Summarization ─────────────────────────────────────────────
+    # ── Convenience helper methods ─────────────────────────────────────
 
     async def summarize_text(self, text: str, language: str = "uz") -> str:
         """Summarize the given text."""
@@ -153,8 +193,6 @@ class AIService:
             f"Matn:\n{text}"
         )
         return await self._generate(prompt)
-
-    # ── Quiz Generation ────────────────────────────────────────────────
 
     async def generate_quiz(
         self,
@@ -178,7 +216,7 @@ class AIService:
             f"Quyidagi matn asosida {num_questions} ta savol yarat.\n"
             f"{qtype}\n"
             f"Til: {lang}\n\n"
-            f"Javobni quyidagi JSON formatda ber (faqat JSON massiv, hech qanday boshqa matnsiz):\n"
+            f"Javobni quyidagi JSON formatda ber (faqat JSON massiv, boshqa hech qanday so'zsiz):\n"
             f'[\n'
             f'  {{\n'
             f'    "question": "Savol matni",\n'
@@ -191,7 +229,6 @@ class AIService:
         )
         response = await self._generate(prompt)
 
-        # Parse JSON from response
         try:
             text_clean = response.strip()
             if text_clean.startswith("```"):
@@ -206,8 +243,6 @@ class AIService:
             logger.warning("Failed to parse quiz JSON, returning raw text")
             return [{"question": response, "options": [], "correct_answer": "", "explanation": ""}]
 
-    # ── Translation ────────────────────────────────────────────────────
-
     async def translate_text(self, text: str, target_lang: str = "en") -> str:
         """Translate text to the target language."""
         lang_map = {"uz": "o'zbek", "ru": "русский", "en": "English"}
@@ -219,8 +254,6 @@ class AIService:
         )
         return await self._generate(prompt)
 
-    # ── Grammar Check ──────────────────────────────────────────────────
-
     async def check_grammar(self, text: str) -> str:
         """Check grammar and suggest corrections."""
         prompt = (
@@ -230,15 +263,12 @@ class AIService:
         )
         return await self._generate(prompt)
 
-    # ── Topic Explanation ──────────────────────────────────────────────
-
     async def explain_topic(self, topic: str, language: str = "uz") -> str:
         """Explain a topic in simple terms."""
         lang_map = {"uz": "o'zbek", "ru": "русский", "en": "English"}
         lang = lang_map.get(language, "o'zbek")
         prompt = (
             f"'{topic}' mavzusini {lang} tilida sodda va tushunarli qilib tushuntir. "
-            f"O'qituvchilarga va o'quvchilarga qulay bo'lishi uchun amaliy misollar bilan yorit. "
             f"Mavzuni quyidagi tuzilmada ber:\n"
             f"1. Qisqa ta'rif\n"
             f"2. Asosiy tushunchalar\n"
@@ -246,8 +276,6 @@ class AIService:
             f"4. Xulosa"
         )
         return await self._generate(prompt)
-
-    # ── Lesson Plan Generation ─────────────────────────────────────────
 
     async def generate_lesson_plan(
         self,
@@ -260,7 +288,7 @@ class AIService:
         lang_map = {"uz": "o'zbek", "ru": "русский", "en": "English"}
         lang = lang_map.get(language, "o'zbek")
         prompt = (
-            f"Quyidagi ma'lumotlar asosida zamonaviy pedagogik talablarga mos, batafsil dars ishlanmasi (konspekt) tuz.\n"
+            f"Quyidagi ma'lumotlar asosida zamonaviy dars ishlanmasi (konspekt) tuz.\n"
             f"Fan: {subject}\n"
             f"Mavzu: {topic}\n"
             f"Davomiyligi: {duration}\n"
@@ -268,30 +296,20 @@ class AIService:
             f"Dars rejasi quyidagilarni to'liq o'z ichiga olsin:\n"
             f"1. Dars maqsadlari (Ta'limiy, Tarbiyaviy, Rivojlantiruvchi)\n"
             f"2. Dars jihozi va kerakli materiallar\n"
-            f"3. Dars bosqichlari (vaqt taqsimoti bilan):\n"
-            f"   - Tashkiliy qism va motivatsiya (5 daqiqa)\n"
-            f"   - O'tilgan mavzuni takrorlash (10 daqiqa)\n"
-            f"   - Yangi mavzu bayoni va interaktiv usullar (20 daqiqa)\n"
-            f"   - Yangi mavzuni mustahkamlash (5 daqiqa)\n"
-            f"   - Baholash va dars yakuni (5 daqiqa)\n"
+            f"3. Dars bosqichlari (vaqt taqsimoti bilan)\n"
             f"4. Uyga vazifa\n"
             f"5. O'qituvchi uchun metodik tavsiyalar"
         )
         return await self._generate(prompt)
 
-    # ── Text Improvement ───────────────────────────────────────────────
-
     async def improve_text(self, text: str, language: str = "uz") -> str:
         """Improve and rewrite the text to be more professional."""
         prompt = (
             "Quyidagi matnni yaxshila va rasmiy, professional uslubda qayta yoz. "
-            "Mazmunini o'zgartirma, faqat uslubini va ta'sirchanligini oshir. "
             "Avval yaxshilangan matnni ber, keyin nimalar o'zgartirilganini qisqacha ko'rsat.\n\n"
             f"Matn:\n{text}"
         )
         return await self._generate(prompt)
-
-    # ── Key Points Extraction ──────────────────────────────────────────
 
     async def extract_key_points(self, text: str, language: str = "uz") -> str:
         """Extract key points from the text."""
@@ -302,17 +320,10 @@ class AIService:
         )
         return await self._generate(prompt)
 
-    # ── Document Analysis ──────────────────────────────────────────────
-
     async def analyze_document(self, text: str, language: str = "uz") -> str:
         """Analyze a document and provide comprehensive pedagogical review."""
         prompt = (
-            "Quyidagi hujjatni chuqur tahlil qil va quyidagilarni taqdim et:\n"
-            "1. Hujjat haqida umumiy tushuncha\n"
-            "2. Asosiy mavzular va bo'limlar\n"
-            "3. Muhim xulosalar va faktlar\n"
-            "4. Kuchli va takomillashtirish lozim bo'lgan jihatlar\n"
-            "5. Umumiy xulosa\n\n"
+            "Quyidagi hujjatni chuqur tahlil qil va xulosalarni ber:\n\n"
             f"Hujjat matni:\n{text[:15000]}"
         )
         return await self._generate(prompt)

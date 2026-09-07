@@ -29,6 +29,48 @@ async def get_ai_config():
     }
 
 
+class ChatMessage(BaseModel):
+    role: str  # "user" | "assistant" | "system"
+    content: str
+
+
+class AIChatRequest(BaseModel):
+    messages: List[ChatMessage]
+    system_prompt: Optional[str] = None
+
+
+class AIChatResponse(BaseModel):
+    message: str
+    role: str = "assistant"
+    model: Optional[str] = None
+
+
+@router.post("/chat", response_model=AIChatResponse)
+async def chat_with_ai(req: AIChatRequest, user: dict = Depends(get_current_user)):
+    """To'liq interaktiv AI Chat (ChatGPT / Gemini kabi jonli muloqot va suhbat xotirasi)."""
+    try:
+        dict_messages = [{"role": m.role, "content": m.content} for m in req.messages]
+        reply_text = await ai_service.generate_chat(dict_messages, system_prompt=req.system_prompt)
+        
+        # Log usage in database asynchronously
+        try:
+            async with get_session() as session:
+                db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "User"))
+                last_user_msg = next((m.content for m in reversed(req.messages) if m.role == "user"), "")
+                await crud.log_usage(session, db_user.id, "ai_chat", last_user_msg[:60])
+        except Exception as log_err:
+            logger.warning(f"Could not log AI chat usage: {log_err}")
+
+        return AIChatResponse(
+            message=reply_text,
+            role="assistant",
+            model=getattr(ai_service, "model_name", "ai")
+        )
+    except Exception as e:
+        logger.error(f"AI chat error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 class ActionTelegramRequest(BaseModel):
     title: str = "EduBot AI Natijasi"
     text: str

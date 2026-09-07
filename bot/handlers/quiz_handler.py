@@ -12,6 +12,7 @@ from bot.keyboards.inline import quiz_settings_keyboard, quiz_type_keyboard, qui
 from bot.keyboards.reply import back_keyboard, main_menu_keyboard
 from bot.services.ai_service import AIService
 from bot.services.quiz_service import QuizService
+from bot.utils.validators import is_prompt_injection
 
 from bot.services.ai_service import get_ai_service
 
@@ -28,6 +29,18 @@ QUIZ_PREVIEW = 3
 QUIZ_EXPORT = 4
 
 
+async def cancel_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Cancel active quiz conversation, clear user context, and return to main menu."""
+    context.user_data.pop("quiz_topic", None)
+    context.user_data.pop("quiz_count", None)
+    context.user_data.pop("quiz_type", None)
+    await update.message.reply_text(
+        "🏠 Bosh menyu",
+        reply_markup=main_menu_keyboard(),
+    )
+    return ConversationHandler.END
+
+
 async def quiz_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show quiz creation menu."""
     await update.message.reply_text(
@@ -40,7 +53,40 @@ async def quiz_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def start_quiz_creation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Receive quiz topic and ask for question count."""
-    context.user_data["quiz_topic"] = update.message.text
+    raw_text = update.message.text or ""
+
+    if raw_text.strip() in ("🔙 Orqaga", "❌ Bekor qilish", "/cancel"):
+        return await cancel_quiz(update, context)
+
+    clean_text = raw_text.strip()
+    if not clean_text:
+        await update.message.reply_text(
+            "⚠️ Iltimos, test mavzusini kiriting.\n"
+            "Bekor qilish uchun <b>🔙 Orqaga</b> tugmasini bosing.",
+            reply_markup=back_keyboard(),
+            parse_mode="HTML"
+        )
+        return QUIZ_TOPIC
+
+    if len(clean_text) > 15000:
+        await update.message.reply_text(
+            "⚠️ Test mavzusi yoki matni juda uzun (maksimal 15 000 belgi).\n"
+            "Iltimos, qisqartirib qayta yuboring.",
+            reply_markup=back_keyboard(),
+            parse_mode="HTML"
+        )
+        return QUIZ_TOPIC
+
+    if is_prompt_injection(clean_text):
+        await update.message.reply_text(
+            "⚠️ Kechirasiz, xavfsizlik qoidalariga zid bo'lgan so'rov aniqlandi.\n"
+            "Iltimos, ta'lim yoki testga oid mavzu kiriting.",
+            reply_markup=back_keyboard(),
+            parse_mode="HTML"
+        )
+        return QUIZ_TOPIC
+
+    context.user_data["quiz_topic"] = clean_text
     await update.message.reply_text(
         "📊 Nechta savol bo'lishini tanlang:",
         reply_markup=quiz_settings_keyboard(),

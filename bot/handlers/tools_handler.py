@@ -19,6 +19,16 @@ WAITING_STUDENTS = 0
 WAITING_SUBJECTS = 1
 
 
+async def cancel_tools(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Cancel active tools conversation, clear context, and return to main menu."""
+    context.user_data.pop("students", None)
+    await update.message.reply_text(
+        "🏠 Bosh menyu",
+        reply_markup=main_menu_keyboard(),
+    )
+    return ConversationHandler.END
+
+
 async def tools_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Show tools menu and ask for student names."""
     await update.message.reply_text(
@@ -35,7 +45,12 @@ async def tools_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def create_grade_table(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Process student names or subjects and create grade table."""
-    text = update.message.text.strip()
+    raw_text = update.message.text or ""
+
+    if raw_text.strip() in ("🔙 Orqaga", "❌ Bekor qilish", "/cancel"):
+        return await cancel_tools(update, context)
+
+    text = raw_text.strip()
 
     if "students" not in context.user_data:
         # First input — student names

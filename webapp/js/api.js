@@ -51,10 +51,10 @@ const api = {
     exportAIDocx(title, text) { return this.fetchWithAuth('/ai/export-docx', { method: 'POST', body: { title, text } }); },
     sendAIToTelegram(title, text, actionType = 'text') { return this.fetchWithAuth('/ai/send-to-telegram', { method: 'POST', body: { title, text, action_type: actionType } }); },
     getAiConfig() { return this.fetchWithAuth('/ai/config'); },
-    sendChatMessage(messages, systemPrompt = null) {
+    sendChatMessage(messages) {
         return this.fetchWithAuth('/ai/chat', {
             method: 'POST',
-            body: { messages, system_prompt: systemPrompt }
+            body: { messages }
         });
     },
     sendChatWithFiles(formData) {

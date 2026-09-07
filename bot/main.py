@@ -34,6 +34,7 @@ from bot.handlers.ai_handler import (
     process_text_input,
     handle_smart_chat_message,
     handle_chat_ai_callback,
+    cancel_ai,
     WAITING_TEXT,
     WAITING_TOPIC,
 )
@@ -43,12 +44,13 @@ from bot.handlers.quiz_handler import (
     handle_quiz_count,
     handle_quiz_type,
     handle_quiz_export,
+    cancel_quiz,
     QUIZ_TOPIC,
     QUIZ_COUNT,
     QUIZ_TYPE,
     QUIZ_EXPORT,
 )
-from bot.handlers.tools_handler import tools_menu, create_grade_table, WAITING_STUDENTS, WAITING_SUBJECTS
+from bot.handlers.tools_handler import tools_menu, create_grade_table, cancel_tools, WAITING_STUDENTS, WAITING_SUBJECTS
 from bot.handlers.settings_handler import settings_menu, show_stats, change_language
 from bot.keyboards.reply import main_menu_keyboard
 
@@ -237,11 +239,18 @@ async def handle_menu_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             await update.message.reply_text(
                 "ℹ️ Mini App havolasi serverda sozlanmoqda. Tez orada faollashadi!"
             )
-    elif text == "🔙 Orqaga":
+    elif text in ("🔙 Orqaga", "❌ Bekor qilish"):
+        context.user_data.pop("ai_action", None)
+        context.user_data.pop("quiz_topic", None)
+        context.user_data.pop("quiz_count", None)
+        context.user_data.pop("quiz_type", None)
+        context.user_data.pop("students", None)
+        context.user_data.pop("expected_tool", None)
         await update.message.reply_text(
             "🏠 Bosh menyu",
             reply_markup=main_menu_keyboard(),
         )
+        return ConversationHandler.END
     else:
         # Route free-form user messages, questions, and commands to Smart Conversational AI
         await handle_smart_chat_message(update, context)
@@ -264,6 +273,8 @@ def build_application():
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler(["ai", "chat", "test", "quiz", "konspekt", "dars", "tarjima", "xulosa"], handle_smart_chat_message))
 
+    cancel_filter = filters.Regex("^(🔙 Orqaga|❌ Bekor qilish)$")
+
     # ── AI conversation handler ────────────────────────────────────────
     ai_conv_handler = ConversationHandler(
         entry_points=[
@@ -277,15 +288,17 @@ def build_application():
         ],
         states={
             WAITING_TEXT: [
+                MessageHandler(cancel_filter, cancel_ai),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, process_text_input),
             ],
             WAITING_TOPIC: [
+                MessageHandler(cancel_filter, cancel_ai),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, process_text_input),
             ],
         },
         fallbacks=[
-            MessageHandler(filters.Regex("^🔙 Orqaga$"), handle_menu_text),
-            CommandHandler("cancel", help_command),
+            MessageHandler(cancel_filter, cancel_ai),
+            CommandHandler("cancel", cancel_ai),
         ],
         per_user=True,
         per_chat=True,
@@ -299,6 +312,7 @@ def build_application():
         ],
         states={
             QUIZ_TOPIC: [
+                MessageHandler(cancel_filter, cancel_quiz),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, start_quiz_creation),
             ],
             QUIZ_COUNT: [
@@ -312,8 +326,8 @@ def build_application():
             ],
         },
         fallbacks=[
-            MessageHandler(filters.Regex("^🔙 Orqaga$"), handle_menu_text),
-            CommandHandler("cancel", help_command),
+            MessageHandler(cancel_filter, cancel_quiz),
+            CommandHandler("cancel", cancel_quiz),
         ],
         per_user=True,
         per_chat=True,
@@ -327,15 +341,17 @@ def build_application():
         ],
         states={
             WAITING_STUDENTS: [
+                MessageHandler(cancel_filter, cancel_tools),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, create_grade_table),
             ],
             WAITING_SUBJECTS: [
+                MessageHandler(cancel_filter, cancel_tools),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, create_grade_table),
             ],
         },
         fallbacks=[
-            MessageHandler(filters.Regex("^🔙 Orqaga$"), handle_menu_text),
-            CommandHandler("cancel", help_command),
+            MessageHandler(cancel_filter, cancel_tools),
+            CommandHandler("cancel", cancel_tools),
         ],
         per_user=True,
         per_chat=True,

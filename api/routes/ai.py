@@ -6,7 +6,7 @@ from typing import List, Optional, Dict, Any
 import docx
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from .auth import get_current_user
 from ..schemas.responses import AIRequest, AIResponse
 from bot.services.ai_service import get_ai_service
@@ -17,6 +17,7 @@ from bot.processors.word_processor import WordProcessor
 from bot.processors.pdf_processor import PDFProcessor
 from bot.processors.image_processor import ImageProcessor
 from bot.utils.helpers import sanitize_filename
+from bot.utils.validators import is_prompt_injection
 from .files import send_file_to_telegram, save_and_backup_user_file, build_file_caption, save_upload_stream_safely
 
 logger = logging.getLogger(__name__)
@@ -35,13 +36,31 @@ async def get_ai_config():
 
 
 class ChatMessage(BaseModel):
-    role: str  # "user" | "assistant" | "system"
-    content: str
+    role: str  # "user" | "assistant"
+    content: str = Field(..., min_length=1, max_length=15000)
+
+    @field_validator('role')
+    @classmethod
+    def validate_role(cls, v: str) -> str:
+        if v not in ('user', 'assistant'):
+            raise ValueError("Faqat 'user' va 'assistant' rollari ruxsat etilgan")
+        return v
+
+    @field_validator('content')
+    @classmethod
+    def validate_content(cls, v: str) -> str:
+        clean = v.strip()
+        if not clean:
+            raise ValueError("Xabar matni bo'sh bo'lishi mumkin emas")
+        if len(clean) > 15000:
+            raise ValueError("Xabar uzunligi 15000 belgidan oshmasligi kerak")
+        if is_prompt_injection(clean):
+            raise ValueError("Xavfsizlik qoidalariga zid bo'lgan so'rov aniqlandi")
+        return clean
 
 
 class AIChatRequest(BaseModel):
     messages: List[ChatMessage]
-    system_prompt: Optional[str] = None
 
 
 class AIChatResponse(BaseModel):
@@ -55,7 +74,8 @@ async def chat_with_ai(req: AIChatRequest, user: dict = Depends(get_current_user
     """To'liq interaktiv AI Chat (ChatGPT / Gemini kabi jonli muloqot va suhbat xotirasi)."""
     try:
         dict_messages = [{"role": m.role, "content": m.content} for m in req.messages]
-        reply_text = await ai_service.generate_chat(dict_messages, system_prompt=req.system_prompt)
+        reply_text = await ai_service.generate_chat(dict_messages)
+
         
         # Log usage in database asynchronously
         try:
@@ -333,7 +353,6 @@ image_processor_tool = ImageProcessor()
 async def chat_with_files(
     prompt: str = Form(""),
     files: List[UploadFile] = File(...),
-    system_prompt: Optional[str] = Form(None),
     user: dict = Depends(get_current_user)
 ):
     """
@@ -343,6 +362,13 @@ async def chat_with_files(
     """
     if not files:
         raise HTTPException(status_code=400, detail="Kamida bitta fayl yuklanishi shart")
+
+    prompt_clean = (prompt or "").strip()
+    if prompt_clean:
+        if len(prompt_clean) > 15000:
+            raise HTTPException(status_code=400, detail="Topshiriq matni 15 000 belgidan oshmasligi kerak")
+        if is_prompt_injection(prompt_clean):
+            raise HTTPException(status_code=400, detail="Xavfsizlik qoidalariga zid bo'lgan so'rov aniqlandi")
 
     tg_id = user.get("telegram_id")
     user_upload_dir = os.path.join(settings.upload_dir, str(tg_id or "shared"))
@@ -366,6 +392,7 @@ async def chat_with_files(
             is_img = ext in (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".heic")
             is_pdf = ext == ".pdf"
             is_word = ext in (".docx", ".doc")
+            file_size = os.path.getsize(save_path) if os.path.exists(save_path) else 0
             saved_files.append({
                 "orig_name": orig_name,
                 "clean_name": clean_name,
@@ -374,10 +401,10 @@ async def chat_with_files(
                 "is_img": is_img,
                 "is_pdf": is_pdf,
                 "is_word": is_word,
-                "size": len(content)
+                "size": file_size
             })
 
-        user_prompt_lower = (prompt or "").lower().strip()
+        user_prompt_lower = prompt_clean.lower()
         all_images = [f for f in saved_files if f["is_img"]]
         all_pdfs = [f for f in saved_files if f["is_pdf"]]
         all_words = [f for f in saved_files if f["is_word"]]
@@ -671,7 +698,7 @@ async def chat_with_files(
                 }
             ]
 
-            reply_text = await ai_service.generate_chat(ai_messages, system_prompt=system_prompt)
+            reply_text = await ai_service.generate_chat(ai_messages)
 
             # Agar foydalanuvchi test tuzishni so'ragan bo'lsa yoki matn Word shaklida kerak bo'lsa, Word hujjati ham tayyorlab beramiz
             result_file_data = None
@@ -718,7 +745,7 @@ async def chat_with_files(
         
         reply_text = await ai_service.generate_chat([
             {"role": "user", "content": f"Foydalanuvchi quyidagi fayllarni yukladi: {file_names_str}.\nFoydalanuvchi so'rovi: {fallback_prompt}"}
-        ], system_prompt=system_prompt)
+        ])
 
         return {
             "message": reply_text,

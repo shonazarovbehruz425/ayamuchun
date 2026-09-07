@@ -10,6 +10,7 @@ from bot.config import get_settings
 from bot.keyboards.reply import ai_menu_keyboard, back_keyboard, main_menu_keyboard
 from bot.services.ai_service import AIService
 from bot.processors.word_processor import WordProcessor
+from bot.utils.validators import is_prompt_injection
 
 logger = logging.getLogger(__name__)
 
@@ -133,9 +134,56 @@ async def handle_improve_text(update: Update, context: ContextTypes.DEFAULT_TYPE
     return WAITING_TEXT
 
 
+async def cancel_ai(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Cancel active AI conversation, clean user context, and return to main menu."""
+    context.user_data.pop("ai_action", None)
+    await update.message.reply_text(
+        "🏠 Bosh menyu",
+        reply_markup=main_menu_keyboard(),
+    )
+    return ConversationHandler.END
+
+
 async def process_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Process the user's text input based on the selected AI action."""
-    text = update.message.text
+    raw_text = update.message.text or ""
+
+    # Check if user wants to cancel or go back
+    if raw_text.strip() in ("🔙 Orqaga", "❌ Bekor qilish", "/cancel"):
+        return await cancel_ai(update, context)
+
+    # Check if text is empty or only whitespace
+    clean_text = raw_text.strip()
+    if not clean_text:
+        await update.message.reply_text(
+            "⚠️ Iltimos, bo'sh bo'lmagan matn yuboring.\n"
+            "Bekor qilish uchun <b>🔙 Orqaga</b> tugmasini bosing.",
+            reply_markup=back_keyboard(),
+            parse_mode="HTML"
+        )
+        return WAITING_TEXT
+
+    # Length limit check (max 15000 chars)
+    if len(clean_text) > 15000:
+        await update.message.reply_text(
+            "⚠️ Kiritilgan matn juda uzun (maksimal 15 000 belgi ruxsat etiladi).\n"
+            "Iltimos, matnni qisqartirib qayta yuboring.",
+            reply_markup=back_keyboard(),
+            parse_mode="HTML"
+        )
+        return WAITING_TEXT
+
+    # Prompt injection check
+    if is_prompt_injection(clean_text):
+        await update.message.reply_text(
+            "⚠️ Kechirasiz, xavfsizlik qoidalariga zid bo'lgan yoki tizim ko'rsatmalarini o'zgartirishga urinuvchi so'rovlar qabul qilinmaydi.\n"
+            "Iltimos, dars yoki ta'limga oid savol yoki matn yuboring.",
+            reply_markup=back_keyboard(),
+            parse_mode="HTML"
+        )
+        return WAITING_TEXT
+
+    text = clean_text
     action = context.user_data.get("ai_action", "summarize")
 
     msg = await update.message.reply_text("⏳ AI tahlil qilmoqda va tayyorlamoqda, biroz kuting...")
@@ -374,6 +422,19 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
         clean_prompt = f"Quyidagi matnni eng muhim tezislarini ajratib qisqacha xulosa qil: {topic}"
     elif raw_text.startswith("/ai") or raw_text.startswith("/chat"):
         clean_prompt = re.sub(r"^/(ai|chat)\s*", "", raw_text).strip()
+
+    if not clean_prompt:
+        return
+
+    if len(clean_prompt) > 15000:
+        await update.message.reply_text("⚠️ Xabar matni juda uzun (maksimal 15 000 belgi).")
+        return
+
+    if is_prompt_injection(clean_prompt):
+        await update.message.reply_text(
+            "⚠️ Kechirasiz, xavfsizlik qoidalariga zid bo'lgan yoki tizim ko'rsatmalarini o'zgartirishga urinuvchi so'rovlar qabul qilinmaydi."
+        )
+        return
 
     status_msg = await update.message.reply_text("⏳ <i>AI javob tayyorlamoqda...</i>", parse_mode="HTML")
 

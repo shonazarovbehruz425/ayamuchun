@@ -3347,15 +3347,78 @@ document.addEventListener('DOMContentLoaded', () => {
         return html;
     }
 
-    // Default chat history from localStorage or empty
-    window.aiChatMessages = JSON.parse(localStorage.getItem('edubot_ai_chat_history') || '[]');
+    // Multi-session chat history storage
+    window.aiChatSessions = JSON.parse(localStorage.getItem('edubot_ai_chat_sessions') || '[]');
+    window.activeSessionId = localStorage.getItem('edubot_active_session_id') || null;
+
+    if (window.activeSessionId) {
+        const found = window.aiChatSessions.find(s => s.id === window.activeSessionId);
+        if (found) {
+            window.aiChatMessages = found.messages || [];
+        } else {
+            window.aiChatMessages = JSON.parse(localStorage.getItem('edubot_ai_chat_history') || '[]');
+        }
+    } else {
+        window.aiChatMessages = JSON.parse(localStorage.getItem('edubot_ai_chat_history') || '[]');
+        if (window.aiChatMessages.length > 0 && window.aiChatSessions.length === 0) {
+            const firstUser = window.aiChatMessages.find(m => m.role === 'user');
+            const title = firstUser ? (firstUser.content.slice(0, 32) + (firstUser.content.length > 32 ? '...' : '')) : "Suhbat";
+            const initialSession = {
+                id: 'session_' + Date.now(),
+                title: title,
+                preview: window.aiChatMessages[window.aiChatMessages.length - 1].content.slice(0, 50),
+                createdAt: new Date().toISOString(),
+                formattedDate: new Date().toLocaleDateString('uz-UZ') + ', ' + new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }),
+                messages: [...window.aiChatMessages]
+            };
+            window.aiChatSessions.push(initialSession);
+            window.activeSessionId = initialSession.id;
+            localStorage.setItem('edubot_ai_chat_sessions', JSON.stringify(window.aiChatSessions));
+            localStorage.setItem('edubot_active_session_id', window.activeSessionId);
+        }
+    }
     let isAiTyping = false;
 
     function saveChatHistory() {
         try {
-            // Keep last 40 messages to prevent excessive localStorage usage
-            const toSave = window.aiChatMessages.slice(-40);
+            const toSave = window.aiChatMessages.slice(-50);
             localStorage.setItem('edubot_ai_chat_history', JSON.stringify(toSave));
+
+            if (toSave.length > 0) {
+                if (!window.activeSessionId) {
+                    window.activeSessionId = 'session_' + Date.now();
+                    localStorage.setItem('edubot_active_session_id', window.activeSessionId);
+                }
+
+                const firstUser = toSave.find(m => m.role === 'user');
+                const title = firstUser ? (firstUser.content.slice(0, 32) + (firstUser.content.length > 32 ? '...' : '')) : "Suhbat";
+                const lastMsg = toSave[toSave.length - 1];
+                const preview = lastMsg ? (lastMsg.content.slice(0, 50) + (lastMsg.content.length > 50 ? '...' : '')) : "";
+
+                const now = new Date();
+                const formattedDate = now.toLocaleDateString('uz-UZ') + ', ' + now.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+
+                const existingIdx = window.aiChatSessions.findIndex(s => s.id === window.activeSessionId);
+                const sessionObj = {
+                    id: window.activeSessionId,
+                    title: title,
+                    preview: preview,
+                    updatedAt: now.toISOString(),
+                    formattedDate: formattedDate,
+                    messages: toSave
+                };
+
+                if (existingIdx >= 0) {
+                    window.aiChatSessions[existingIdx] = sessionObj;
+                } else {
+                    window.aiChatSessions.unshift(sessionObj);
+                }
+
+                if (window.aiChatSessions.length > 30) {
+                    window.aiChatSessions = window.aiChatSessions.slice(0, 30);
+                }
+                localStorage.setItem('edubot_ai_chat_sessions', JSON.stringify(window.aiChatSessions));
+            }
         } catch (e) {}
     }
 
@@ -3381,11 +3444,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
 
-                    <!-- Top Action Icons -->
-                    <div class="flex items-center gap-1.5">
-                        <button onclick="clearChatConversation()" class="liquid-glass-pill p-2 rounded-xl text-slate-500 hover:text-rose-500 transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer" title="Suhbatni tozalash">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                            <span class="hidden sm:inline text-[11px]">Tozalash</span>
+                    <!-- Top Action Icons (History & Clear) -->
+                    <div class="flex items-center gap-2">
+                        <button onclick="openChatHistoryModal()" class="liquid-glass-pill py-1.5 px-3 rounded-xl text-slate-700 dark:text-slate-200 hover:text-brand-600 dark:hover:text-brand-400 hover:border-brand-500/30 transition-all flex items-center gap-1.5 text-xs font-bold shadow-sm cursor-pointer" title="Suhbatlar tarixi">
+                            <i data-lucide="history" class="w-3.5 h-3.5 text-brand-600 dark:text-brand-400"></i>
+                            <span class="text-[11px]">Tarix</span>
+                        </button>
+                        <button onclick="clearChatConversation()" class="liquid-glass-pill p-1.5 rounded-xl text-slate-400 hover:text-rose-500 transition-colors flex items-center justify-center cursor-pointer" title="Yangi suhbat / Tozalash">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                         </button>
                     </div>
                 </div>
@@ -3634,15 +3700,169 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.clearChatConversation = () => {
         TelegramApp.hapticFeedback('medium');
-        TelegramApp.showConfirm("Barcha yozishmalarni o'chirmoqchimisiz?", (confirmed) => {
+        TelegramApp.showConfirm("Joriy yozishmalarni tozalab, yangi suhbat boshlamoqchimisiz?", (confirmed) => {
             if (confirmed) {
+                // Save current conversation to history before resetting so user work is never lost!
+                if (window.aiChatMessages && window.aiChatMessages.length > 0) {
+                    saveChatHistory();
+                }
+                window.activeSessionId = 'session_' + Date.now();
+                localStorage.setItem('edubot_active_session_id', window.activeSessionId);
                 window.aiChatMessages = [];
                 localStorage.removeItem('edubot_ai_chat_history');
                 renderAI();
-                TelegramApp.showAlert("Yozishmalar tozalandi!");
+                TelegramApp.showAlert("Tozalandi! Yangi suhbat boshlandi.");
             }
         });
     };
+    // ─────────────────────────────────────────────────────────────
+    // AI CHAT HISTORY SESSIONS MODAL
+    // ─────────────────────────────────────────────────────────────
+    window.openChatHistoryModal = () => {
+        TelegramApp.hapticFeedback('light');
+        const existing = document.getElementById('ai-history-modal');
+        if (existing) existing.remove();
+
+        const sessions = window.aiChatSessions || [];
+        const activeId = window.activeSessionId;
+
+        const modal = document.createElement('div');
+        modal.id = 'ai-history-modal';
+        modal.className = 'fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/60 backdrop-blur-md animate-fade-in';
+        modal.onclick = (e) => {
+            if (e.target === modal) modal.remove();
+        };
+
+        const sessionsHtml = sessions.length === 0 ? `
+            <div class="py-10 px-4 text-center space-y-3">
+                <div class="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-500 flex items-center justify-center mx-auto">
+                    <i data-lucide="clock" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h4 class="text-sm font-bold text-slate-800 dark:text-slate-200">Suhbatlar tarixi bo'sh</h4>
+                    <p class="text-xs text-slate-400 mt-1 max-w-xs mx-auto">AI bilan suhbatlashing, barcha savol-javoblar avtomatik tarzda shu yerda saqlanadi.</p>
+                </div>
+            </div>
+        ` : `
+            <div class="space-y-2 max-h-[55vh] sm:max-h-[420px] overflow-y-auto pr-1" style="scrollbar-width: thin;">
+                ${sessions.map((sess, idx) => {
+                    const isActive = sess.id === activeId;
+                    const msgCount = (sess.messages || []).length;
+                    return `
+                        <div class="p-3 rounded-2xl border transition-all ${isActive ? 'bg-brand-50/90 dark:bg-brand-950/50 border-brand-300 dark:border-brand-700/60 shadow-sm' : 'bg-white/60 dark:bg-slate-900/60 border-slate-200/80 dark:border-slate-800 hover:border-brand-400/50'} flex items-center justify-between gap-2.5">
+                            <div class="min-w-0 flex-1 cursor-pointer" onclick="loadChatSession('${sess.id}')">
+                                <div class="flex items-center gap-2">
+                                    <h4 class="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">${sess.title || 'Nomsiz suhbat'}</h4>
+                                    ${isActive ? '<span class="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-brand-600 text-white shrink-0">Faol</span>' : ''}
+                                </div>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">${sess.preview || 'Xabarlar...'}</p>
+                                <div class="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
+                                    <span>${sess.formattedDate || ''}</span>
+                                    <span>•</span>
+                                    <span>${msgCount} ta xabar</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1 shrink-0">
+                                <button onclick="loadChatSession('${sess.id}')" class="p-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-sm transition-all cursor-pointer" title="Suhbatni ochish">
+                                    <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <button onclick="deleteChatSession('${sess.id}')" class="p-2 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer" title="O'chirish">
+                                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+
+        modal.innerHTML = `
+            <div class="liquid-glass-card w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl p-5 space-y-4 shadow-2xl border border-white/60 dark:border-white/10 animate-slide-up" onclick="event.stopPropagation()">
+                
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between pb-2 border-b border-slate-200/60 dark:border-slate-800/80">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-brand-500/20">
+                            <i data-lucide="history" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">Suhbatlar tarixi</h3>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400">${sessions.length} ta saqlangan suhbat</p>
+                        </div>
+                    </div>
+                    
+                    <button onclick="document.getElementById('ai-history-modal').remove()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Start New Chat Action -->
+                <button onclick="startNewChatSession()" class="w-full py-2.5 px-4 rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-brand-500/25 active:scale-95 transition-all cursor-pointer">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                    <span>➕ Yangi suhbat boshlash</span>
+                </button>
+
+                <!-- Sessions List -->
+                ${sessionsHtml}
+
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        refreshIcons(modal);
+    };
+
+    window.loadChatSession = (sessionId) => {
+        TelegramApp.hapticFeedback('medium');
+        const session = (window.aiChatSessions || []).find(s => s.id === sessionId);
+        if (!session) return;
+
+        window.activeSessionId = session.id;
+        localStorage.setItem('edubot_active_session_id', window.activeSessionId);
+        window.aiChatMessages = session.messages || [];
+        localStorage.setItem('edubot_ai_chat_history', JSON.stringify(window.aiChatMessages));
+
+        const modal = document.getElementById('ai-history-modal');
+        if (modal) modal.remove();
+
+        renderAI();
+        TelegramApp.showAlert(`«${session.title || 'Suhbat'}» ochildi!`);
+    };
+
+    window.deleteChatSession = (sessionId) => {
+        TelegramApp.hapticFeedback('medium');
+        window.aiChatSessions = (window.aiChatSessions || []).filter(s => s.id !== sessionId);
+        localStorage.setItem('edubot_ai_chat_sessions', JSON.stringify(window.aiChatSessions));
+
+        if (window.activeSessionId === sessionId) {
+            window.activeSessionId = null;
+            localStorage.removeItem('edubot_active_session_id');
+            window.aiChatMessages = [];
+            localStorage.removeItem('edubot_ai_chat_history');
+            renderAI();
+        }
+
+        openChatHistoryModal();
+    };
+
+    window.startNewChatSession = () => {
+        TelegramApp.hapticFeedback('medium');
+        if (window.aiChatMessages && window.aiChatMessages.length > 0) {
+            saveChatHistory();
+        }
+
+        window.activeSessionId = 'session_' + Date.now();
+        localStorage.setItem('edubot_active_session_id', window.activeSessionId);
+        window.aiChatMessages = [];
+        localStorage.removeItem('edubot_ai_chat_history');
+
+        const modal = document.getElementById('ai-history-modal');
+        if (modal) modal.remove();
+
+        renderAI();
+        TelegramApp.showAlert("Yangi suhbat boshlandi!");
+    };
+
 
     window.copyMessageText = (idx) => {
         const msg = window.aiChatMessages[idx];

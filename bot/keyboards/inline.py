@@ -78,3 +78,37 @@ def confirm_keyboard(action: str) -> InlineKeyboardMarkup:
          InlineKeyboardButton("❌ Yo'q", callback_data=f"cancel_{action}")]
     ]
     return InlineKeyboardMarkup(keyboard)
+
+def photo_actions_keyboard() -> InlineKeyboardMarkup:
+    from bot.config import get_settings
+    from telegram import WebAppInfo
+    settings = get_settings()
+    keyboard = [
+        [InlineKeyboardButton("📸 3×4 Hujjat fotosi tayyorlash", callback_data="photo_process_3x4")],
+        [InlineKeyboardButton("🖼️ PDF ga aylantirish", callback_data="photo_to_pdf")],
+    ]
+    if settings.WEBAPP_URL:
+        keyboard.append([
+            InlineKeyboardButton("🎨 Mini App 3×4 Studiyada ochish", web_app=WebAppInfo(url=f"{settings.WEBAPP_URL}#/?tool=photo3x4"))
+        ])
+    return InlineKeyboardMarkup(keyboard)
+
+def photo_result_keyboard() -> InlineKeyboardMarkup:
+    from bot.config import get_settings
+    from telegram import WebAppInfo
+    settings = get_settings()
+    keyboard = []
+    if settings.WEBAPP_URL:
+        keyboard.append([
+            InlineKeyboardButton("🎨 Mini App Studiyada boshqarish", web_app=WebAppInfo(url=f"{settings.WEBAPP_URL}#/?tool=photo3x4"))
+        ])
+    keyboard.append([
+        InlineKeyboardButton("⚪ Oq fon", callback_data="photo_bg_white"),
+        InlineKeyboardButton("🔵 Ko'k fon", callback_data="photo_bg_blue")
+    ])
+    keyboard.append([
+        InlineKeyboardButton("🔘 Kulrang", callback_data="photo_bg_gray"),
+        InlineKeyboardButton("📐 Burchak (Doira)", callback_data="photo_toggle_corner")
+    ])
+    return InlineKeyboardMarkup(keyboard)
+

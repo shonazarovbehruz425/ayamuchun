@@ -21,6 +21,7 @@ from bot.config import get_settings
 from bot.database.engine import init_db
 from bot.handlers.start import start_command, help_command
 from bot.handlers.file_handler import handle_file, handle_file_callback
+from bot.handlers.photo_handler import handle_photo, handle_photo_callback
 from bot.handlers.ai_handler import (
     ai_menu,
     handle_summarize,
@@ -349,8 +350,16 @@ def build_application():
                  filters.Document.FileExtension("pptx") | \
                  filters.Document.FileExtension("doc") | \
                  filters.Document.FileExtension("xls") | \
-                 filters.Document.FileExtension("csv")
+                 filters.Document.FileExtension("csv") | \
+                 filters.Document.FileExtension("jpg") | \
+                 filters.Document.FileExtension("jpeg") | \
+                 filters.Document.FileExtension("png") | \
+                 filters.Document.FileExtension("webp")
     application.add_handler(MessageHandler(doc_filter, handle_file))
+
+    # ── Photo handler ──────────────────────────────────────────────────
+    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    application.add_handler(CallbackQueryHandler(handle_photo_callback, pattern="^photo_"))
 
     # ── File action callbacks ──────────────────────────────────────────
     application.add_handler(CallbackQueryHandler(handle_file_callback, pattern="^file_"))

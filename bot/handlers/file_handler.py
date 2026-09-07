@@ -35,12 +35,12 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     # Get file extension
     file_name = document.file_name or "unknown"
     ext = get_file_extension(file_name).lower()
-    supported = {".pdf", ".docx", ".xlsx", ".pptx", ".doc", ".xls", ".csv"}
+    supported = {".pdf", ".docx", ".xlsx", ".pptx", ".doc", ".xls", ".csv", ".jpg", ".jpeg", ".png", ".webp"}
 
     if f".{ext}" not in supported and ext not in [e.lstrip('.') for e in supported]:
         await update.message.reply_text(
             "❌ Bu fayl formati qo'llab-quvvatlanmaydi.\n"
-            "Qo'llab-quvvatlanadigan formatlar: PDF, Word, Excel, PowerPoint, CSV"
+            "Qo'llab-quvvatlanadigan formatlar: PDF, Word, Excel, PowerPoint, CSV, Rasm (JPG, PNG)"
         )
         return
 
@@ -111,6 +111,28 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             except Exception:
                 pass
 
+        if ext_lower in ("jpg", "jpeg", "png", "webp"):
+            from bot.handlers.photo_handler import execute_photo_3x4, photo_actions_keyboard
+            context.user_data["last_photo"] = {
+                "path": local_path,
+                "file_id": document.file_id,
+                "file_size": document.file_size,
+            }
+            if expected_tool == "photo_3x4":
+                await execute_photo_3x4(update, context, input_path=local_path, bg_color="#FFFFFF", change_bg=False, add_corner=False, status_msg=msg)
+                return
+            else:
+                await msg.edit_text(
+                    "📸 <b>Suratingiz qabul qilindi!</b>\n\n"
+                    "Ushbu suratdan qanday foydalanamiz?\n"
+                    "• <b>3×4 Hujjat fotosi</b> — Pasport/viza standarti (yakka va 6 talik varaq)\n"
+                    "• <b>PDF ga aylantirish</b> — A4 formatidagi PDF hujjat qilish\n"
+                    "• <b>Mini App</b> — Fon rangini (oq, ko'k) va parametrlarini sozlash",
+                    reply_markup=photo_actions_keyboard(),
+                    parse_mode="HTML"
+                )
+                return
+
         expected_tool = context.user_data.pop("expected_tool", None)
         if expected_tool == "pdf_to_word" and ext_lower == "pdf":
             await msg.edit_text("⏳ PDF ni Word (DOCX) ga aylantirish boshlandi...")
@@ -123,6 +145,10 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         elif expected_tool == "extract_images" and ext_lower == "pdf":
             await msg.edit_text("⏳ PDF dagi barcha rasmlar ajratilmoqda...")
             await _extract_images(msg, update, local_path, file_name)
+            return
+        elif expected_tool == "photo_3x4":
+            from bot.handlers.photo_handler import execute_photo_3x4
+            await execute_photo_3x4(update, context, input_path=local_path, bg_color="#FFFFFF", change_bg=False, add_corner=False, status_msg=msg)
             return
 
         info_text = (

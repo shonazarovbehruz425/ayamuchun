@@ -3515,7 +3515,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
 
                 <!-- Sticky Bottom Input Composer Bar (WhatsApp / Telegram / ChatGPT layout) -->
-                <div class="chat-input-bar p-2 sm:p-2.5 rounded-3xl space-y-2">
+                <div class="chat-input-bar p-2 sm:p-2.5 rounded-3xl">
                     <div class="flex items-end gap-2">
                         <div class="flex-1 relative">
                             <textarea id="ai-chat-input" rows="1" class="w-full bg-transparent px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none resize-none max-h-32 min-h-[42px] leading-relaxed scrollbar-none" placeholder="Savolingizni yozing yoki mavzuni ayting... (Shift+Enter yangi qator)"></textarea>
@@ -3523,16 +3523,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         <button id="ai-chat-send-btn" onclick="sendUserChatMessage()" class="w-10 h-10 rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 active:scale-95 text-white flex items-center justify-center shadow-md shadow-brand-500/25 transition-all cursor-pointer shrink-0">
                             <i data-lucide="send" class="w-4 h-4"></i>
                         </button>
-                    </div>
-
-                    <!-- Compact Suggested Questions Pill Row -->
-                    <div class="flex items-center gap-1.5 overflow-x-auto pb-1 px-1 scrollbar-none text-[11px]">
-                        <span class="text-slate-400 font-bold shrink-0">⚡ Tezkor:</span>
-                        <button onclick="quickSendPrompt('Konspekt tuz')" class="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 shrink-0 transition-colors">Dars konspekti</button>
-                        <button onclick="quickSendPrompt('5 ta test tuz')" class="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 shrink-0 transition-colors">5 ta Test</button>
-                        <button onclick="quickSendPrompt('Matnni rus tiliga tarjima qil')" class="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 shrink-0 transition-colors">Tarjima</button>
-                        <button onclick="quickSendPrompt('Imlo xatolarini tekshirib to\'g\'irla')" class="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 shrink-0 transition-colors">Grammatika</button>
-                        <button onclick="quickSendPrompt('Oddiy va qiziqarli qilib tushuntir')" class="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 shrink-0 transition-colors">Tushuntirish</button>
                     </div>
                 </div>
 

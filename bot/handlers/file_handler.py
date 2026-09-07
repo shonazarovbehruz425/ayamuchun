@@ -79,10 +79,20 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             "telegram_file_id": document.file_id,
         }
 
-        # Save record in database
+        # Save record in database and backup to channel -1003745209875
         try:
             from bot.database.engine import get_session
             from bot.database import crud
+            from bot.services.cloud_storage import get_cloud_storage
+            cloud_storage = get_cloud_storage()
+            chan_file_id, chan_msg_id = await cloud_storage.backup_file_to_channel(
+                file_path=local_path,
+                file_name=file_name,
+                telegram_id=update.effective_user.id,
+                user_full_name=update.effective_user.full_name or "",
+                username=update.effective_user.username or "",
+                tool_name="Telegram_Fayl_Yuklash"
+            )
             async with get_session() as session:
                 db_user = await crud.get_or_create_user(session, update.effective_user.id, update.effective_user.full_name)
                 await crud.save_file_record(
@@ -90,13 +100,14 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     user_id=db_user.id,
                     file_name=file_name,
                     file_type=ext_lower,
-                    telegram_file_id=document.file_id,
+                    telegram_file_id=chan_file_id or document.file_id,
                     local_path=local_path,
-                    file_size=document.file_size
+                    file_size=document.file_size,
+                    channel_message_id=chan_msg_id
                 )
                 await crud.log_usage(session, db_user.id, "upload_file", file_name)
         except Exception as dbe:
-            logger.warning(f"Could not persist file record to DB: {dbe}")
+            logger.warning(f"Could not persist file record or backup to DB: {dbe}")
 
         # Get processor and metadata
         processor = get_processor(local_path)

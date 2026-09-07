@@ -30,6 +30,7 @@ class File(Base):
     telegram_file_id = Column(String, nullable=False)
     local_path = Column(String, nullable=False)
     file_size = Column(Integer, nullable=False)
+    channel_message_id = Column(Integer, nullable=True)
     uploaded_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="files")

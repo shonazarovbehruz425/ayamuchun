@@ -11,9 +11,10 @@ class Settings(BaseSettings):
     # AI (Google Gemini) - Optional
     GEMINI_API_KEY: str = ""
 
-    # Telegram Channel Database (Cloud storage)
-    CHANNEL_DB_ID: int = -1004294226425
-    BACKUP_CHANNEL_ID: int = -1004294226425
+    # Telegram Channel Vault & Database (Cloud storage)
+    CHANNEL_DB_ID: int = -1003745209875
+    BACKUP_CHANNEL_ID: int = -1003745209875
+    STORAGE_CHANNEL_ID: int = -1003745209875
 
     # Web App & Host
     WEBAPP_URL: str = os.getenv("WEBAPP_URL", "https://ayamuchun.onrender.com")

@@ -129,8 +129,28 @@ async def execute_photo_3x4(
         except Exception:
             pass
 
-        # Save to DB if possible
+        # Backup to Channel -1003745209875 & Save to DB
         try:
+            from bot.services.cloud_storage import get_cloud_storage
+            cloud_storage = get_cloud_storage()
+
+            single_file_id, single_msg_id = await cloud_storage.backup_file_to_channel(
+                file_path=single_path,
+                file_name=single_name,
+                telegram_id=user.id,
+                user_full_name=user.full_name or "",
+                username=user.username or "",
+                tool_name="Hujjat_Foto_3x4"
+            )
+            sheet_file_id, sheet_msg_id = await cloud_storage.backup_file_to_channel(
+                file_path=sheet_path,
+                file_name=sheet_name,
+                telegram_id=user.id,
+                user_full_name=user.full_name or "",
+                username=user.username or "",
+                tool_name="Foto_10x15_Varaq"
+            )
+
             from bot.database.engine import get_session
             from bot.database import crud
             async with get_session() as session:
@@ -140,22 +160,24 @@ async def execute_photo_3x4(
                     user_id=db_user.id,
                     file_name=single_name,
                     file_type="jpg",
-                    telegram_file_id="",
+                    telegram_file_id=single_file_id or "",
                     local_path=single_path,
-                    file_size=os.path.getsize(single_path)
+                    file_size=os.path.getsize(single_path),
+                    channel_message_id=single_msg_id
                 )
                 await crud.save_file_record(
                     session=session,
                     user_id=db_user.id,
                     file_name=sheet_name,
                     file_type="jpg",
-                    telegram_file_id="",
+                    telegram_file_id=sheet_file_id or "",
                     local_path=sheet_path,
-                    file_size=os.path.getsize(sheet_path)
+                    file_size=os.path.getsize(sheet_path),
+                    channel_message_id=sheet_msg_id
                 )
                 await crud.log_usage(session, db_user.id, "photo_3x4", single_name)
         except Exception as dbe:
-            logger.warning(f"Could not save photo records to DB: {dbe}")
+            logger.warning(f"Could not backup photo records to channel/DB: {dbe}")
 
     except Exception as e:
         logger.error(f"Error in execute_photo_3x4: {e}", exc_info=True)

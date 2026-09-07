@@ -52,25 +52,70 @@ def build_file_caption(file_name: str, tool_name: str, details: list = None, fil
     lines.append("🤖 <i>EduBot Pro orqali tayyorlandi</i>")
     return "\n".join(lines)
 
-async def send_file_to_telegram(telegram_id: int, file_path: str, caption: str = ""):
-    """Tayyor bo'lgan faylni foydalanuvchining Telegram chatiga to'g'ridan-to'g'ri yuborish."""
+async def send_file_to_telegram(telegram_id: int, file_path: str, caption: str = "", file_id: str = None):
+    """Tayyor bo'lgan faylni foydalanuvchining Telegram chatiga to'g'ridan-to'g'ri (kanal nomisiz, hide name) yuborish."""
     if not settings.BOT_TOKEN or not telegram_id or settings.BOT_TOKEN in ("local_dev_preview_token", "your_bot_token_here"):
         logger.warning(f"Telegramga yuborilmadi: bot_token={bool(settings.BOT_TOKEN)}, tg_id={telegram_id}")
         return
     import httpx
+    url = f"https://api.telegram.org/bot{settings.BOT_TOKEN}/sendDocument"
     try:
-        url = f"https://api.telegram.org/bot{settings.BOT_TOKEN}/sendDocument"
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            with open(file_path, "rb") as f:
-                files = {"document": (os.path.basename(file_path), f)}
-                data = {"chat_id": telegram_id, "caption": caption, "parse_mode": "HTML"}
-                resp = await client.post(url, data=data, files=files)
-                if resp.status_code != 200:
-                    logger.error(f"Telegram sendDocument error for {telegram_id}: {resp.status_code} - {resp.text}")
-                else:
-                    logger.info(f"Fayl muvaffaqiyatli Telegram user {telegram_id} chatiga yuborildi: {os.path.basename(file_path)}")
+        # 1. Fast direct sending via telegram_file_id (100% clean, no channel info)
+        if file_id:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                data = {"chat_id": telegram_id, "document": file_id, "caption": caption, "parse_mode": "HTML"}
+                resp = await client.post(url, data=data)
+                if resp.status_code == 200:
+                    logger.info(f"Fayl file_id orqali user {telegram_id} chatiga yuborildi (Kanal nomi yashirin)")
+                    return
+
+        # 2. Send via fresh document stream
+        if file_path and os.path.exists(file_path):
+            async with httpx.AsyncClient(timeout=90.0) as client:
+                with open(file_path, "rb") as f:
+                    files = {"document": (os.path.basename(file_path), f)}
+                    data = {"chat_id": telegram_id, "caption": caption, "parse_mode": "HTML"}
+                    resp = await client.post(url, data=data, files=files)
+                    if resp.status_code == 200:
+                        logger.info(f"Fayl stream orqali user {telegram_id} chatiga yuborildi (Kanal nomi yashirin)")
     except Exception as e:
         logger.warning(f"Telegramga fayl yuborishda xatolik: {e}")
+
+async def save_and_backup_user_file(
+    session,
+    db_user,
+    user_dict: dict,
+    local_path: str,
+    file_name: str,
+    file_type: str,
+    tool_name: str = "Hujjat"
+):
+    """Faylni Telegram kanalga (-1003745209875) doimiy zaxiralash va bazaga saqlash."""
+    from bot.services.cloud_storage import get_cloud_storage
+    cloud_storage = get_cloud_storage()
+    tg_id = user_dict.get("telegram_id")
+    full_name = f"{user_dict.get('first_name', '')} {user_dict.get('last_name', '')}".strip() or "Foydalanuvchi"
+    username = user_dict.get("username", "")
+
+    file_id, msg_id = await cloud_storage.backup_file_to_channel(
+        file_path=local_path,
+        file_name=file_name,
+        telegram_id=tg_id,
+        user_full_name=full_name,
+        username=username,
+        tool_name=tool_name
+    )
+    rec = await crud.save_file_record(
+        session=session,
+        user_id=db_user.id,
+        file_name=file_name,
+        file_type=file_type,
+        telegram_file_id=file_id or "",
+        local_path=local_path,
+        file_size=os.path.getsize(local_path),
+        channel_message_id=msg_id
+    )
+    return rec
 
 
 @router.get("", response_model=List[FileResponse])
@@ -111,14 +156,14 @@ async def upload_file(
         
         async with get_session() as session:
             db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
-            record = await crud.save_file_record(
+            record = await save_and_backup_user_file(
                 session=session,
-                user_id=db_user.id,
+                db_user=db_user,
+                user_dict=user,
+                local_path=dest_path,
                 file_name=file.filename,
                 file_type=ext,
-                telegram_file_id="",
-                local_path=dest_path,
-                file_size=file_size
+                tool_name="Yuklangan_Fayl"
             )
             await crud.log_usage(session, db_user.id, "upload_web", f"Uploaded {file.filename}")
             
@@ -161,18 +206,18 @@ async def convert_file(
                 raise HTTPException(status_code=400, detail=f"{format} formatiga konvertatsiya mavjud emas")
                 
             new_ext = os.path.splitext(out_path)[1].lstrip(".").lower()
-            new_record = await crud.save_file_record(
+            tool_title = "Word ➔ PDF Konvertatsiyasi" if new_ext == "pdf" else "PDF ➔ Word (DOCX) Konvertatsiyasi"
+            new_record = await save_and_backup_user_file(
                 session=session,
-                user_id=db_user.id,
+                db_user=db_user,
+                user_dict=user,
+                local_path=out_path,
                 file_name=os.path.basename(out_path),
                 file_type=new_ext,
-                telegram_file_id="",
-                local_path=out_path,
-                file_size=os.path.getsize(out_path)
+                tool_name=tool_title
             )
 
             # Auto-send to Telegram chat with rich caption
-            tool_title = "Word ➔ PDF Konvertatsiyasi" if new_ext == "pdf" else "PDF ➔ Word (DOCX) Konvertatsiyasi"
             extra_info = ["Asl matn, shrift va jadvallar to'liq saqlab qolindi"]
             caption = build_file_caption(
                 file_name=new_record.file_name,
@@ -180,7 +225,7 @@ async def convert_file(
                 details=extra_info,
                 file_size=os.path.getsize(out_path)
             )
-            await send_file_to_telegram(user["telegram_id"], out_path, caption)
+            await send_file_to_telegram(user["telegram_id"], out_path, caption, file_id=new_record.telegram_file_id)
 
             return {
                 "message": "Konvertatsiya muvaffaqiyatli yakunlandi",
@@ -199,11 +244,18 @@ async def download_file(file_id: int, user: dict = Depends(get_current_user)):
         files = await crud.get_user_files(session, db_user.id)
         target = next((f for f in files if f.id == file_id), None)
         
-        if not target or not os.path.exists(target.local_path):
+        if not target:
             raise HTTPException(status_code=404, detail="Fayl topilmadi")
             
+        # Ensure local file exists on disk, auto-restoring from Telegram Cloud (-1003745209875) if wiped
+        from bot.services.cloud_storage import get_cloud_storage
+        cloud_storage = get_cloud_storage()
+        valid_path = await cloud_storage.ensure_local_file(target)
+        if not valid_path or not os.path.exists(valid_path):
+            raise HTTPException(status_code=404, detail="Fayl serverda topilmadi")
+            
         return FastFileResponse(
-            path=target.local_path,
+            path=valid_path,
             filename=target.file_name,
             media_type="application/octet-stream"
         )
@@ -336,21 +388,22 @@ async def save_file_content(
             with open(out_path, "w", encoding="utf-8") as f:
                 f.write(new_text)
 
-        new_record = await crud.save_file_record(
+        new_record = await save_and_backup_user_file(
             session=session,
-            user_id=db_user.id,
+            db_user=db_user,
+            user_dict=user,
+            local_path=out_path,
             file_name=out_name,
             file_type=ext.lstrip("."),
-            telegram_file_id="",
-            local_path=out_path,
-            file_size=os.path.getsize(out_path)
+            tool_name="Tahrirlangan_Fayl"
         )
 
         # Auto-send to Telegram chat
         await send_file_to_telegram(
             user["telegram_id"],
             out_path,
-            f"📝 {out_name} tahrirlangan faylingiz tayyor bo'ldi!"
+            f"📝 {out_name} tahrirlangan faylingiz tayyor bo'ldi!",
+            file_id=new_record.telegram_file_id
         )
 
         return {"status": "ok", "new_file_id": new_record.id, "new_file_name": out_name}
@@ -777,15 +830,14 @@ async def save_file_html(
         pdf_rec = None
         
         if result.get("docx_path") and os.path.exists(result["docx_path"]):
-            docx_rec = await crud.save_file_record(
+            docx_rec = await save_and_backup_user_file(
                 session=session,
-                user_id=db_user.id,
+                db_user=db_user,
+                user_dict=user,
+                local_path=result["docx_path"],
                 file_name=result["docx_name"],
                 file_type="docx",
-                telegram_file_id="",
-                local_path=result["docx_path"],
-                file_size=os.path.getsize(result["docx_path"]),
-                upsert=True
+                tool_name="Tahrirlangan_Word_Hujjati"
             )
             docx_caption = build_file_caption(
                 file_name=result["docx_name"],
@@ -793,18 +845,17 @@ async def save_file_html(
                 details=["Kiritilgan o'zgarishlar bilan saqlangan Word (DOCX) formati"],
                 file_size=os.path.getsize(result["docx_path"])
             )
-            await send_file_to_telegram(user["telegram_id"], result["docx_path"], docx_caption)
+            await send_file_to_telegram(user["telegram_id"], result["docx_path"], docx_caption, file_id=docx_rec.telegram_file_id)
 
         if result.get("pdf_path") and os.path.exists(result["pdf_path"]):
-            pdf_rec = await crud.save_file_record(
+            pdf_rec = await save_and_backup_user_file(
                 session=session,
-                user_id=db_user.id,
+                db_user=db_user,
+                user_dict=user,
+                local_path=result["pdf_path"],
                 file_name=result["pdf_name"],
                 file_type="pdf",
-                telegram_file_id="",
-                local_path=result["pdf_path"],
-                file_size=os.path.getsize(result["pdf_path"]),
-                upsert=True
+                tool_name="Tahrirlangan_PDF_Hujjati"
             )
             pdf_caption = build_file_caption(
                 file_name=result["pdf_name"],
@@ -812,7 +863,7 @@ async def save_file_html(
                 details=["Kiritilgan o'zgarishlar bilan saqlangan A4 PDF formati"],
                 file_size=os.path.getsize(result["pdf_path"])
             )
-            await send_file_to_telegram(user["telegram_id"], result["pdf_path"], pdf_caption)
+            await send_file_to_telegram(user["telegram_id"], result["pdf_path"], pdf_caption, file_id=pdf_rec.telegram_file_id)
 
         primary_rec = docx_rec if format_type == "docx" else (pdf_rec if format_type == "pdf" else (docx_rec or pdf_rec))
 
@@ -937,15 +988,14 @@ async def images_to_pdf(
 
         async with get_session() as session:
             db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
-            record = await crud.save_file_record(
+            record = await save_and_backup_user_file(
                 session=session,
-                user_id=db_user.id,
+                db_user=db_user,
+                user_dict=user,
+                local_path=out_path,
                 file_name=clean_title,
                 file_type="pdf",
-                telegram_file_id="",
-                local_path=out_path,
-                file_size=os.path.getsize(out_path),
-                upsert=True
+                tool_name="Rasmlardan_Yaratilgan_PDF"
             )
 
             # Auto-send to Telegram chat
@@ -955,7 +1005,7 @@ async def images_to_pdf(
                 details=[f"Sahifalar soni: {len(processed_pages)} ta", f"Varaq o'lchami: {page_size.upper()}"],
                 file_size=os.path.getsize(out_path)
             )
-            await send_file_to_telegram(user["telegram_id"], out_path, img_caption)
+            await send_file_to_telegram(user["telegram_id"], out_path, img_caption, file_id=record.telegram_file_id)
 
             return {"status": "ok", "new_file_id": record.id, "new_file_name": clean_title}
     except Exception as e:
@@ -1007,14 +1057,14 @@ async def extract_images_from_pdf(
                 os.remove(zip_path)
             raise HTTPException(status_code=400, detail="Ushbu PDF ichida rasm topilmadi")
 
-        record = await crud.save_file_record(
+        record = await save_and_backup_user_file(
             session=session,
-            user_id=db_user.id,
+            db_user=db_user,
+            user_dict=user,
+            local_path=zip_path,
             file_name=zip_name,
             file_type="zip",
-            telegram_file_id="",
-            local_path=zip_path,
-            file_size=os.path.getsize(zip_path)
+            tool_name="PDF_Rasmlari_Arxivi"
         )
 
         # Auto-send to Telegram chat
@@ -1024,7 +1074,7 @@ async def extract_images_from_pdf(
             details=[f"Ajratib olingan rasmlar: {img_count} ta", "Asl sifatdagi ZIP arxiv"],
             file_size=os.path.getsize(zip_path)
         )
-        await send_file_to_telegram(user["telegram_id"], zip_path, zip_caption)
+        await send_file_to_telegram(user["telegram_id"], zip_path, zip_caption, file_id=record.telegram_file_id)
 
         return {"status": "ok", "new_file_id": record.id, "new_file_name": zip_name, "images_count": img_count}
 
@@ -1059,14 +1109,14 @@ async def merge_pdfs_endpoint(
 
         async with get_session() as session:
             db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
-            record = await crud.save_file_record(
+            record = await save_and_backup_user_file(
                 session=session,
-                user_id=db_user.id,
+                db_user=db_user,
+                user_dict=user,
+                local_path=out_path,
                 file_name=out_name,
                 file_type="pdf",
-                telegram_file_id="",
-                local_path=out_path,
-                file_size=os.path.getsize(out_path)
+                tool_name="Birlashtirilgan_PDF"
             )
 
         if user.get("telegram_id"):
@@ -1077,7 +1127,7 @@ async def merge_pdfs_endpoint(
                     details=[f"Birlashtirilgan fayllar soni: {len(files)} ta"],
                     file_size=os.path.getsize(out_path)
                 )
-                await send_file_to_telegram(telegram_id=user["telegram_id"], file_path=out_path, caption=m_caption)
+                await send_file_to_telegram(telegram_id=user["telegram_id"], file_path=out_path, caption=m_caption, file_id=record.telegram_file_id)
             except Exception:
                 pass
 
@@ -1139,14 +1189,14 @@ async def split_pdf_endpoint(
             out_name = split_res["file_name"]
             f_type = "zip" if split_res["is_zip"] else "pdf"
 
-            record = await crud.save_file_record(
+            record = await save_and_backup_user_file(
                 session=session,
-                user_id=db_user.id,
+                db_user=db_user,
+                user_dict=user,
+                local_path=out_path,
                 file_name=out_name,
                 file_type=f_type,
-                telegram_file_id="",
-                local_path=out_path,
-                file_size=os.path.getsize(out_path)
+                tool_name="PDF_Ajratilgan_Sahifalar"
             )
 
             if user.get("telegram_id"):
@@ -1165,7 +1215,7 @@ async def split_pdf_endpoint(
                             details=[f"Ajratilgan sahifalar: {page_range}", f"Sahifalar soni: {split_res['extracted_count']} ta"],
                             file_size=os.path.getsize(out_path)
                         )
-                    await send_file_to_telegram(user["telegram_id"], out_path, caption=s_caption)
+                    await send_file_to_telegram(user["telegram_id"], out_path, caption=s_caption, file_id=record.telegram_file_id)
                 except Exception:
                     pass
 
@@ -1230,14 +1280,14 @@ async def compress_pdf_endpoint(
                 quality_level=quality_level
             )
 
-            record = await crud.save_file_record(
+            record = await save_and_backup_user_file(
                 session=session,
-                user_id=db_user.id,
+                db_user=db_user,
+                user_dict=user,
+                local_path=out_path,
                 file_name=out_name,
                 file_type="pdf",
-                telegram_file_id="",
-                local_path=out_path,
-                file_size=os.path.getsize(out_path)
+                tool_name="Siqilgan_PDF"
             )
 
             if user.get("telegram_id"):
@@ -1254,7 +1304,7 @@ async def compress_pdf_endpoint(
                         ],
                         file_size=stats["final_size"]
                     )
-                    await send_file_to_telegram(user["telegram_id"], out_path, caption=c_caption)
+                    await send_file_to_telegram(user["telegram_id"], out_path, caption=c_caption, file_id=record.telegram_file_id)
                 except Exception:
                     pass
 
@@ -1339,14 +1389,14 @@ async def watermark_pdf_endpoint(
                 logo_path=temp_logo_path
             )
 
-            record = await crud.save_file_record(
+            record = await save_and_backup_user_file(
                 session=session,
-                user_id=db_user.id,
+                db_user=db_user,
+                user_dict=user,
+                local_path=out_path,
                 file_name=out_name,
                 file_type="pdf",
-                telegram_file_id="",
-                local_path=out_path,
-                file_size=os.path.getsize(out_path)
+                tool_name="Watermark_PDF"
             )
 
             if user.get("telegram_id"):
@@ -1358,7 +1408,7 @@ async def watermark_pdf_endpoint(
                         details=[f"Belgi turi: {wm_info}", f"Shaffoflik: {int(float(opacity)*100)}%"],
                         file_size=os.path.getsize(out_path)
                     )
-                    await send_file_to_telegram(telegram_id=user["telegram_id"], file_path=out_path, caption=wm_caption)
+                    await send_file_to_telegram(telegram_id=user["telegram_id"], file_path=out_path, caption=wm_caption, file_id=record.telegram_file_id)
                 except Exception:
                     pass
 
@@ -1444,28 +1494,28 @@ async def create_photo_3x4_endpoint(
                 dpi=300
             )
 
-            # Save both records in DB
-            single_rec = await crud.save_file_record(
+            # Save and backup both files to channel -1003745209875
+            single_rec = await save_and_backup_user_file(
                 session=session,
-                user_id=db_user.id,
+                db_user=db_user,
+                user_dict=user,
+                local_path=single_path,
                 file_name=single_name,
                 file_type="jpg",
-                telegram_file_id="",
-                local_path=single_path,
-                file_size=os.path.getsize(single_path)
+                tool_name="Hujjat_Foto_3x4"
             )
 
-            sheet_rec = await crud.save_file_record(
+            sheet_rec = await save_and_backup_user_file(
                 session=session,
-                user_id=db_user.id,
+                db_user=db_user,
+                user_dict=user,
+                local_path=sheet_path,
                 file_name=sheet_name,
                 file_type="jpg",
-                telegram_file_id="",
-                local_path=sheet_path,
-                file_size=os.path.getsize(sheet_path)
+                tool_name="Foto_10x15_Varaq"
             )
 
-            # Send both to Telegram chat
+            # Send both to Telegram chat (completely hidden channel name)
             if user.get("telegram_id"):
                 try:
                     single_caption = build_file_caption(
@@ -1474,7 +1524,12 @@ async def create_photo_3x4_endpoint(
                         details=["Standart 30×40 mm (300 DPI bosma sifat)", "Pasport, viza, talaba hujjatlari uchun"],
                         file_size=os.path.getsize(single_path)
                     )
-                    await send_file_to_telegram(telegram_id=user["telegram_id"], file_path=single_path, caption=single_caption)
+                    await send_file_to_telegram(
+                        telegram_id=user["telegram_id"],
+                        file_path=single_path,
+                        caption=single_caption,
+                        file_id=single_rec.telegram_file_id
+                    )
 
                     sheet_caption = build_file_caption(
                         file_name=sheet_name,
@@ -1482,7 +1537,12 @@ async def create_photo_3x4_endpoint(
                         details=["6 ta 3×4 fotosurat", "Qaychi bilan to'g'ri kesish chiziqlari bilan"],
                         file_size=os.path.getsize(sheet_path)
                     )
-                    await send_file_to_telegram(telegram_id=user["telegram_id"], file_path=sheet_path, caption=sheet_caption)
+                    await send_file_to_telegram(
+                        telegram_id=user["telegram_id"],
+                        file_path=sheet_path,
+                        caption=sheet_caption,
+                        file_id=sheet_rec.telegram_file_id
+                    )
                 except Exception as tg_err:
                     logger.warning(f"Telegram photo 3x4 send error: {tg_err}")
 
@@ -1510,7 +1570,7 @@ async def resend_file_to_telegram_endpoint(
     file_id: int,
     user: dict = Depends(get_current_user)
 ):
-    """Mavjud faylni foydalanuvchining Telegram chatiga qayta yuborish."""
+    """Mavjud faylni foydalanuvchining Telegram chatiga qayta yuborish (kanal nomisiz, hide name)."""
     tg_id = user.get("telegram_id")
     if not tg_id:
         raise HTTPException(status_code=400, detail="Telegram ID aniqlanmadi")
@@ -1519,8 +1579,12 @@ async def resend_file_to_telegram_endpoint(
         db_user = await crud.get_or_create_user(session, tg_id, user.get("first_name", "Teacher"))
         files = await crud.get_user_files(session, db_user.id)
         target = next((f for f in files if f.id == file_id), None)
-        if not target or not os.path.exists(target.local_path):
+        if not target:
             raise HTTPException(status_code=404, detail="Fayl topilmadi")
+
+        from bot.services.cloud_storage import get_cloud_storage
+        cloud_storage = get_cloud_storage()
+        valid_path = await cloud_storage.ensure_local_file(target)
 
         caption = build_file_caption(
             file_name=target.file_name,
@@ -1528,5 +1592,10 @@ async def resend_file_to_telegram_endpoint(
             details=["Mening tayyor fayllarim ro'yxatidan yuborildi"],
             file_size=target.file_size
         )
-        await send_file_to_telegram(tg_id, target.local_path, caption)
+        await send_file_to_telegram(
+            telegram_id=tg_id,
+            file_path=valid_path,
+            caption=caption,
+            file_id=target.telegram_file_id
+        )
         return {"success": True, "message": "Fayl Telegram chatiga yuborildi!"}

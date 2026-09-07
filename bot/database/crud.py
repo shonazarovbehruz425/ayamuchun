@@ -28,7 +28,17 @@ async def update_user_activity(session: AsyncSession, telegram_id: int):
         user.last_active = datetime.utcnow()
         await session.commit()
 
-async def save_file_record(session: AsyncSession, user_id: int, file_name: str, file_type: str, telegram_file_id: str, local_path: str, file_size: int, upsert: bool = True) -> File:
+async def save_file_record(
+    session: AsyncSession,
+    user_id: int,
+    file_name: str,
+    file_type: str,
+    telegram_file_id: str,
+    local_path: str,
+    file_size: int,
+    channel_message_id: Optional[int] = None,
+    upsert: bool = True
+) -> File:
     if upsert:
         import os
         from datetime import datetime
@@ -44,9 +54,12 @@ async def save_file_record(session: AsyncSession, user_id: int, file_name: str, 
                 except Exception:
                     pass
             existing.file_type = file_type
-            existing.telegram_file_id = telegram_file_id
+            if telegram_file_id:
+                existing.telegram_file_id = telegram_file_id
             existing.local_path = local_path
             existing.file_size = file_size
+            if channel_message_id:
+                existing.channel_message_id = channel_message_id
             existing.uploaded_at = datetime.utcnow()
             await session.commit()
             await session.refresh(existing)
@@ -58,7 +71,8 @@ async def save_file_record(session: AsyncSession, user_id: int, file_name: str, 
         file_type=file_type,
         telegram_file_id=telegram_file_id,
         local_path=local_path,
-        file_size=file_size
+        file_size=file_size,
+        channel_message_id=channel_message_id
     )
     session.add(file_record)
     await session.commit()

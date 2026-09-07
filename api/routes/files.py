@@ -54,7 +54,8 @@ def build_file_caption(file_name: str, tool_name: str, details: list = None, fil
 
 async def send_file_to_telegram(telegram_id: int, file_path: str, caption: str = ""):
     """Tayyor bo'lgan faylni foydalanuvchining Telegram chatiga to'g'ridan-to'g'ri yuborish."""
-    if not settings.BOT_TOKEN or not telegram_id:
+    if not settings.BOT_TOKEN or not telegram_id or settings.BOT_TOKEN in ("local_dev_preview_token", "your_bot_token_here"):
+        logger.warning(f"Telegramga yuborilmadi: bot_token={bool(settings.BOT_TOKEN)}, tg_id={telegram_id}")
         return
     import httpx
     try:
@@ -63,7 +64,11 @@ async def send_file_to_telegram(telegram_id: int, file_path: str, caption: str =
             with open(file_path, "rb") as f:
                 files = {"document": (os.path.basename(file_path), f)}
                 data = {"chat_id": telegram_id, "caption": caption, "parse_mode": "HTML"}
-                await client.post(url, data=data, files=files)
+                resp = await client.post(url, data=data, files=files)
+                if resp.status_code != 200:
+                    logger.error(f"Telegram sendDocument error for {telegram_id}: {resp.status_code} - {resp.text}")
+                else:
+                    logger.info(f"Fayl muvaffaqiyatli Telegram user {telegram_id} chatiga yuborildi: {os.path.basename(file_path)}")
     except Exception as e:
         logger.warning(f"Telegramga fayl yuborishda xatolik: {e}")
 

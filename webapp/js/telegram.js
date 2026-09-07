@@ -133,27 +133,51 @@ const TelegramApp = {
     },
 
     closeApp() {
-        if (tg?.close) {
-            tg.close();
+        this.hapticFeedback('medium');
+        try {
+            if (tg) {
+                if (tg.disableClosingConfirmation) {
+                    tg.disableClosingConfirmation();
+                }
+                if (tg.close) {
+                    tg.close();
+                    return;
+                }
+            }
+        } catch (e) {
+            console.warn("closeApp error:", e);
         }
+        window.close();
+    },
+
+    closeToChat() {
+        this.closeApp();
     },
 
     downloadFile(url, fileName = "") {
-        // 1. Notify user clearly in Telegram Mini App that document is ready and sent to Telegram
         this.hapticFeedback('medium');
-        this.showAlert(
-            "📬 Hujjatingiz to'g'ridan-to'g'ri Telegram botingizga yuborildi!\n\n" +
-            "Siz uni pastdagi 'Yopish' tugmasini bosib, bot chatidan yuklab olishingiz mumkin."
-        );
 
-        // 2. Also trigger direct device download in background without forcing navigation
+        // Inside Telegram Mini App: NEVER trigger a.click()!
+        // a.click() opens external Chrome/Safari and forces user onto website.
+        // The file is already sent to the user's Telegram chat.
+        if (tg && (tg.initData || window.Telegram?.WebApp)) {
+            this.showAlert(
+                "📬 Fayl to'g'ridan-to'g'ri Telegram botingiz chatiga yuborildi!\n\n" +
+                "Saytga kirmasdan, bot chatidan original sifatda yuklab oling."
+            );
+            setTimeout(() => {
+                this.closeApp();
+            }, 600);
+            return;
+        }
+
+        // Only for desktop web browser outside Telegram:
         try {
             const fullUrl = url.startsWith('http') ? url : (window.location.origin + url);
             const a = document.createElement('a');
             a.href = fullUrl;
             if (fileName) a.download = fileName;
-            a.target = '_self';
-            a.style.display = 'none';
+            a.target = '_blank';
             document.body.appendChild(a);
             a.click();
             setTimeout(() => {

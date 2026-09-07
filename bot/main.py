@@ -32,6 +32,8 @@ from bot.handlers.ai_handler import (
     handle_explain,
     handle_quiz,
     process_text_input,
+    handle_smart_chat_message,
+    handle_chat_ai_callback,
     WAITING_TEXT,
     WAITING_TOPIC,
 )
@@ -241,10 +243,8 @@ async def handle_menu_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             reply_markup=main_menu_keyboard(),
         )
     else:
-        await update.message.reply_text(
-            "Kechirasiz, men bu buyruqni tushunmadim.\n"
-            "Iltimos, menyudan tanlang yoki /help buyrug'ini yuboring."
-        )
+        # Route free-form user messages, questions, and commands to Smart Conversational AI
+        await handle_smart_chat_message(update, context)
 
 
 # ── Application builder ───────────────────────────────────────────────────
@@ -263,6 +263,7 @@ def build_application():
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("backup", manual_backup_command))
+    application.add_handler(CommandHandler(["ai", "chat", "test", "quiz", "konspekt", "dars", "tarjima", "xulosa"], handle_smart_chat_message))
 
     # ── AI conversation handler ────────────────────────────────────────
     ai_conv_handler = ConversationHandler(
@@ -362,6 +363,7 @@ def build_application():
 
     # ── File action callbacks ──────────────────────────────────────────
     application.add_handler(CallbackQueryHandler(handle_file_callback, pattern="^file_"))
+    application.add_handler(CallbackQueryHandler(handle_chat_ai_callback, pattern="^chat_ai_"))
 
     # ── Settings handlers ──────────────────────────────────────────────
     application.add_handler(MessageHandler(filters.Regex("^⚙️ Sozlamalar$"), settings_menu))

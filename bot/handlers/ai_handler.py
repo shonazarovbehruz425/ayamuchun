@@ -3,7 +3,7 @@
 import logging
 import os
 import tempfile
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from telegram.ext import ContextTypes, ConversationHandler
 
 from bot.config import get_settings
@@ -256,3 +256,316 @@ async def process_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
     return ConversationHandler.END
 
+
+
+# ── SMART TELEGRAM CHATBOT & ACTION SUGGESTIONS ─────────────────────────────
+
+def format_ai_response_for_telegram(text: str) -> str:
+    """Safely convert AI markdown into clean Telegram HTML entities."""
+    import html as html_lib
+    import re
+    
+    # 1. HTML escape everything first
+    safe_text = html_lib.escape(text)
+    
+    # 2. Bold: **text** or __text__ -> <b>text</b>
+    safe_text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', safe_text)
+    safe_text = re.sub(r'__(.+?)__', r'<b>\1</b>', safe_text)
+    
+    # 3. Italic: *text* or _text_ -> <i>text</i>
+    safe_text = re.sub(r'(?<!\w)\*([^\*\n]+?)\*(?!\w)', r'<i>\1</i>', safe_text)
+    safe_text = re.sub(r'(?<!\w)_([^\_\n]+?)_(?!\w)', r'<i>\1</i>', safe_text)
+    
+    # 4. Inline code: `code` -> <code>code</code>
+    safe_text = re.sub(r'`([^`\n]+?)`', r'<code>\1</code>', safe_text)
+    
+    # 5. Headings: ### Header -> <b>Header</b>
+    safe_text = re.sub(r'^#{1,6}\s*(.+)$', r'<b>\1</b>', safe_text, flags=re.MULTILINE)
+    
+    # 6. Bullet lists: * item or - item -> • item
+    safe_text = re.sub(r'^[\*\-]\s+', '• ', safe_text, flags=re.MULTILINE)
+    
+    return safe_text
+
+
+def build_ai_suggestions_keyboard(topic: str = "") -> InlineKeyboardMarkup:
+    """Build quick interactive next-action suggestion chips for Telegram AI responses."""
+    settings = get_settings()
+    webapp_url = settings.WEBAPP_URL or "https://ayamuchun.onrender.com"
+    
+    buttons = [
+        [
+            InlineKeyboardButton("📄 Word (.docx) yuklab olish", callback_data="chat_ai_word"),
+            InlineKeyboardButton("📝 5 ta test tuzish", callback_data="chat_ai_quiz"),
+        ],
+        [
+            InlineKeyboardButton("🔄 Rus/Eng tarjima", callback_data="chat_ai_translate"),
+            InlineKeyboardButton("📋 Qisqa xulosa", callback_data="chat_ai_summarize"),
+        ],
+        [
+            InlineKeyboardButton("📱 Mini App'da ochish", web_app=WebAppInfo(url=f"{webapp_url}#/ai")),
+            InlineKeyboardButton("🗑️ Yangi mavzu", callback_data="chat_ai_clear"),
+        ]
+    ]
+    return InlineKeyboardMarkup(buttons)
+
+
+async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Intelligently handle any user text in Telegram chat:
+    - Recognizes explicit/implicit intents and commands (test, lesson plan, translation, file tools)
+    - Generates multi-turn pedagogical AI answers with memory
+    - Offers instant interactive micro-actions (Word download, quiz generation, translation, Mini App)
+    """
+    if not update.message or not update.message.text:
+        return
+
+    raw_text = update.message.text.strip()
+    chat_id = update.effective_chat.id
+
+    # 1. Send live typing indicator in Telegram header
+    try:
+        await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+    except Exception:
+        pass
+
+    # 2. Check for File Tools intent in user natural language
+    lower_text = raw_text.lower()
+    if any(w in lower_text for w in ("pdf to word", "pdfni word", "pdf dan word", "pdf wordga")):
+        context.user_data["expected_tool"] = "pdf_to_word"
+        await update.message.reply_text(
+            "🔄 <b>PDF ➔ Word (DOCX)</b>\n\n"
+            "Menga <b>PDF fayl</b> yuboring, uni sifatli va tahrirlanadigan Word (.docx) hujjatiga aylantirib beraman.",
+            parse_mode="HTML"
+        )
+        return
+    elif any(w in lower_text for w in ("word to pdf", "wordni pdf", "doc to pdf", "word pdfga")):
+        context.user_data["expected_tool"] = "word_to_pdf"
+        await update.message.reply_text(
+            "🔄 <b>Word ➔ PDF</b>\n\n"
+            "Menga <b>Word (.docx yoki .doc)</b> fayl yuboring, uni sifatli PDF ga aylantirib beraman.",
+            parse_mode="HTML"
+        )
+        return
+    elif any(w in lower_text for w in ("3x4 rasm", "3x4 foto", "hujjat foto", "3*4 rasm")):
+        context.user_data["expected_tool"] = "photo_3x4"
+        await update.message.reply_text(
+            "📸 <b>Hujjat foto (3×4) tayyorlash</b>\n\n"
+            "Menga fotosurat yuboring. Uni 3×4 o'lchamga keltirib, oq yoki ko'k fon bilan tayyorlab beraman.",
+            parse_mode="HTML"
+        )
+        return
+
+    import re
+
+    # Clean command prefixes if user typed /ai, /test, /konspekt, etc.
+    clean_prompt = raw_text
+    if raw_text.startswith("/test") or raw_text.startswith("/quiz"):
+        topic = re.sub(r"^/(test|quiz)\s*", "", raw_text).strip() or "Umumiy fanlar"
+        clean_prompt = f"Menga quyidagi mavzu bo'yicha 5 ta test (A, B, C, D variantlari va to'g'ri javoblar bilan) tuzib ber: {topic}"
+    elif raw_text.startswith("/konspekt") or raw_text.startswith("/dars"):
+        topic = re.sub(r"^/(konspekt|dars)\s*", "", raw_text).strip() or "Dars mavzusi"
+        clean_prompt = f"Menga quyidagi mavzu bo'yicha 45 daqiqalik to'liq dars ishlanmasi (konspekt) tuzib ber: {topic}"
+    elif raw_text.startswith("/tarjima"):
+        topic = re.sub(r"^/tarjima\s*", "", raw_text).strip()
+        clean_prompt = f"Quyidagi matnni Rus va Ingliz tillariga professional tarjima qil: {topic}"
+    elif raw_text.startswith("/xulosa"):
+        topic = re.sub(r"^/xulosa\s*", "", raw_text).strip()
+        clean_prompt = f"Quyidagi matnni eng muhim tezislarini ajratib qisqacha xulosa qil: {topic}"
+    elif raw_text.startswith("/ai") or raw_text.startswith("/chat"):
+        clean_prompt = re.sub(r"^/(ai|chat)\s*", "", raw_text).strip()
+
+    status_msg = await update.message.reply_text("⏳ <i>AI javob tayyorlamoqda...</i>", parse_mode="HTML")
+
+    try:
+        # Multi-turn conversational memory for Telegram chat
+        chat_history = context.user_data.setdefault("telegram_chat_history", [])
+        
+        system_instruction = (
+            "Siz EduBot AI — o'qituvchilar, talabalar va barcha foydalanuvchilar uchun "
+            "yuksak bilimdon, pedagogik tajribali va do'stona virtual sun'iy intellekt yordamchisisiz. "
+            "Foydalanuvchining savol, matn va topshiriqlariga doim o'zbek tilida, aniq, chiroyli va tartibli "
+            "(sarlavha, qalin harflar, nuqtali ro'yxatlar bilan) javob bering. "
+            "Agar savol test yoki konspektga oid bo'lsa, to'liq va o'quv standartlariga mos shaklda tuzing."
+        )
+
+        chat_history.append({"role": "user", "content": clean_prompt})
+        if len(chat_history) > 8:
+            chat_history = chat_history[-8:]
+            context.user_data["telegram_chat_history"] = chat_history
+
+        ai_reply = await ai_service.generate_chat(
+            messages=chat_history,
+            system_prompt=system_instruction
+        )
+
+        # Save assistant message to memory
+        chat_history.append({"role": "assistant", "content": ai_reply})
+        context.user_data["telegram_chat_history"] = chat_history
+        context.user_data["last_ai_response"] = ai_reply
+        context.user_data["last_ai_topic"] = clean_prompt[:35]
+
+        # Format reply
+        formatted_html = format_ai_response_for_telegram(ai_reply)
+        keyboard = build_ai_suggestions_keyboard(topic=clean_prompt[:30])
+
+        try:
+            await status_msg.delete()
+        except Exception:
+            pass
+
+        # Send response safely
+        if len(formatted_html) <= 4000:
+            try:
+                await update.message.reply_text(
+                    formatted_html,
+                    reply_markup=keyboard,
+                    parse_mode="HTML"
+                )
+            except Exception:
+                await update.message.reply_text(ai_reply, reply_markup=keyboard)
+        else:
+            chunks = [formatted_html[i:i + 3800] for i in range(0, len(formatted_html), 3800)]
+            for i, chunk in enumerate(chunks):
+                is_last = (i == len(chunks) - 1)
+                try:
+                    await update.message.reply_text(
+                        chunk,
+                        reply_markup=keyboard if is_last else None,
+                        parse_mode="HTML"
+                    )
+                except Exception:
+                    await update.message.reply_text(
+                        chunk,
+                        reply_markup=keyboard if is_last else None
+                    )
+
+    except Exception as e:
+        logger.error(f"Error in handle_smart_chat_message: {e}", exc_info=True)
+        err_text = (
+            f"⚠️ <b>Javob berishda xatolik yuz berdi:</b>\n<i>{str(e)[:160]}</i>\n\n"
+            f"Iltimos, qayta urinib ko'ring yoki savolingizni boshqacharoq yozing."
+        )
+        try:
+            await status_msg.edit_text(err_text, parse_mode="HTML")
+        except Exception:
+            await update.message.reply_text(f"⚠️ Xatolik yuz berdi: {str(e)[:160]}")
+
+
+async def handle_chat_ai_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle callback button clicks from smart suggestions under AI responses."""
+    query = update.callback_query
+    await query.answer()
+
+    action = query.data
+    last_response = context.user_data.get("last_ai_response", "")
+    last_topic = context.user_data.get("last_ai_topic", "Material")
+
+    if action == "chat_ai_word":
+        if not last_response:
+            await query.message.reply_text("⚠️ Avval biror savol yoki mavzu yuboring.")
+            return
+
+        wait_msg = await query.message.reply_text("⏳ Word (.docx) hujjati tayyorlanmoqda...")
+        try:
+            temp_dir = tempfile.mkdtemp()
+            clean_title = "".join(c for c in last_topic if c.isalnum() or c in (" ", "-", "_")).strip() or "Material"
+            file_name = f"{clean_title[:30]}.docx"
+            out_path = os.path.join(temp_dir, file_name)
+
+            await word_processor.create_document(last_response, out_path, title=last_topic)
+
+            with open(out_path, "rb") as f:
+                await query.message.reply_document(
+                    document=f,
+                    filename=file_name,
+                    caption=f"📄 <b>{clean_title}</b> hujjati Word (.docx) formatida tayyor!",
+                    parse_mode="HTML"
+                )
+            try:
+                await wait_msg.delete()
+                os.remove(out_path)
+            except Exception:
+                pass
+        except Exception as err:
+            logger.error(f"Word docx export error: {err}")
+            await wait_msg.edit_text(f"❌ Word fayl yaratishda xatolik: {err}")
+
+    elif action == "chat_ai_quiz":
+        prompt_topic = last_topic or last_response[:200]
+        wait_msg = await query.message.reply_text(f"📝 <b>«{last_topic[:30]}»</b> mavzusi bo'yicha 5 ta test tuzilmoqda...", parse_mode="HTML")
+        try:
+            quiz_list = await ai_service.generate_quiz(text=prompt_topic, num_questions=5, quiz_type="multiple")
+            if isinstance(quiz_list, list) and len(quiz_list) > 0 and isinstance(quiz_list[0], dict):
+                lines = [f"📝 <b>Mavzu:</b> {last_topic} bo'yicha testlar\n"]
+                for i, q in enumerate(quiz_list, 1):
+                    lines.append(f"<b>{i}. {q.get('question', '')}</b>")
+                    for opt in q.get("options", []):
+                        lines.append(f"   {opt}")
+                    lines.append(f"✅ <i>To'g'ri javob:</i> {q.get('correct_answer', '')}")
+                    if q.get("explanation"):
+                        lines.append(f"💡 <i>Izoh:</i> {q.get('explanation', '')}")
+                    lines.append("")
+                quiz_text = "\n".join(lines)
+            else:
+                quiz_text = str(quiz_list)
+
+            context.user_data["last_ai_response"] = quiz_text
+            context.user_data["last_ai_topic"] = f"{last_topic} - Testlar"
+
+            keyboard = build_ai_suggestions_keyboard(topic=f"{last_topic} - Test")
+            await wait_msg.delete()
+            await query.message.reply_text(quiz_text, reply_markup=keyboard, parse_mode="HTML")
+        except Exception as err:
+            logger.error(f"Quiz generation error: {err}")
+            await wait_msg.edit_text(f"❌ Test tuzishda xatolik: {err}")
+
+    elif action == "chat_ai_summarize":
+        if not last_response:
+            await query.message.reply_text("⚠️ Xulosa qilish uchun avval matn yuboring.")
+            return
+
+        wait_msg = await query.message.reply_text("📋 <i>Qisqa xulosa tayyorlanmoqda...</i>", parse_mode="HTML")
+        try:
+            summary = await ai_service.summarize_text(text=last_response[:4000])
+            context.user_data["last_ai_response"] = summary
+            keyboard = build_ai_suggestions_keyboard(topic=f"{last_topic} - Xulosa")
+            await wait_msg.delete()
+            await query.message.reply_text(
+                f"📋 <b>Qisqacha Xulosa:</b>\n\n{summary}",
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
+        except Exception as err:
+            await wait_msg.edit_text(f"❌ Xulosa qilishda xatolik: {err}")
+
+    elif action == "chat_ai_translate":
+        if not last_response:
+            await query.message.reply_text("⚠️ Tarjima qilish uchun avval matn yuboring.")
+            return
+
+        wait_msg = await query.message.reply_text("🔄 <i>Rus va Ingliz tillariga tarjima qilinmoqda...</i>", parse_mode="HTML")
+        try:
+            tr_prompt = [
+                {"role": "user", "content": f"Quyidagi matnni Rus va Ingliz tillariga sifatli va tushunarli qilib tarjima qilib ber:\n\n{last_response[:2500]}"}
+            ]
+            translated = await ai_service.generate_chat(messages=tr_prompt)
+            context.user_data["last_ai_response"] = translated
+            keyboard = build_ai_suggestions_keyboard(topic=f"{last_topic} - Tarjima")
+            await wait_msg.delete()
+            await query.message.reply_text(
+                f"🔄 <b>Tarjima (Rus va Ingliz tillarida):</b>\n\n{translated}",
+                reply_markup=keyboard
+            )
+        except Exception as err:
+            await wait_msg.edit_text(f"❌ Tarjima qilishda xatolik: {err}")
+
+    elif action == "chat_ai_clear":
+        context.user_data["telegram_chat_history"] = []
+        context.user_data["last_ai_response"] = ""
+        context.user_data["last_ai_topic"] = ""
+        await query.message.reply_text(
+            "🧹 <b>Yangi suhbat boshlandi!</b>\n\n"
+            "Menga xohlagan savolingiz, mavzungiz, konspekt yoki test tuzish bo'yicha topshirig'ingizni yozishingiz mumkin.",
+            parse_mode="HTML"
+        )

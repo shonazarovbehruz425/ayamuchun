@@ -779,14 +779,15 @@ body.route-ai {
 }
 
 body.route-ai main#app {
-    padding-top: 0.5rem !important;
-    padding-bottom: 0.25rem !important;
-    height: calc(100vh - 120px) !important;
-    height: calc(100dvh - 120px) !important;
-    max-height: calc(100dvh - 120px) !important;
+    padding-top: 0.25rem !important;
+    padding-bottom: calc(75px + max(env(safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px))) !important;
+    height: calc(100vh - 110px) !important;
+    height: calc(100dvh - 110px) !important;
+    max-height: calc(100dvh - 110px) !important;
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
+    box-sizing: border-box !important;
 }
 
 body.route-ai .chat-container-card {
@@ -794,7 +795,22 @@ body.route-ai .chat-container-card {
     min-height: 0 !important;
     max-height: 100% !important;
     flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
     overflow: hidden !important;
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+body.route-ai #ai-chat-stream {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+}
+
+body.route-ai .chat-input-bar {
+    flex-shrink: 0 !important;
+    margin-bottom: 2px !important;
 }
 
 /* Eliminate native scrollbar visual bar completely */

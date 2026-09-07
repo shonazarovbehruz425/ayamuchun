@@ -3363,7 +3363,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const aiName = window.aiDisplayName || "EduBot AI";
 
         appDiv.innerHTML = `
-            <div class="chat-container-card space-y-3 animate-fade-in pb-4">
+            <div class="chat-container-card space-y-3 animate-fade-in">
                 
                 <!-- Chat Header Bar -->
                 <div class="liquid-glass-card p-3.5 flex items-center justify-between shadow-sm">

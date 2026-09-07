@@ -22,7 +22,7 @@ const TelegramApp = {
             setTimeout(triggerExpandAndFullscreen, 150);
             setTimeout(triggerExpandAndFullscreen, 400);
 
-            // Synchronize Telegram Safe Area Insets for notch and status bar
+            // Synchronize Telegram Safe Area Insets and dynamically position header below overlay buttons
             const syncSafeArea = () => {
                 const top = tg.contentSafeAreaInset?.top ?? tg.safeAreaInset?.top ?? 0;
                 const bottom = tg.contentSafeAreaInset?.bottom ?? tg.safeAreaInset?.bottom ?? 0;
@@ -34,6 +34,12 @@ const TelegramApp = {
                     document.documentElement.style.setProperty('--tg-safe-area-inset-bottom', `${bottom}px`);
                     document.documentElement.style.setProperty('--tg-content-safe-area-inset-bottom', `${bottom}px`);
                 }
+
+                // Explicitly enforce header clearance so Close and Menu buttons never overlap
+                const headerPadding = Math.max(72, top + 56);
+                document.querySelectorAll('header.liquid-glass-header, .doc-editor-header').forEach(h => {
+                    h.style.setProperty('padding-top', `${headerPadding}px`, 'important');
+                });
             };
             syncSafeArea();
             tg.onEvent?.('safeAreaChanged', syncSafeArea);

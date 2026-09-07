@@ -82,9 +82,9 @@ button, a, .interactive-card, [role="button"], .ios-tab-btn, .liquid-glass-inter
     border-bottom: 1.5px solid rgba(255, 255, 255, 0.9);
     box-shadow: 
         0 10px 30px -10px rgba(15, 23, 42, 0.08),
-        inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.95),
-        inset 0 -1.5px 2.5px 0 rgba(0, 0, 0, 0.03);
-    padding-top: calc(max(env(safe-area-inset-top, 0px), var(--tg-content-safe-area-inset-top, 0px), var(--tg-safe-area-inset-top, 0px), 0px) + 54px) !important;
+        inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.95);
+    padding-top: 70px !important;
+    padding-top: calc(70px + var(--tg-content-safe-area-inset-top, 0px)) !important;
     padding-bottom: 14px !important;
 }
 
@@ -464,8 +464,8 @@ html.dark .doc-editor-view {
     -webkit-backdrop-filter: blur(20px);
     border-bottom: 1px solid rgba(226, 232, 240, 0.8);
     box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
-    flex-shrink: 0;
-    padding-top: calc(max(env(safe-area-inset-top, 0px), var(--tg-content-safe-area-inset-top, 0px), var(--tg-safe-area-inset-top, 0px), 0px) + 54px) !important;
+    padding-top: 70px !important;
+    padding-top: calc(70px + var(--tg-content-safe-area-inset-top, 0px)) !important;
     padding-bottom: 10px !important;
 }
 
@@ -473,7 +473,8 @@ html.dark .doc-editor-header {
     background: rgba(15, 23, 42, 0.95);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
-    padding-top: calc(max(env(safe-area-inset-top, 0px), var(--tg-content-safe-area-inset-top, 0px), var(--tg-safe-area-inset-top, 0px), 0px) + 54px) !important;
+    padding-top: 70px !important;
+    padding-top: calc(70px + var(--tg-content-safe-area-inset-top, 0px)) !important;
     padding-bottom: 10px !important;
 }
 

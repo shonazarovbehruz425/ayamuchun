@@ -288,16 +288,15 @@ button, a, .interactive-card, [role="button"], .ios-tab-btn, .liquid-glass-inter
 }
 
 /* Tactile tab buttons */
-.mercury-capsule {
-    display: none !important;
-}
-
 .ios-tab-btn {
     position: relative;
     z-index: 20;
     transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
     touch-action: manipulation;
     color: #64748b !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
     border-radius: 30px;
     cursor: pointer;
 }
@@ -305,36 +304,32 @@ button, a, .interactive-card, [role="button"], .ios-tab-btn, .liquid-glass-inter
 .ios-tab-btn span {
     color: #64748b !important;
     font-weight: 600;
-    transition: color 0.2s ease, font-weight 0.2s ease;
+    transition: color 0.25s ease, font-weight 0.25s ease;
 }
 
 .ios-tab-btn svg {
     color: #64748b !important;
     stroke: currentColor !important;
-    transition: transform 0.22s ease, stroke-width 0.22s ease, opacity 0.22s ease;
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), stroke-width 0.2s ease, opacity 0.2s ease, color 0.2s ease;
     opacity: 0.75;
 }
 
 .ios-tab-btn:active {
-    transform: scale(0.95);
+    transform: scale(0.94);
 }
 
 .ios-tab-btn.active-tab {
     color: #ffffff !important;
     font-weight: 800 !important;
-    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%) !important;
-    box-shadow: 
-        0 8px 24px -2px rgba(79, 70, 229, 0.75),
-        0 3px 8px -2px rgba(99, 102, 241, 0.5),
-        inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.5),
-        inset 0 -1.5px 2px 0 rgba(0, 0, 0, 0.25) !important;
-    border-radius: 30px !important;
+    background: transparent !important;
+    box-shadow: none !important;
     opacity: 1 !important;
 }
 
 .ios-tab-btn.active-tab span {
     color: #ffffff !important;
     font-weight: 800 !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 .ios-tab-btn.active-tab svg {
@@ -445,6 +440,8 @@ html.dark .ios26-glass-chassis {
 
 html.dark .ios-tab-btn {
     color: #64748b !important;
+    background: transparent !important;
+    box-shadow: none !important;
 }
 
 html.dark .ios-tab-btn span {
@@ -459,19 +456,15 @@ html.dark .ios-tab-btn svg {
 html.dark .ios-tab-btn.active-tab {
     color: #ffffff !important;
     font-weight: 800 !important;
-    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%) !important;
-    box-shadow: 
-        0 10px 28px -2px rgba(79, 70, 229, 0.8),
-        0 4px 12px -2px rgba(99, 102, 241, 0.5),
-        inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.5),
-        inset 0 -1.5px 2px 0 rgba(0, 0, 0, 0.5) !important;
-    border-radius: 30px !important;
+    background: transparent !important;
+    box-shadow: none !important;
     opacity: 1 !important;
 }
 
 html.dark .ios-tab-btn.active-tab span {
     color: #ffffff !important;
     font-weight: 800 !important;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
 
 html.dark .ios-tab-btn.active-tab svg {

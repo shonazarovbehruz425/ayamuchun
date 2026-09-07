@@ -146,18 +146,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (activeRoute === '#/ai') mainTab = '#/ai';
         else if (activeRoute === '#/settings') mainTab = '#/settings';
 
+        let activeBtn = null;
+
         document.querySelectorAll('.nav-item').forEach(item => {
             const route = item.getAttribute('data-route');
             const isActive = (route === mainTab);
             const icon = item.querySelector('svg');
             const textSpan = item.querySelector('span');
 
+            item.style.removeProperty('background');
+            item.style.removeProperty('box-shadow');
+
             if (isActive) {
+                activeBtn = item;
                 item.classList.add('active-tab');
                 item.classList.remove('text-slate-400', 'text-slate-500', 'text-slate-600', 'text-slate-700');
                 item.style.setProperty('color', '#ffffff', 'important');
-                item.style.setProperty('background', 'linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%)', 'important');
-                item.style.setProperty('box-shadow', '0 8px 24px -2px rgba(79, 70, 229, 0.75), inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.5)', 'important');
                 if (icon) {
                     icon.style.setProperty('transform', 'scale(1.15)', 'important');
                     icon.style.setProperty('stroke-width', '2.6', 'important');
@@ -172,8 +176,6 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 item.classList.remove('active-tab');
                 item.classList.add('text-slate-400');
-                item.style.removeProperty('background');
-                item.style.removeProperty('box-shadow');
                 item.style.setProperty('color', '#64748b', 'important');
                 if (icon) {
                     icon.style.removeProperty('transform');
@@ -188,8 +190,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
+
+        // ── Liquid Mercury Capsule Sliding & Elastic Physics ──
+        const capsule = document.getElementById('mercuryCapsule');
+        if (capsule && activeBtn) {
+            const leftOffset = activeBtn.offsetLeft;
+            const btnWidth = activeBtn.offsetWidth;
+            
+            if (btnWidth > 0) {
+                capsule.classList.add('morphing');
+                capsule.style.left = `${leftOffset}px`;
+                capsule.style.width = `${btnWidth}px`;
+                
+                clearTimeout(window._capsuleMorphTimeout);
+                window._capsuleMorphTimeout = setTimeout(() => {
+                    capsule.classList.remove('morphing');
+                }, 380);
+            }
+        }
     }
     window.updateNav = updateNav;
+
+    // Recalculate capsule position on window resize
+    window.addEventListener('resize', () => {
+        const capsule = document.getElementById('mercuryCapsule');
+        const activeBtn = document.querySelector('.nav-item.active-tab');
+        if (capsule && activeBtn && activeBtn.offsetWidth > 0) {
+            capsule.style.left = `${activeBtn.offsetLeft}px`;
+            capsule.style.width = `${activeBtn.offsetWidth}px`;
+        }
+    });
 
     window.navigateTo = (route) => {
         TelegramApp.hapticFeedback('medium');

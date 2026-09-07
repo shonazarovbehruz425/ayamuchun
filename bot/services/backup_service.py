@@ -99,7 +99,14 @@ class DatabaseSyncService:
     async def sync_to_channel(self, reason: str = "Auto-Sync") -> bool:
         """Export database to a .js file and upload it to the backup channel."""
         if not self.channel_id:
-            logger.warning("Backup channel ID is not configured. Skipping sync.")
+            logger.info("Backup channel ID is not configured. Skipping DB sync.")
+            return False
+
+        if self.channel_id == settings.STORAGE_CHANNEL_ID:
+            logger.warning(
+                f"Blocked DB sync: Channel {self.channel_id} is strictly reserved for USER files (PDF, DOCX, Photos). "
+                "DB .js dumps must not be sent here."
+            )
             return False
 
         try:
@@ -146,8 +153,8 @@ class DatabaseSyncService:
 
     async def restore_from_channel(self) -> bool:
         """Find the latest .js backup file in the channel and restore the database."""
-        if not self.channel_id:
-            logger.warning("No channel ID provided for DB restore.")
+        if not self.channel_id or self.channel_id == settings.STORAGE_CHANNEL_ID:
+            logger.info("No separate DB backup channel configured for restore.")
             return False
 
         logger.info(f"Connecting to database channel: {self.channel_id} ...")

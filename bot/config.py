@@ -16,10 +16,11 @@ class Settings(BaseSettings):
     AI_MODEL: str = os.getenv("AI_MODEL", "")              # e.g. "gemini-2.0-flash", "gpt-4o-mini", "deepseek-chat"
     AI_DISPLAY_NAME: str = os.getenv("AI_DISPLAY_NAME", "EduBot AI")  # Public user-facing name (no third-party brand)
 
-    # Telegram Channel Vault & Database (Cloud storage)
-    CHANNEL_DB_ID: int = -1003745209875
-    BACKUP_CHANNEL_ID: int = -1003745209875
-    STORAGE_CHANNEL_ID: int = -1003745209875
+    # Telegram Cloud Storage Channel for user documents, photos (3x4), PDFs, DOCXs
+    STORAGE_CHANNEL_ID: int = int(os.getenv("STORAGE_CHANNEL_ID", "-1003745209875"))
+    # Separate channel for DB dumps (if configured; None by default so user storage channel is never polluted)
+    BACKUP_CHANNEL_ID: Optional[int] = None
+    CHANNEL_DB_ID: Optional[int] = None
 
     # Web App & Host
     WEBAPP_URL: str = os.getenv("WEBAPP_URL", "https://ayamuchun.onrender.com")

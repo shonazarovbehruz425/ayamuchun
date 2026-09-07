@@ -47,9 +47,8 @@ from bot.handlers.quiz_handler import (
     QUIZ_EXPORT,
 )
 from bot.handlers.tools_handler import tools_menu, create_grade_table, WAITING_STUDENTS, WAITING_SUBJECTS
-from bot.handlers.settings_handler import settings_menu, show_stats, change_language, manual_backup_command
+from bot.handlers.settings_handler import settings_menu, show_stats, change_language
 from bot.keyboards.reply import main_menu_keyboard
-from bot.services.backup_service import DatabaseSyncService
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -383,19 +382,6 @@ async def start_quiz_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     return QUIZ_TOPIC
 
 
-async def periodic_db_sync(sync_service: DatabaseSyncService, interval_seconds: int = 600):
-    """Background loop that exports DB to channel every 10 minutes."""
-    while True:
-        try:
-            await asyncio.sleep(interval_seconds)
-            logger.info("Executing periodic database sync to channel...")
-            await sync_service.sync_to_channel(reason="Periodic Auto-Backup (10m)")
-        except asyncio.CancelledError:
-            break
-        except Exception as e:
-            logger.error(f"Error in periodic_db_sync: {e}")
-
-
 # ── Main entry point ──────────────────────────────────────────────────────
 
 async def main() -> None:
@@ -409,17 +395,6 @@ async def main() -> None:
 
     # Initialize bot
     await application.initialize()
-
-    # ── RESTORE DATABASE FROM TELEGRAM CHANNEL (IF BACKUP EXISTS) ───────────
-    sync_service = DatabaseSyncService(bot=application.bot, channel_id=config.BACKUP_CHANNEL_ID)
-    try:
-        restored = await sync_service.restore_from_channel()
-        if restored:
-            logger.info("Database state successfully restored from Telegram channel!")
-        else:
-            logger.info("No prior channel backup applied. Using local state.")
-    except Exception as e:
-        logger.warning(f"Could not restore database from channel on boot: {e}")
 
     # Start bot
     if config.WEBHOOK_URL:
@@ -446,12 +421,6 @@ async def main() -> None:
     except Exception as e:
         logger.warning(f"Could not set menu button: {e}")
 
-    # Initial backup on start
-    asyncio.create_task(sync_service.sync_to_channel(reason="Service Startup Sync"))
-
-    # Launch periodic backup background task
-    sync_task = asyncio.create_task(periodic_db_sync(sync_service, interval_seconds=600))
-
     # Start FastAPI server
     logger.info(f"Starting API server on {config.API_HOST}:{config.API_PORT}")
     uvicorn_config = uvicorn.Config(
@@ -465,13 +434,7 @@ async def main() -> None:
     try:
         await server.serve()
     finally:
-        logger.info("Shutting down... Performing final database sync to channel.")
-        sync_task.cancel()
-        try:
-            await sync_service.sync_to_channel(reason="Service Graceful Shutdown Sync")
-        except Exception as e:
-            logger.error(f"Shutdown sync error: {e}")
-
+        logger.info("Shutting down bot and server...")
         if not config.WEBHOOK_URL:
             await application.updater.stop()
         await application.stop()

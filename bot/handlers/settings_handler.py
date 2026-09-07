@@ -43,14 +43,21 @@ async def show_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 async def manual_backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Manual trigger to backup database to Telegram channel."""
-    msg = await update.message.reply_text("⏳ Ma'lumotlar bazasi kanalga (.js) formatida zaxiralanmoqda...")
+    if not settings.BACKUP_CHANNEL_ID or settings.BACKUP_CHANNEL_ID == settings.STORAGE_CHANNEL_ID:
+        await update.message.reply_text(
+            "ℹ️ Maxsus ma'lumotlar bazasi zaxira kanali sozlanmagan.\n"
+            "Foydalanuvchilar kanali faqat hujjatlar (PDF, Word) va rasmlar (3x4) uchun ajratilgan."
+        )
+        return
+
+    msg = await update.message.reply_text("⏳ Ma'lumotlar bazasi alohida zaxira kanaliga yuborilmoqda...")
     try:
         sync_svc = DatabaseSyncService(bot=context.bot, channel_id=settings.BACKUP_CHANNEL_ID)
         success = await sync_svc.sync_to_channel(reason=f"Manual backup by {update.effective_user.id}")
         if success:
             await msg.edit_text("✅ Ma'lumotlar bazasi zaxira kanaliga muvaffaqiyatli saqlandi!")
         else:
-            await msg.edit_text("❌ Kanalga zaxiralashda xatolik yuz berdi. Bot kanalda admin ekanligini tekshiring.")
+            await msg.edit_text("❌ Alohida kanalga zaxiralashda xatolik yuz berdi.")
     except Exception as e:
         logger.error(f"Manual backup error: {e}")
         await msg.edit_text(f"❌ Xatolik: {e}")

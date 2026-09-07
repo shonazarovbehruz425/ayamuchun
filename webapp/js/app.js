@@ -3927,12 +3927,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 <!-- 1. ASOSIY TELEGRAM PROFIL KARTASI -->
                 <div class="liquid-glass-card p-4 sm:p-5 flex items-center gap-4">
-                    <div class="relative w-15 h-15 sm:w-18 sm:h-18 flex-shrink-0">
+                    <div class="relative w-16 h-16 shrink-0" style="width: 68px; height: 68px; min-width: 68px; min-height: 68px; max-width: 68px; max-height: 68px;">
                         <img src="${photoUrl}" 
                              alt="${fullName}" 
-                             class="w-full h-full rounded-2xl object-cover shadow-lg shadow-brand-500/20 ring-2 ring-white/90 dark:ring-slate-700" 
+                             class="w-full h-full rounded-2xl object-cover shadow-md shadow-brand-500/20 ring-2 ring-white/90 dark:ring-slate-700" 
+                             style="width: 68px; height: 68px; object-fit: cover; border-radius: 16px;"
                              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
-                        <div style="display:none;" class="w-full h-full rounded-2xl bg-gradient-to-tr from-brand-600 via-indigo-600 to-purple-600 text-white items-center justify-center font-black text-2xl shadow-lg shadow-brand-500/25 ring-2 ring-white/90 dark:ring-slate-700">
+                        <div style="display:none; width: 68px; height: 68px; border-radius: 16px;" class="w-full h-full rounded-2xl bg-gradient-to-tr from-brand-600 via-indigo-600 to-purple-600 text-white items-center justify-center font-black text-2xl shadow-md shadow-brand-500/25 ring-2 ring-white/90 dark:ring-slate-700">
                             ${userInitial}
                         </div>
                         ${isPremium ? `

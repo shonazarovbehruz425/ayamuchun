@@ -200,6 +200,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (e) {}
 
+        if (route === '#/ai') {
+            document.body.classList.add('route-ai');
+        } else {
+            document.body.classList.remove('route-ai');
+        }
+
         switch (route) {
             case '#/ai': renderAI(); break;
             case '#/settings': renderSettings(); break;
@@ -3384,8 +3390,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
 
-                <!-- Chat Messages Scroll Stream -->
-                <div id="ai-chat-stream" class="flex-1 overflow-y-auto space-y-3.5 pr-1 min-h-[380px] max-h-[calc(100vh-320px)] sm:max-h-[calc(100vh-340px)] scroll-smooth">
+                <!-- Chat Messages Scroll Stream (Scrollbar completely hidden to prevent double scrollbars) -->
+                <div id="ai-chat-stream" class="flex-1 overflow-y-auto space-y-3.5 pr-1 scroll-smooth scrollbar-none" style="scrollbar-width: none; -ms-overflow-style: none;">
                     
                     <!-- Welcome Initial Message if empty -->
                     ${window.aiChatMessages.length === 0 ? `
@@ -4010,6 +4016,12 @@ document.addEventListener('DOMContentLoaded', () => {
             renderDashboard();
             setTimeout(() => { if (window.openPhoto3x4Modal) window.openPhoto3x4Modal(); }, 200);
             return;
+        }
+
+        if (route === '#/ai') {
+            document.body.classList.add('route-ai');
+        } else {
+            document.body.classList.remove('route-ai');
         }
 
         switch (route) {

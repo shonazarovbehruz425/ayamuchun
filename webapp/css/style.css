@@ -769,5 +769,50 @@ html.dark .chat-input-bar {
     box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.4);
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Double Scrollbar Elimination & Clean Fullscreen AI Chat
+───────────────────────────────────────────────────────────── */
+body.route-ai {
+    overflow: hidden !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+}
+
+body.route-ai main#app {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.25rem !important;
+    height: calc(100vh - 120px) !important;
+    height: calc(100dvh - 120px) !important;
+    max-height: calc(100dvh - 120px) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+body.route-ai .chat-container-card {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    flex: 1 1 auto !important;
+    overflow: hidden !important;
+}
+
+/* Eliminate native scrollbar visual bar completely */
+#ai-chat-stream,
+.scrollbar-none,
+.chat-container-card * {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+}
+
+#ai-chat-stream::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar,
+.chat-container-card *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+
 
 

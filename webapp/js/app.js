@@ -277,13 +277,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     window.closeModal = closeModal;
 
+    function positionToolsFilterCapsule(activeBtn, animated = true) {
+        const capsule = document.getElementById('toolsFilterCapsule');
+        if (!capsule) return;
+        
+        const btn = activeBtn || document.querySelector('.tool-filter-chip.active-chip');
+        if (!btn || btn.offsetWidth === 0) return;
+
+        if (animated) {
+            capsule.classList.add('morphing');
+            clearTimeout(window._filterCapsuleTimeout);
+            window._filterCapsuleTimeout = setTimeout(() => {
+                capsule.classList.remove('morphing');
+            }, 320);
+        }
+
+        capsule.style.left = `${btn.offsetLeft}px`;
+        capsule.style.width = `${btn.offsetWidth}px`;
+    }
+    window.positionToolsFilterCapsule = positionToolsFilterCapsule;
+
     window.filterTools = (category, btn) => {
         TelegramApp.hapticFeedback('light');
+        
         document.querySelectorAll('.tool-filter-chip').forEach(el => {
-            el.className = 'tool-filter-chip inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white/70 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all whitespace-nowrap border border-slate-200/60 dark:border-slate-700/60';
+            el.classList.remove('active-chip');
         });
         if (btn) {
-            btn.className = 'tool-filter-chip inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm transition-all whitespace-nowrap active-chip';
+            btn.classList.add('active-chip');
+            positionToolsFilterCapsule(btn, true);
         }
         
         document.querySelectorAll('#tools-grid > div[data-category]').forEach(card => {
@@ -295,6 +317,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     };
+
+    window.addEventListener('resize', () => {
+        positionToolsFilterCapsule(null, false);
+    });
 
 
     // ─────────────────────────────────────────────────────────────
@@ -322,24 +348,27 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold font-mono">12 ta asbob ✓</span>
                     </div>
 
-                    <!-- Filter Tabs for Quick Navigation -->
-                    <div class="flex items-center gap-1.5 overflow-x-auto pb-2 no-scrollbar mb-3">
-                        <button onclick="filterTools('all', this)" class="tool-filter-chip inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-brand-600 text-white shadow-sm transition-all whitespace-nowrap active-chip">
-                            <i data-lucide="layers" class="w-3.5 h-3.5"></i>
-                            <span>Barchasi (12)</span>
-                        </button>
-                        <button onclick="filterTools('pdf', this)" class="tool-filter-chip inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white/70 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all whitespace-nowrap border border-slate-200/60 dark:border-slate-700/60">
-                            <i data-lucide="file-text" class="w-3.5 h-3.5 text-rose-500"></i>
-                            <span>PDF Vositalari (6)</span>
-                        </button>
-                        <button onclick="filterTools('word', this)" class="tool-filter-chip inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white/70 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all whitespace-nowrap border border-slate-200/60 dark:border-slate-700/60">
-                            <i data-lucide="file-edit" class="w-3.5 h-3.5 text-blue-500"></i>
-                            <span>Word & Doc (3)</span>
-                        </button>
-                        <button onclick="filterTools('media', this)" class="tool-filter-chip inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white/70 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-all whitespace-nowrap border border-slate-200/60 dark:border-slate-700/60">
-                            <i data-lucide="image" class="w-3.5 h-3.5 text-purple-500"></i>
-                            <span>Surat & 3×4 (3)</span>
-                        </button>
+                    <!-- Filter Tabs for Quick Navigation (Liquid Glass Track & Sliding Capsule) -->
+                    <div class="overflow-x-auto pb-2 no-scrollbar mb-3">
+                        <div id="toolsFilterTrack" class="tools-filter-glass-track">
+                            <div id="toolsFilterCapsule" class="tools-filter-capsule"></div>
+                            <button onclick="filterTools('all', this)" class="tool-filter-chip active-chip" data-filter="all">
+                                <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                                <span>Barchasi (12)</span>
+                            </button>
+                            <button onclick="filterTools('pdf', this)" class="tool-filter-chip" data-filter="pdf">
+                                <i data-lucide="file-text" class="w-3.5 h-3.5 text-rose-500"></i>
+                                <span>PDF Vositalari (6)</span>
+                            </button>
+                            <button onclick="filterTools('word', this)" class="tool-filter-chip" data-filter="word">
+                                <i data-lucide="file-edit" class="w-3.5 h-3.5 text-blue-500"></i>
+                                <span>Word & Doc (3)</span>
+                            </button>
+                            <button onclick="filterTools('media', this)" class="tool-filter-chip" data-filter="media">
+                                <i data-lucide="image" class="w-3.5 h-3.5 text-purple-500"></i>
+                                <span>Surat & 3×4 (3)</span>
+                            </button>
+                        </div>
                     </div>
 
                     <div id="tools-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -563,6 +592,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         refreshIcons();
         loadRecentFiles();
+        setTimeout(() => positionToolsFilterCapsule(null, false), 50);
     }
 
     async function loadRecentFiles() {

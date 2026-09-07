@@ -288,14 +288,45 @@ button, a, .interactive-card, [role="button"], .ios-tab-btn, .liquid-glass-inter
 }
 
 /* Tactile tab buttons */
+.mercury-capsule {
+    display: none !important;
+}
+
 .ios-tab-btn {
     position: relative;
     z-index: 20;
-    transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1), color 0.25s ease;
+    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
     touch-action: manipulation;
+    color: #64748b !important;
+    border-radius: 30px;
 }
+
+.ios-tab-btn svg {
+    transition: transform 0.22s ease, stroke-width 0.22s ease, opacity 0.22s ease;
+    opacity: 0.65;
+}
+
 .ios-tab-btn:active {
-    transform: scale(0.93);
+    transform: scale(0.95);
+}
+
+.ios-tab-btn.active-tab {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%) !important;
+    box-shadow: 
+        0 8px 24px -2px rgba(79, 70, 229, 0.6),
+        0 3px 8px -2px rgba(99, 102, 241, 0.4),
+        inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.45),
+        inset 0 -1.5px 2px 0 rgba(0, 0, 0, 0.25) !important;
+    border-radius: 30px !important;
+}
+
+.ios-tab-btn.active-tab svg {
+    stroke-width: 2.6 !important;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+    transform: scale(1.12);
+    opacity: 1 !important;
 }
 
 /* ======================================================================
@@ -396,12 +427,26 @@ html.dark .ios26-glass-chassis {
 }
 
 html.dark .ios-tab-btn {
-    color: #94a3b8 !important;
+    color: #64748b !important;
 }
 
-html.dark .ios-tab-btn.active-tab,
-html.dark .ios-tab-btn.text-white {
+html.dark .ios-tab-btn.active-tab {
     color: #ffffff !important;
+    font-weight: 700 !important;
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%) !important;
+    box-shadow: 
+        0 10px 28px -2px rgba(79, 70, 229, 0.75),
+        0 4px 12px -2px rgba(99, 102, 241, 0.5),
+        inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.4),
+        inset 0 -1.5px 2px 0 rgba(0, 0, 0, 0.5) !important;
+    border-radius: 30px !important;
+}
+
+html.dark .ios-tab-btn.active-tab svg {
+    stroke-width: 2.6 !important;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+    transform: scale(1.12);
+    opacity: 1 !important;
 }
 
 html.dark input,

@@ -89,68 +89,34 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ── iOS 26 Liquid Glass Dock & Capsule Motion ──
-    const mercuryPill = document.getElementById('mercuryPill');
-
-    function alignPillToTab(tabElement, animateMorph = true) {
-        if (!mercuryPill || !tabElement) return;
-        const parent = tabElement.parentElement;
-        if (!parent) return;
-
-        const parentRect = parent.getBoundingClientRect();
-        const tabRect = tabElement.getBoundingClientRect();
-
-        const offsetLeft = tabRect.left - parentRect.left;
-        const targetWidth = tabRect.width;
-
-        if (animateMorph) {
-            mercuryPill.classList.add('morphing');
-            setTimeout(() => {
-                mercuryPill.classList.remove('morphing');
-            }, 300);
-        }
-
-        mercuryPill.style.left = `${offsetLeft}px`;
-        mercuryPill.style.width = `${targetWidth}px`;
-    }
-
-    const handleViewportChange = () => {
-        const activeItem = document.querySelector('.nav-item.active-tab');
-        if (activeItem) alignPillToTab(activeItem, false);
-    };
-
-    window.addEventListener('resize', handleViewportChange);
-    window.addEventListener('orientationchange', () => {
-        setTimeout(handleViewportChange, 150);
-    });
-
-    if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.onEvent('viewportChanged', handleViewportChange);
-    }
-
+    // ── iOS 26 Liquid Glass Dock Active Navigation ──
     function updateNav(hash) {
-        let activeEl = null;
+        const currentHash = hash || window.location.hash || '#/';
         document.querySelectorAll('.nav-item').forEach(item => {
             const route = item.getAttribute('data-route');
-            const isActive = route === hash || (hash === '' && route === '#/');
+            const isActive = (route === currentHash) || 
+                             ((currentHash === '' || currentHash === '#' || currentHash === '#/') && route === '#/');
             const icon = item.querySelector('svg');
             
             if (isActive) {
                 item.classList.add('active-tab', 'text-white', 'font-bold');
-                item.classList.remove('text-slate-700');
+                item.classList.remove('text-slate-400', 'text-slate-500', 'text-slate-600', 'text-slate-700');
                 if (icon) icon.classList.add('scale-110');
-                activeEl = item;
             } else {
                 item.classList.remove('active-tab', 'text-white', 'font-bold');
-                item.classList.add('text-slate-700');
+                item.classList.add('text-slate-400');
                 if (icon) icon.classList.remove('scale-110');
             }
         });
-
-        if (activeEl) {
-            alignPillToTab(activeEl, true);
-        }
     }
+
+    // Direct click listeners on nav items for zero-latency active visual response
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const route = item.getAttribute('data-route');
+            if (route) updateNav(route);
+        });
+    });
 
     // ── Modal Management ──
     function openModal(modalHtml) {
@@ -192,11 +158,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
 
-                <!-- 7 CORE TOOLS DIRECT ACTIONS -->
+                <!-- 11 CORE TOOLS DIRECT ACTIONS -->
                 <div>
                     <div class="flex items-center justify-between mb-3 px-0.5">
-                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Asosiy 7 ta Asbob</h3>
-                        <span class="text-[11px] text-emerald-600 font-bold font-mono">Tezkor amallar ✓</span>
+                        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Asosiy Asboblar</h3>
+                        <span class="text-[11px] text-emerald-600 font-bold font-mono">12 ta asbob ✓</span>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -292,6 +258,86 @@ document.addEventListener('DOMContentLoaded', () => {
                                         <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-600">ZIP</span>
                                     </div>
                                     <p class="text-xs text-slate-500 mt-0.5 truncate">PDF ichidagi suratlarni ajratib olish</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tool 8: PDF Merge -->
+                        <div onclick="openPdfMergeModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-red-400/50 transition-all">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-red-50 to-rose-100 text-red-600 flex items-center justify-center shadow-sm border border-white shrink-0 group-hover:scale-105 transition-transform">
+                                    <i data-lucide="file-plus" class="w-5 h-5"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <h4 class="text-sm font-bold text-slate-900">PDF birlashtirish</h4>
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-600">Birlashtirish</span>
+                                    </div>
+                                    <p class="text-xs text-slate-500 mt-0.5 truncate">Bir nechta PDF ni bitta faylga ulash</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tool 9: PDF Split -->
+                        <div onclick="openPdfSplitModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-amber-400/50 transition-all">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-50 to-yellow-100 text-amber-600 flex items-center justify-center shadow-sm border border-white shrink-0 group-hover:scale-105 transition-transform">
+                                    <i data-lucide="columns-2" class="w-5 h-5"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <h4 class="text-sm font-bold text-slate-900">PDF bo'lish</h4>
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600">Bo'lish</span>
+                                    </div>
+                                    <p class="text-xs text-slate-500 mt-0.5 truncate">Sahifalarni ajratish yoki kesish</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tool 10: PDF Compress -->
+                        <div onclick="openPdfCompressModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-fuchsia-400/50 transition-all">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-fuchsia-50 to-pink-100 text-fuchsia-600 flex items-center justify-center shadow-sm border border-white shrink-0 group-hover:scale-105 transition-transform">
+                                    <i data-lucide="file-down" class="w-5 h-5"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <h4 class="text-sm font-bold text-slate-900">PDF kichraytirish</h4>
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-fuchsia-500/10 text-fuchsia-600">Siqish</span>
+                                    </div>
+                                    <p class="text-xs text-slate-500 mt-0.5 truncate">Fayl hajmini sifatli qisqartirish</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tool 11: PDF Watermark -->
+                        <div onclick="openPdfWatermarkModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-indigo-400/50 transition-all">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-50 to-blue-100 text-indigo-600 flex items-center justify-center shadow-sm border border-white shrink-0 group-hover:scale-105 transition-transform">
+                                    <i data-lucide="stamp" class="w-5 h-5"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <h4 class="text-sm font-bold text-slate-900">PDF suv belgisi</h4>
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-600">Watermark</span>
+                                    </div>
+                                    <p class="text-xs text-slate-500 mt-0.5 truncate">Matn yoki logotip himoyasi qo'yish</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tool 12: Hujjat foto (3x4) -->
+                        <div onclick="openPhoto3x4Modal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-purple-400/50 transition-all">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-500/20 to-indigo-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center shadow-sm border border-white shrink-0 group-hover:scale-105 transition-transform">
+                                    <i data-lucide="contact" class="w-5 h-5"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">Hujjat foto (3×4)</h4>
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400">3×4</span>
+                                    </div>
+                                    <p class="text-xs text-slate-500 mt-0.5 truncate">Studiyaga bormang, pasport, viza, 3×4 foto tayyorlang</p>
                                 </div>
                             </div>
                         </div>
@@ -394,7 +440,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <i data-lucide="edit-3" class="w-3 h-3"></i> Tahrirlash
                             </button>
                             ` : ''}
-                            <button onclick="TelegramApp.downloadFile('/api/files/${f.id}/download')" title="Yuklab olish" class="px-2.5 py-1 rounded-lg liquid-glass-pill text-[11px] font-bold text-brand-600 hover:bg-white transition-colors inline-flex items-center gap-1">
+                            <button onclick="window.sendRecentFileToTg(${f.id})" title="Telegram chatga yuborish" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-bold hover:bg-indigo-700 active:scale-95 transition-all inline-flex items-center gap-1 shadow-xs">
+                                <i data-lucide="send" class="w-3 h-3"></i> Chatga
+                            </button>
+                            <button onclick="TelegramApp.downloadFile('/api/files/${f.id}/download', '${f.file_name.replace(/'/g, "\'")}')" title="Yuklab olish" class="px-2 py-1 rounded-lg liquid-glass-pill text-[11px] font-bold text-slate-600 hover:bg-white transition-colors inline-flex items-center">
                                 <i data-lucide="download" class="w-3 h-3"></i>
                             </button>
                             <button onclick="deleteFileFromDash(${f.id})" title="O'chirish" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors">
@@ -489,17 +538,30 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
 
                         <!-- Result Box -->
-                        <div id="p2w-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-center space-y-3">
-                            <div class="w-10 h-10 mx-auto rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md">
-                                <i data-lucide="check" class="w-5 h-5"></i>
+                        <div id="p2w-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-3.5">
+                            <div class="w-11 h-11 mx-auto rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                                <i data-lucide="check-check" class="w-6 h-6"></i>
                             </div>
                             <div>
-                                <h4 class="text-xs font-bold text-slate-900" id="p2w-out-name">Fayl</h4>
-                                <p class="text-[11px] text-emerald-600 font-semibold mt-0.5">Word formati tayyor! Telegramingizga ham yuborildi ✓</p>
+                                <h4 class="text-xs font-bold text-slate-900 dark:text-white" id="p2w-out-name">Fayl</h4>
+                                <div class="mt-2 p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-left space-y-1">
+                                    <div class="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
+                                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                        <span>Fayl Telegram botingizga yuborildi!</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
+                                        Saytdan yuklab olish shart emas. Pastdagi tugmani bossangiz, to'g'ridan-to'g'ri Telegram chatidan olasiz.
+                                    </p>
+                                </div>
                             </div>
-                            <button id="p2w-dl-btn" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold shadow-md shadow-emerald-500/20 inline-flex items-center justify-center gap-1.5">
-                                <i data-lucide="download" class="w-4 h-4"></i> Word faylni yuklab olish
-                            </button>
+                            <div class="space-y-2 pt-1">
+                                <button onclick="TelegramApp.closeApp()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-brand-600 to-blue-600 text-white text-xs font-bold shadow-md shadow-brand-500/25 inline-flex items-center justify-center gap-2 active:scale-98 transition-all">
+                                    <i data-lucide="send" class="w-4 h-4"></i> Telegram chatida ochish ✓
+                                </button>
+                                <button id="p2w-dl-btn" class="w-full py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 text-xs font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-white">
+                                    <i data-lucide="download" class="w-3.5 h-3.5"></i> Shu yerni o'zida yuklab olish
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -586,17 +648,30 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
 
                         <!-- Result Box -->
-                        <div id="w2p-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-center space-y-3">
-                            <div class="w-10 h-10 mx-auto rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md">
-                                <i data-lucide="check" class="w-5 h-5"></i>
+                        <div id="w2p-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-3.5">
+                            <div class="w-11 h-11 mx-auto rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                                <i data-lucide="check-check" class="w-6 h-6"></i>
                             </div>
                             <div>
-                                <h4 class="text-xs font-bold text-slate-900" id="w2p-out-name">Fayl</h4>
-                                <p class="text-[11px] text-emerald-600 font-semibold mt-0.5">PDF tayyor! Telegramingizga ham yuborildi ✓</p>
+                                <h4 class="text-xs font-bold text-slate-900 dark:text-white" id="w2p-out-name">Fayl</h4>
+                                <div class="mt-2 p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-left space-y-1">
+                                    <div class="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
+                                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                        <span>PDF fayl Telegram botingizga yuborildi!</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
+                                        Saytga kirmasdan to'g'ridan-to'g'ri Telegram chatidan hujjatni yuklab olishingiz mumkin.
+                                    </p>
+                                </div>
                             </div>
-                            <button id="w2p-dl-btn" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold shadow-md shadow-emerald-500/20 inline-flex items-center justify-center gap-1.5">
-                                <i data-lucide="download" class="w-4 h-4"></i> PDF faylni yuklab olish
-                            </button>
+                            <div class="space-y-2 pt-1">
+                                <button onclick="TelegramApp.closeApp()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-brand-600 to-blue-600 text-white text-xs font-bold shadow-md shadow-brand-500/25 inline-flex items-center justify-center gap-2 active:scale-98 transition-all">
+                                    <i data-lucide="send" class="w-4 h-4"></i> Telegram chatida ochish ✓
+                                </button>
+                                <button id="w2p-dl-btn" class="w-full py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 text-xs font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-white">
+                                    <i data-lucide="download" class="w-3.5 h-3.5"></i> Shu yerni o'zida yuklab olish
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -1407,24 +1482,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 openModal(`
                     <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md animate-fade-in">
                         <div class="liquid-glass-card max-w-md w-full p-6 text-center space-y-4 bg-white/95 dark:bg-slate-900/95 border border-white/80 shadow-2xl">
-                            <div class="w-12 h-12 mx-auto rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                                <i data-lucide="check" class="w-6 h-6"></i>
+                            <div class="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                                <i data-lucide="check-check" class="w-6 h-6"></i>
                             </div>
                             <div>
                                 <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">${mainFileName}</h3>
-                                <p class="text-xs text-emerald-600 font-semibold mt-1">Hujjat muvaffaqiyatli saqlandi va Telegramingizga yuborildi ✓</p>
+                                <div class="mt-2.5 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-left space-y-1">
+                                    <div class="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
+                                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                        <span>Tahrirlangan hujjat Telegram chatiga yuborildi!</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
+                                        Barcha o'zgartirishlar, jadvallar va shriftlar saqlangan holda bot chatida tayyor turibdi.
+                                    </p>
+                                </div>
                             </div>
 
-                            <div class="space-y-2 pt-2">
+                            <div class="space-y-2 pt-1">
+                                <button onclick="TelegramApp.closeApp()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-brand-600 to-blue-600 text-white text-xs font-bold shadow-md shadow-brand-500/25 flex items-center justify-center gap-2">
+                                    <i data-lucide="send" class="w-4 h-4"></i> Telegram chatida ochish ✓
+                                </button>
                                 ${saveRes.docx_file_id ? `
-                                    <button onclick="TelegramApp.downloadFile('/api/files/${saveRes.docx_file_id}/download')" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-2">
-                                        <i data-lucide="download" class="w-4 h-4"></i> Word (.docx) yuklab olish
+                                    <button onclick="TelegramApp.downloadFile('/api/files/${saveRes.docx_file_id}/download')" class="w-full py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-white">
+                                        <i data-lucide="download" class="w-3.5 h-3.5"></i> Shu yerdan Word (.docx) yuklab olish
                                     </button>
                                 ` : ''}
 
                                 ${saveRes.pdf_file_id ? `
-                                    <button onclick="TelegramApp.downloadFile('/api/files/${saveRes.pdf_file_id}/download')" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 text-white text-xs font-bold shadow-md shadow-rose-500/20 flex items-center justify-center gap-2">
-                                        <i data-lucide="file-check" class="w-4 h-4"></i> PDF (.pdf) yuklab olish
+                                    <button onclick="TelegramApp.downloadFile('/api/files/${saveRes.pdf_file_id}/download')" class="w-full py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-white">
+                                        <i data-lucide="file-check" class="w-3.5 h-3.5"></i> Shu yerdan PDF (.pdf) yuklab olish
                                     </button>
                                 ` : ''}
                             </div>
@@ -1764,21 +1850,34 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
 
                         <!-- Success Result Box -->
-                        <div id="img2pdf-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-center space-y-3">
-                            <div class="w-11 h-11 mx-auto rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md">
-                                <i data-lucide="check" class="w-6 h-6"></i>
+                        <div id="img2pdf-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-3.5">
+                            <div class="w-11 h-11 mx-auto rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                                <i data-lucide="check-check" class="w-6 h-6"></i>
                             </div>
                             <div>
                                 <h4 class="text-xs font-bold text-slate-900 dark:text-white" id="img2pdf-out-name">PDF Tayyor</h4>
-                                <p class="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">PDF fayl Telegramingizga ham yuborildi ✓</p>
+                                <div class="mt-2 p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-left space-y-1">
+                                    <div class="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
+                                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                        <span>PDF hujjatingiz Telegram chatiga yuborildi!</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
+                                        Barcha rasmlar bitta PDF ga ulanib, botingizga yuborildi.
+                                    </p>
+                                </div>
                             </div>
-                            <div class="flex gap-2">
-                                <button id="img2pdf-dl-btn" class="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold shadow-md shadow-emerald-500/20 inline-flex items-center justify-center gap-1.5">
-                                    <i data-lucide="download" class="w-4 h-4"></i> Yuklab olish
+                            <div class="space-y-2 pt-1">
+                                <button onclick="TelegramApp.closeApp()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-brand-600 to-blue-600 text-white text-xs font-bold shadow-md shadow-brand-500/25 inline-flex items-center justify-center gap-2">
+                                    <i data-lucide="send" class="w-4 h-4"></i> Telegram chatida ochish ✓
                                 </button>
-                                <button onclick="window.resetImagesToPdf()" class="py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800">
-                                    Yangi PDF
-                                </button>
+                                <div class="flex gap-2">
+                                    <button id="img2pdf-dl-btn" class="flex-1 py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 text-xs font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-white">
+                                        <i data-lucide="download" class="w-3.5 h-3.5"></i> Yuklab olish
+                                    </button>
+                                    <button onclick="window.resetImagesToPdf()" class="py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100">
+                                        Yangi PDF
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2015,15 +2114,30 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
 
                         <!-- Result -->
-                        <div id="ext-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-center space-y-3">
-                            <div class="w-10 h-10 mx-auto rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md">
-                                <i data-lucide="check" class="w-5 h-5"></i>
+                        <div id="ext-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-3.5">
+                            <div class="w-11 h-11 mx-auto rounded-2xl bg-gradient-to-tr from-cyan-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-cyan-500/30">
+                                <i data-lucide="check-check" class="w-6 h-6"></i>
                             </div>
-                            <h4 class="text-xs font-bold text-slate-900" id="ext-out-msg">Rasmlar arxivlandi</h4>
-                            <p class="text-[11px] text-emerald-600 font-semibold">ZIP arxiv tayyor va Telegramingizga ham yuborildi ✓</p>
-                            <button id="ext-dl-btn" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-cyan-600 to-teal-600 text-white text-xs font-bold shadow-md shadow-cyan-500/20 inline-flex items-center justify-center gap-1.5">
-                                <i data-lucide="download" class="w-4 h-4"></i> ZIP arxivni yuklab olish
-                            </button>
+                            <div>
+                                <h4 class="text-xs font-bold text-slate-900" id="ext-out-msg">Rasmlar arxivlandi</h4>
+                                <div class="mt-2 p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-left space-y-1">
+                                    <div class="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
+                                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                        <span>ZIP arxiv Telegram botingizga yuborildi!</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
+                                        Rasmlar to'liq asl sifatda arxivlanib bot chatiga tashlandi.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="space-y-2 pt-1">
+                                <button onclick="TelegramApp.closeApp()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-brand-600 to-blue-600 text-white text-xs font-bold shadow-md shadow-brand-500/25 inline-flex items-center justify-center gap-2">
+                                    <i data-lucide="send" class="w-4 h-4"></i> Telegram chatida ochish ✓
+                                </button>
+                                <button id="ext-dl-btn" class="w-full py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 text-xs font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-white">
+                                    <i data-lucide="download" class="w-3.5 h-3.5"></i> Shu yerni o'zida yuklab olish
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -2072,6 +2186,1035 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
     };
+
+    // ─────────────────────────────────────────────────────────────
+    // TOOL 8: PDF Birlashtirish Modal (PDF Merge)
+    // ─────────────────────────────────────────────────────────────
+    window.openPdfMergeModal = () => {
+        TelegramApp.hapticFeedback();
+        openModal(`
+            <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+                <div class="liquid-glass-card max-w-lg w-full flex flex-col max-h-[90vh] overflow-hidden bg-white/95 dark:bg-slate-900/95 border border-white/80 dark:border-slate-700/80 shadow-2xl">
+                    <div class="p-4 border-b border-white/60 dark:border-slate-800 flex items-center justify-between shrink-0">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-xl bg-red-500/10 text-red-600 flex items-center justify-center">
+                                <i data-lucide="file-plus" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-900 dark:text-white">PDF birlashtirish</h3>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400">Bir nechta PDF faylni bitta umumiy hujjatga jamlash</p>
+                            </div>
+                        </div>
+                        <button onclick="closeModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600">
+                            <i data-lucide="x" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <div class="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
+                        <div id="pmerge-upload-box" class="p-5 rounded-2xl border-2 border-dashed border-red-300/80 hover:border-red-500 transition-colors bg-red-50/20 text-center cursor-pointer" onclick="document.getElementById('pmerge-file-input').click()">
+                            <i data-lucide="upload-cloud" class="w-8 h-8 mx-auto text-red-500 mb-1.5"></i>
+                            <span class="text-xs font-bold text-slate-800 dark:text-slate-200 block">PDF fayllarni tanlang</span>
+                            <span class="text-[11px] text-slate-500 mt-0.5 block">Kamida 2 ta PDF fayl tanlang</span>
+                            <input type="file" id="pmerge-file-input" multiple accept=".pdf" class="hidden">
+                        </div>
+
+                        <div id="pmerge-preview-area" class="hidden space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                    <i data-lucide="layers" class="w-3.5 h-3.5 text-red-500"></i>
+                                    Tanlangan fayllar: <span id="pmerge-count-badge" class="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-mono text-[10px] font-bold">0 ta</span>
+                                </span>
+                                <div class="flex items-center gap-2">
+                                    <button onclick="document.getElementById('pmerge-file-input').click()" class="text-[11px] font-bold text-red-600 hover:text-red-700 inline-flex items-center gap-1">
+                                        <i data-lucide="plus" class="w-3 h-3"></i> Yana qo'shish
+                                    </button>
+                                    <button onclick="window.clearPmergeFiles()" class="text-[11px] font-bold text-slate-400 hover:text-rose-500 inline-flex items-center gap-1">
+                                        <i data-lucide="trash" class="w-3 h-3"></i> Tozalash
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div id="pmerge-files-list" class="space-y-1.5 max-h-48 overflow-y-auto p-1"></div>
+
+                            <div class="pt-2">
+                                <label class="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">Yangi fayl nomi (ixtiyoriy):</label>
+                                <div class="relative">
+                                    <input type="text" id="pmerge-title" placeholder="birlashtirilgan_hujjat" class="w-full text-xs py-2 pl-3 pr-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-800 text-slate-900 dark:text-white">
+                                    <span class="absolute right-3 top-2 text-[11px] font-mono text-slate-400">.pdf</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="pmerge-loading" class="hidden py-8 text-center space-y-3">
+                            <i data-lucide="loader-2" class="w-9 h-9 mx-auto text-red-600 animate-spin"></i>
+                            <p class="text-xs font-bold text-slate-800 dark:text-white">PDF lar birlashtirilmoqda...</p>
+                            <p class="text-[11px] text-slate-500">Sahifalar sifatli tarzda ulanmoqda</p>
+                        </div>
+
+                        <div id="pmerge-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-3.5">
+                            <div class="w-11 h-11 mx-auto rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                                <i data-lucide="check-check" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-bold text-slate-900 dark:text-white" id="pmerge-out-name">Fayl</h4>
+                                <div class="mt-2 p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-left space-y-1">
+                                    <div class="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
+                                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                        <span>Birlashtirilgan PDF Telegram chatiga yuborildi!</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
+                                        Fayllar to'liq ulanib, bitta hujjat sifatida bot chatiga yetkazildi.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="space-y-2 pt-1">
+                                <button onclick="TelegramApp.closeApp()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-brand-600 to-blue-600 text-white text-xs font-bold shadow-md shadow-brand-500/25 inline-flex items-center justify-center gap-2">
+                                    <i data-lucide="send" class="w-4 h-4"></i> Telegram chatida ochish ✓
+                                </button>
+                                <button id="pmerge-dl-btn" class="w-full py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 text-xs font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-white">
+                                    <i data-lucide="download" class="w-3.5 h-3.5"></i> Shu yerni o'zida yuklab olish
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-3.5 border-t border-white/60 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/40 shrink-0">
+                        <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100">
+                            Bekor qilish
+                        </button>
+                        <button id="pmerge-action-btn" disabled onclick="window.executePdfMerge()" class="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold shadow-md shadow-red-600/20 inline-flex items-center gap-1.5 transition-all">
+                            <i data-lucide="file-plus" class="w-4 h-4"></i> Birlashtirish
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `);
+        refreshIcons();
+
+        let mergeFiles = [];
+        const fileInput = document.getElementById('pmerge-file-input');
+        const previewArea = document.getElementById('pmerge-preview-area');
+        const filesList = document.getElementById('pmerge-files-list');
+        const countBadge = document.getElementById('pmerge-count-badge');
+        const actionBtn = document.getElementById('pmerge-action-btn');
+
+        function renderList() {
+            if (mergeFiles.length === 0) {
+                previewArea.classList.add('hidden');
+                actionBtn.disabled = true;
+                return;
+            }
+            previewArea.classList.remove('hidden');
+            countBadge.innerText = `${mergeFiles.length} ta`;
+            actionBtn.disabled = mergeFiles.length < 2;
+
+            filesList.innerHTML = mergeFiles.map((f, i) => `
+                <div class="flex items-center justify-between p-2 rounded-xl bg-slate-100/80 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 text-xs">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <span class="w-5 h-5 rounded-full bg-red-500/10 text-red-600 font-bold flex items-center justify-center text-[10px] shrink-0">${i + 1}</span>
+                        <span class="truncate font-medium text-slate-800 dark:text-slate-200">${f.name}</span>
+                        <span class="text-[10px] text-slate-400 shrink-0">(${Math.round(f.size / 1024)} KB)</span>
+                    </div>
+                    <div class="flex items-center gap-1 shrink-0">
+                        ${i > 0 ? `<button onclick="window.movePmergeFile(${i}, -1)" class="p-1 hover:bg-white rounded text-slate-500"><i data-lucide="arrow-up" class="w-3.5 h-3.5"></i></button>` : ''}
+                        ${i < mergeFiles.length - 1 ? `<button onclick="window.movePmergeFile(${i}, 1)" class="p-1 hover:bg-white rounded text-slate-500"><i data-lucide="arrow-down" class="w-3.5 h-3.5"></i></button>` : ''}
+                        <button onclick="window.removePmergeFile(${i})" class="p-1 hover:bg-rose-50 text-rose-500 rounded"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+                    </div>
+                </div>
+            `).join('');
+            refreshIcons();
+        }
+
+        fileInput.onchange = (e) => {
+            const added = Array.from(e.target.files || []);
+            mergeFiles = [...mergeFiles, ...added];
+            fileInput.value = '';
+            renderList();
+        };
+
+        window.clearPmergeFiles = () => {
+            mergeFiles = [];
+            renderList();
+        };
+
+        window.removePmergeFile = (idx) => {
+            mergeFiles.splice(idx, 1);
+            renderList();
+        };
+
+        window.movePmergeFile = (idx, dir) => {
+            const target = idx + dir;
+            if (target < 0 || target >= mergeFiles.length) return;
+            const temp = mergeFiles[idx];
+            mergeFiles[idx] = mergeFiles[target];
+            mergeFiles[target] = temp;
+            renderList();
+        };
+
+        window.executePdfMerge = async () => {
+            if (mergeFiles.length < 2) return;
+            TelegramApp.hapticFeedback('medium');
+
+            document.getElementById('pmerge-upload-box').classList.add('hidden');
+            previewArea.classList.add('hidden');
+            actionBtn.classList.add('hidden');
+            document.getElementById('pmerge-loading').classList.remove('hidden');
+            refreshIcons();
+
+            const fd = new FormData();
+            mergeFiles.forEach(f => fd.append('files', f));
+            const title = document.getElementById('pmerge-title')?.value;
+            if (title && title.trim()) fd.append('title', title.trim());
+
+            try {
+                const res = await api.mergePdfs(fd);
+                TelegramApp.hapticFeedback('heavy');
+
+                document.getElementById('pmerge-loading').classList.add('hidden');
+                document.getElementById('pmerge-result').classList.remove('hidden');
+                document.getElementById('pmerge-out-name').innerText = res.file_name;
+                document.getElementById('pmerge-dl-btn').onclick = () => {
+                    TelegramApp.downloadFile(res.download_url);
+                };
+                refreshIcons();
+                loadRecentFiles();
+            } catch (err) {
+                document.getElementById('pmerge-loading').classList.add('hidden');
+                previewArea.classList.remove('hidden');
+                actionBtn.classList.remove('hidden');
+                TelegramApp.showAlert(`Xatolik: ${err.message}`);
+                refreshIcons();
+            }
+        };
+    };
+
+    // ─────────────────────────────────────────────────────────────
+    // TOOL 9: PDF Bo'lish Modal (PDF Split)
+    // ─────────────────────────────────────────────────────────────
+    window.openPdfSplitModal = () => {
+        TelegramApp.hapticFeedback();
+        openModal(`
+            <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+                <div class="liquid-glass-card max-w-md w-full flex flex-col overflow-hidden bg-white/95 dark:bg-slate-900/95 border border-white/80 dark:border-slate-700/80 shadow-2xl">
+                    <div class="p-4 border-b border-white/60 dark:border-slate-800 flex items-center justify-between">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                                <i data-lucide="columns-2" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-900 dark:text-white">PDF bo'lish va ajratish</h3>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400">Kerakli sahifalarni ajratib olish yoki bo'lib chiqish</p>
+                            </div>
+                        </div>
+                        <button onclick="closeModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600">
+                            <i data-lucide="x" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <div class="p-5 space-y-4">
+                        <div id="psplit-upload-box" class="p-6 rounded-2xl border-2 border-dashed border-amber-300/80 text-center hover:border-amber-500 transition-colors bg-amber-50/20 cursor-pointer" onclick="document.getElementById('psplit-file-input').click()">
+                            <i data-lucide="upload-cloud" class="w-9 h-9 mx-auto text-amber-500 mb-2"></i>
+                            <span class="text-xs font-bold text-slate-800 dark:text-slate-200 block" id="psplit-file-label">PDF faylni tanlang</span>
+                            <span class="text-[11px] text-slate-500 mt-1 block">Sahifalarga bo'lish uchun PDF yuklang</span>
+                            <input type="file" id="psplit-file-input" accept=".pdf" class="hidden">
+                        </div>
+
+                        <div id="psplit-options" class="space-y-3">
+                            <label class="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">Bo'lish usuli:</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button type="button" id="psplit-btn-range" onclick="window.selectSplitMode('range')" class="p-2.5 rounded-xl border-2 border-amber-500 bg-amber-50/40 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 font-bold text-xs flex flex-col items-center gap-1">
+                                    <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+                                    <span>Sahifalar oralig'i</span>
+                                </button>
+                                <button type="button" id="psplit-btn-all" onclick="window.selectSplitMode('all')" class="p-2.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold text-xs flex flex-col items-center gap-1">
+                                    <i data-lucide="archive" class="w-4 h-4"></i>
+                                    <span>Barcha sahifalar (ZIP)</span>
+                                </button>
+                            </div>
+
+                            <div id="psplit-range-input-box" class="pt-1">
+                                <label class="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">Oraliq yoki sahifa raqamlari:</label>
+                                <input type="text" id="psplit-range-val" value="1-3" placeholder="Masalan: 1-5 yoki 2, 4, 7" class="w-full text-xs p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
+                                <span class="text-[10px] text-slate-400 mt-0.5 block">Masalan: <b>1-3</b> (1 dan 3 gacha) yoki <b>1,3,5</b></span>
+                            </div>
+                        </div>
+
+                        <div id="psplit-loading" class="hidden py-8 text-center space-y-3">
+                            <i data-lucide="loader-2" class="w-9 h-9 mx-auto text-amber-600 animate-spin"></i>
+                            <p class="text-xs font-bold text-slate-800 dark:text-white">PDF sahifalari ajratilmoqda...</p>
+                            <p class="text-[11px] text-slate-500">Hujjat tayyorlanmoqda</p>
+                        </div>
+
+                        <div id="psplit-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-3.5">
+                            <div class="w-11 h-11 mx-auto rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-600 text-white flex items-center justify-center shadow-lg shadow-amber-500/30">
+                                <i data-lucide="check-check" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-bold text-slate-900 dark:text-white" id="psplit-out-name">Fayl</h4>
+                                <div class="mt-2 p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-left space-y-1">
+                                    <div class="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
+                                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                        <span>Ajratilgan sahifalar Telegramga yuborildi!</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
+                                        Tanlangan sahifalar tayyor holatda bot chatida kutmoqda.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="space-y-2 pt-1">
+                                <button onclick="TelegramApp.closeApp()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-brand-600 to-blue-600 text-white text-xs font-bold shadow-md shadow-brand-500/25 inline-flex items-center justify-center gap-2">
+                                    <i data-lucide="send" class="w-4 h-4"></i> Telegram chatida ochish ✓
+                                </button>
+                                <button id="psplit-dl-btn" class="w-full py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 text-xs font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-white">
+                                    <i data-lucide="download" class="w-3.5 h-3.5"></i> Shu yerni o'zida yuklab olish
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-3.5 border-t border-white/60 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/40">
+                        <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100">
+                            Bekor qilish
+                        </button>
+                        <button id="psplit-action-btn" onclick="window.executePdfSplit()" class="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-md shadow-amber-600/20 inline-flex items-center gap-1.5 transition-all">
+                            <i data-lucide="columns-2" class="w-4 h-4"></i> Ajratish
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `);
+        refreshIcons();
+
+        let chosenFile = null;
+        let splitMode = 'range';
+        const fileInput = document.getElementById('psplit-file-input');
+        const fileLabel = document.getElementById('psplit-file-label');
+
+        fileInput.onchange = (e) => {
+            if (e.target.files && e.target.files[0]) {
+                chosenFile = e.target.files[0];
+                fileLabel.innerText = `Tanlandi: ${chosenFile.name}`;
+            }
+        };
+
+        window.selectSplitMode = (mode) => {
+            splitMode = mode;
+            TelegramApp.hapticFeedback('light');
+            const btnRange = document.getElementById('psplit-btn-range');
+            const btnAll = document.getElementById('psplit-btn-all');
+            const rangeBox = document.getElementById('psplit-range-input-box');
+
+            if (mode === 'range') {
+                btnRange.className = 'p-2.5 rounded-xl border-2 border-amber-500 bg-amber-50/40 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 font-bold text-xs flex flex-col items-center gap-1';
+                btnAll.className = 'p-2.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold text-xs flex flex-col items-center gap-1';
+                rangeBox.classList.remove('hidden');
+            } else {
+                btnAll.className = 'p-2.5 rounded-xl border-2 border-amber-500 bg-amber-50/40 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 font-bold text-xs flex flex-col items-center gap-1';
+                btnRange.className = 'p-2.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold text-xs flex flex-col items-center gap-1';
+                rangeBox.classList.add('hidden');
+            }
+        };
+
+        window.executePdfSplit = async () => {
+            if (!chosenFile) {
+                TelegramApp.showAlert("Iltimos, avval PDF faylni tanlang!");
+                return;
+            }
+            TelegramApp.hapticFeedback('medium');
+
+            document.getElementById('psplit-upload-box').classList.add('hidden');
+            document.getElementById('psplit-options').classList.add('hidden');
+            document.getElementById('psplit-action-btn').classList.add('hidden');
+            document.getElementById('psplit-loading').classList.remove('hidden');
+            refreshIcons();
+
+            const fd = new FormData();
+            fd.append('file', chosenFile);
+            fd.append('split_mode', splitMode);
+            if (splitMode === 'range') {
+                const rangeVal = document.getElementById('psplit-range-val')?.value || '1';
+                fd.append('page_range', rangeVal);
+            }
+
+            try {
+                const res = await api.splitPdf(fd);
+                TelegramApp.hapticFeedback('heavy');
+
+                document.getElementById('psplit-loading').classList.add('hidden');
+                document.getElementById('psplit-result').classList.remove('hidden');
+                document.getElementById('psplit-out-name').innerText = res.file_name;
+                document.getElementById('psplit-dl-btn').onclick = () => {
+                    TelegramApp.downloadFile(res.download_url);
+                };
+                refreshIcons();
+                loadRecentFiles();
+            } catch (err) {
+                document.getElementById('psplit-loading').classList.add('hidden');
+                document.getElementById('psplit-upload-box').classList.remove('hidden');
+                document.getElementById('psplit-options').classList.remove('hidden');
+                document.getElementById('psplit-action-btn').classList.remove('hidden');
+                TelegramApp.showAlert(`Xatolik: ${err.message}`);
+                refreshIcons();
+            }
+        };
+    };
+
+    // ─────────────────────────────────────────────────────────────
+    // TOOL 10: PDF Kichraytirish Modal (PDF Compress)
+    // ─────────────────────────────────────────────────────────────
+    window.openPdfCompressModal = () => {
+        TelegramApp.hapticFeedback();
+        openModal(`
+            <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+                <div class="liquid-glass-card max-w-md w-full flex flex-col overflow-hidden bg-white/95 dark:bg-slate-900/95 border border-white/80 dark:border-slate-700/80 shadow-2xl">
+                    <div class="p-4 border-b border-white/60 dark:border-slate-800 flex items-center justify-between">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-xl bg-fuchsia-500/10 text-fuchsia-600 flex items-center justify-center">
+                                <i data-lucide="file-down" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-900 dark:text-white">PDF kichraytirish (Siqish)</h3>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400">PDF hajmini sifatli kamaytirish (50-80% gacha)</p>
+                            </div>
+                        </div>
+                        <button onclick="closeModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600">
+                            <i data-lucide="x" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <div class="p-5 space-y-4">
+                        <div id="pcomp-upload-box" class="p-6 rounded-2xl border-2 border-dashed border-fuchsia-300/80 text-center hover:border-fuchsia-500 transition-colors bg-fuchsia-50/20 cursor-pointer" onclick="document.getElementById('pcomp-file-input').click()">
+                            <i data-lucide="upload-cloud" class="w-9 h-9 mx-auto text-fuchsia-500 mb-2"></i>
+                            <span class="text-xs font-bold text-slate-800 dark:text-slate-200 block" id="pcomp-file-label">PDF faylni tanlang</span>
+                            <span class="text-[11px] text-slate-500 mt-1 block">Hajmi katta PDF ni tanlang</span>
+                            <input type="file" id="pcomp-file-input" accept=".pdf" class="hidden">
+                        </div>
+
+                        <div id="pcomp-options" class="space-y-2">
+                            <label class="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">Siqish darajasi:</label>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button type="button" onclick="window.selectCompressLevel('basic')" id="pcomp-btn-basic" class="p-2 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800 text-slate-600 font-bold text-xs flex flex-col items-center">
+                                    <span>Yengil</span>
+                                    <span class="text-[10px] text-slate-400 font-normal">Maksimal sifat</span>
+                                </button>
+                                <button type="button" onclick="window.selectCompressLevel('recommended')" id="pcomp-btn-rec" class="p-2 rounded-xl border-2 border-fuchsia-500 bg-fuchsia-50/40 dark:bg-fuchsia-950/20 text-fuchsia-700 dark:text-fuchsia-300 font-bold text-xs flex flex-col items-center shadow-sm">
+                                    <span>Tavsiya</span>
+                                    <span class="text-[10px] text-fuchsia-500 font-normal">Optimal hajm</span>
+                                </button>
+                                <button type="button" onclick="window.selectCompressLevel('extreme')" id="pcomp-btn-ext" class="p-2 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800 text-slate-600 font-bold text-xs flex flex-col items-center">
+                                    <span>Kuchli</span>
+                                    <span class="text-[10px] text-slate-400 font-normal">Kichik hajm</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="pcomp-loading" class="hidden py-8 text-center space-y-3">
+                            <i data-lucide="loader-2" class="w-9 h-9 mx-auto text-fuchsia-600 animate-spin"></i>
+                            <p class="text-xs font-bold text-slate-800 dark:text-white">PDF siqilmoqda...</p>
+                            <p class="text-[11px] text-slate-500">Tasvirlar qayta optimallashtirilmoqda</p>
+                        </div>
+
+                        <div id="pcomp-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-3.5">
+                            <div class="w-11 h-11 mx-auto rounded-2xl bg-gradient-to-tr from-fuchsia-500 to-pink-600 text-white flex items-center justify-center shadow-lg shadow-fuchsia-500/30">
+                                <i data-lucide="check-check" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-bold text-slate-900 dark:text-white" id="pcomp-out-name">Fayl</h4>
+                                <div id="pcomp-stats" class="text-xs font-bold text-emerald-600 mt-1"></div>
+                                <div class="mt-2 p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-left space-y-1">
+                                    <div class="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
+                                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                        <span>Siqilgan PDF Telegram chatiga yuborildi!</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
+                                        Hajmi yengillashtirilgan faylni bot chatidan to'g'ridan-to'g'ri oling.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="space-y-2 pt-1">
+                                <button onclick="TelegramApp.closeApp()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-brand-600 to-blue-600 text-white text-xs font-bold shadow-md shadow-brand-500/25 inline-flex items-center justify-center gap-2">
+                                    <i data-lucide="send" class="w-4 h-4"></i> Telegram chatida ochish ✓
+                                </button>
+                                <button id="pcomp-dl-btn" class="w-full py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 text-xs font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-white">
+                                    <i data-lucide="download" class="w-3.5 h-3.5"></i> Shu yerni o'zida yuklab olish
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-3.5 border-t border-white/60 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/40">
+                        <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100">
+                            Bekor qilish
+                        </button>
+                        <button id="pcomp-action-btn" onclick="window.executePdfCompress()" class="px-5 py-2 rounded-xl bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-bold shadow-md shadow-fuchsia-600/20 inline-flex items-center gap-1.5 transition-all">
+                            <i data-lucide="file-down" class="w-4 h-4"></i> Kichraytirish
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `);
+        refreshIcons();
+
+        let chosenFile = null;
+        let compressLevel = 'recommended';
+        const fileInput = document.getElementById('pcomp-file-input');
+        const fileLabel = document.getElementById('pcomp-file-label');
+
+        fileInput.onchange = (e) => {
+            if (e.target.files && e.target.files[0]) {
+                chosenFile = e.target.files[0];
+                fileLabel.innerText = `Tanlandi: ${chosenFile.name} (${Math.round(chosenFile.size / 1024)} KB)`;
+            }
+        };
+
+        window.selectCompressLevel = (level) => {
+            compressLevel = level;
+            TelegramApp.hapticFeedback('light');
+            ['basic', 'rec', 'ext'].forEach(k => {
+                const b = document.getElementById(`pcomp-btn-${k}`);
+                if (!b) return;
+                b.className = 'p-2 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800 text-slate-600 font-bold text-xs flex flex-col items-center';
+            });
+            const keyMap = { basic: 'basic', recommended: 'rec', extreme: 'ext' };
+            const activeBtn = document.getElementById(`pcomp-btn-${keyMap[level]}`);
+            if (activeBtn) {
+                activeBtn.className = 'p-2 rounded-xl border-2 border-fuchsia-500 bg-fuchsia-50/40 dark:bg-fuchsia-950/20 text-fuchsia-700 dark:text-fuchsia-300 font-bold text-xs flex flex-col items-center shadow-sm';
+            }
+        };
+
+        window.executePdfCompress = async () => {
+            if (!chosenFile) {
+                TelegramApp.showAlert("Iltimos, avval PDF faylni tanlang!");
+                return;
+            }
+            TelegramApp.hapticFeedback('medium');
+
+            document.getElementById('pcomp-upload-box').classList.add('hidden');
+            document.getElementById('pcomp-options').classList.add('hidden');
+            document.getElementById('pcomp-action-btn').classList.add('hidden');
+            document.getElementById('pcomp-loading').classList.remove('hidden');
+            refreshIcons();
+
+            const fd = new FormData();
+            fd.append('file', chosenFile);
+            fd.append('quality_level', compressLevel);
+
+            try {
+                const res = await api.compressPdf(fd);
+                TelegramApp.hapticFeedback('heavy');
+
+                document.getElementById('pcomp-loading').classList.add('hidden');
+                document.getElementById('pcomp-result').classList.remove('hidden');
+                document.getElementById('pcomp-out-name').innerText = res.file_name;
+                
+                const initMb = (res.initial_size / (1024 * 1024)).toFixed(2);
+                const finMb = (res.final_size / (1024 * 1024)).toFixed(2);
+                document.getElementById('pcomp-stats').innerHTML = `📉 ${initMb} MB ➔ <b>${finMb} MB</b> (${res.saved_percent}% tejandi)`;
+
+                document.getElementById('pcomp-dl-btn').onclick = () => {
+                    TelegramApp.downloadFile(res.download_url);
+                };
+                refreshIcons();
+                loadRecentFiles();
+            } catch (err) {
+                document.getElementById('pcomp-loading').classList.add('hidden');
+                document.getElementById('pcomp-upload-box').classList.remove('hidden');
+                document.getElementById('pcomp-options').classList.remove('hidden');
+                document.getElementById('pcomp-action-btn').classList.remove('hidden');
+                TelegramApp.showAlert(`Xatolik: ${err.message}`);
+                refreshIcons();
+            }
+        };
+    };
+
+    // ─────────────────────────────────────────────────────────────
+    // TOOL 11: PDF Suv Belgisi Modal (PDF Watermark)
+    // ─────────────────────────────────────────────────────────────
+    window.openPdfWatermarkModal = () => {
+        TelegramApp.hapticFeedback();
+        openModal(`
+            <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+                <div class="liquid-glass-card max-w-md w-full flex flex-col max-h-[90vh] overflow-hidden bg-white/95 dark:bg-slate-900/95 border border-white/80 dark:border-slate-700/80 shadow-2xl">
+                    <div class="p-4 border-b border-white/60 dark:border-slate-800 flex items-center justify-between shrink-0">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
+                                <i data-lucide="stamp" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-900 dark:text-white">PDF suv belgisi (Watermark)</h3>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400">Hujjat sahifalariga mualliflik belgisi yoki logo qo'yish</p>
+                            </div>
+                        </div>
+                        <button onclick="closeModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600">
+                            <i data-lucide="x" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <div class="p-5 space-y-4 overflow-y-auto flex-1">
+                        <div id="pwm-upload-box" class="p-5 rounded-2xl border-2 border-dashed border-indigo-300/80 text-center hover:border-indigo-500 transition-colors bg-indigo-50/20 cursor-pointer" onclick="document.getElementById('pwm-file-input').click()">
+                            <i data-lucide="upload-cloud" class="w-8 h-8 mx-auto text-indigo-500 mb-1.5"></i>
+                            <span class="text-xs font-bold text-slate-800 dark:text-slate-200 block" id="pwm-file-label">PDF faylni tanlang</span>
+                            <span class="text-[11px] text-slate-500 mt-0.5 block">Suv belgisi qo'yiladigan PDF</span>
+                            <input type="file" id="pwm-file-input" accept=".pdf" class="hidden">
+                        </div>
+
+                        <div id="pwm-options" class="space-y-3">
+                            <div class="grid grid-cols-2 gap-2">
+                                <button type="button" id="pwm-mode-text" onclick="window.selectWatermarkMode('text')" class="p-2.5 rounded-xl border-2 border-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm">
+                                    <i data-lucide="type" class="w-4 h-4"></i> Matn belgisi
+                                </button>
+                                <button type="button" id="pwm-mode-image" onclick="window.selectWatermarkMode('image')" class="p-2.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800 text-slate-600 font-bold text-xs flex items-center justify-center gap-1.5">
+                                    <i data-lucide="image" class="w-4 h-4"></i> Logotip (Rasm)
+                                </button>
+                            </div>
+
+                            <div id="pwm-text-section" class="space-y-2">
+                                <div>
+                                    <label class="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">Belgi matni:</label>
+                                    <input type="text" id="pwm-text-val" value="EduBot Ustoz" placeholder="Masalan: Maxfiy yoki Ismingiz" class="w-full text-xs p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="text-[10px] font-bold text-slate-500 block mb-1">Rangi:</label>
+                                        <input type="color" id="pwm-color-val" value="#6366f1" class="w-full h-8 rounded-lg cursor-pointer border border-slate-200">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-slate-500 block mb-1">Shrift o'lchami:</label>
+                                        <select id="pwm-size-val" class="w-full text-xs p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                                            <option value="28">Kichik (28px)</option>
+                                            <option value="38" selected>O'rtacha (38px)</option>
+                                            <option value="52">Katta (52px)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="pwm-image-section" class="hidden space-y-2">
+                                <label class="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">Logotip rasmi (PNG tavsiya etiladi):</label>
+                                <div class="p-3 rounded-xl border border-dashed border-slate-300 text-center cursor-pointer bg-slate-50/50" onclick="document.getElementById('pwm-logo-input').click()">
+                                    <span class="text-xs font-semibold text-indigo-600 block" id="pwm-logo-label">Rasm tanlash</span>
+                                    <input type="file" id="pwm-logo-input" accept="image/*" class="hidden">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2 pt-1">
+                                <div>
+                                    <label class="text-[10px] font-bold text-slate-500 block mb-1">Shaffoflik: <span id="pwm-opacity-label">35%</span></label>
+                                    <input type="range" id="pwm-opacity-val" min="10" max="80" value="35" oninput="document.getElementById('pwm-opacity-label').innerText = this.value + '%'" class="w-full">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold text-slate-500 block mb-1">Burchak: <span id="pwm-angle-label">45°</span></label>
+                                    <input type="range" id="pwm-angle-val" min="0" max="90" step="15" value="45" oninput="document.getElementById('pwm-angle-label').innerText = this.value + '°'" class="w-full">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="pwm-loading" class="hidden py-8 text-center space-y-3">
+                            <i data-lucide="loader-2" class="w-9 h-9 mx-auto text-indigo-600 animate-spin"></i>
+                            <p class="text-xs font-bold text-slate-800 dark:text-white">Suv belgisi qo'yilmoqda...</p>
+                            <p class="text-[11px] text-slate-500">Barcha sahifalar himoyalanmoqda</p>
+                        </div>
+
+                        <div id="pwm-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-3.5">
+                            <div class="w-11 h-11 mx-auto rounded-2xl bg-gradient-to-tr from-indigo-500 to-blue-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                                <i data-lucide="check-check" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-bold text-slate-900 dark:text-white" id="pwm-out-name">Fayl</h4>
+                                <div class="mt-2 p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-left space-y-1">
+                                    <div class="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
+                                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                        <span>Himoyalangan PDF Telegram chatiga yuborildi!</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
+                                        Suv belgisi qo'yilgan hujjat botingizda saqlandi.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="space-y-2 pt-1">
+                                <button onclick="TelegramApp.closeApp()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-brand-600 to-blue-600 text-white text-xs font-bold shadow-md shadow-brand-500/25 inline-flex items-center justify-center gap-2">
+                                    <i data-lucide="send" class="w-4 h-4"></i> Telegram chatida ochish ✓
+                                </button>
+                                <button id="pwm-dl-btn" class="w-full py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 text-xs font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-white">
+                                    <i data-lucide="download" class="w-3.5 h-3.5"></i> Shu yerni o'zida yuklab olish
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-3.5 border-t border-white/60 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/40 shrink-0">
+                        <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100">
+                            Bekor qilish
+                        </button>
+                        <button id="pwm-action-btn" onclick="window.executePdfWatermark()" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 inline-flex items-center gap-1.5 transition-all">
+                            <i data-lucide="stamp" class="w-4 h-4"></i> Belgini qo'yish
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `);
+        refreshIcons();
+
+        let chosenFile = null;
+        let chosenLogo = null;
+        let wmMode = 'text';
+
+        const fileInput = document.getElementById('pwm-file-input');
+        const fileLabel = document.getElementById('pwm-file-label');
+        const logoInput = document.getElementById('pwm-logo-input');
+        const logoLabel = document.getElementById('pwm-logo-label');
+
+        fileInput.onchange = (e) => {
+            if (e.target.files && e.target.files[0]) {
+                chosenFile = e.target.files[0];
+                fileLabel.innerText = `Tanlandi: ${chosenFile.name}`;
+            }
+        };
+
+        logoInput.onchange = (e) => {
+            if (e.target.files && e.target.files[0]) {
+                chosenLogo = e.target.files[0];
+                logoLabel.innerText = `Logo tanlandi: ${chosenLogo.name}`;
+            }
+        };
+
+        window.selectWatermarkMode = (mode) => {
+            wmMode = mode;
+            TelegramApp.hapticFeedback('light');
+            const btnText = document.getElementById('pwm-mode-text');
+            const btnImg = document.getElementById('pwm-mode-image');
+            const secText = document.getElementById('pwm-text-section');
+            const secImg = document.getElementById('pwm-image-section');
+
+            if (mode === 'text') {
+                btnText.className = 'p-2.5 rounded-xl border-2 border-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm';
+                btnImg.className = 'p-2.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800 text-slate-600 font-bold text-xs flex items-center justify-center gap-1.5';
+                secText.classList.remove('hidden');
+                secImg.classList.add('hidden');
+            } else {
+                btnImg.className = 'p-2.5 rounded-xl border-2 border-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm';
+                btnText.className = 'p-2.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800 text-slate-600 font-bold text-xs flex items-center justify-center gap-1.5';
+                secText.classList.add('hidden');
+                secImg.classList.remove('hidden');
+            }
+        };
+
+        window.executePdfWatermark = async () => {
+            if (!chosenFile) {
+                TelegramApp.showAlert("Iltimos, avval PDF faylni tanlang!");
+                return;
+            }
+            if (wmMode === 'image' && !chosenLogo) {
+                TelegramApp.showAlert("Iltimos, logotip rasmini tanlang!");
+                return;
+            }
+            TelegramApp.hapticFeedback('medium');
+
+            document.getElementById('pwm-upload-box').classList.add('hidden');
+            document.getElementById('pwm-options').classList.add('hidden');
+            document.getElementById('pwm-action-btn').classList.add('hidden');
+            document.getElementById('pwm-loading').classList.remove('hidden');
+            refreshIcons();
+
+            const fd = new FormData();
+            fd.append('file', chosenFile);
+            fd.append('mode', wmMode);
+
+            const opacityVal = (parseFloat(document.getElementById('pwm-opacity-val')?.value || 35) / 100).toFixed(2);
+            const angleVal = document.getElementById('pwm-angle-val')?.value || 45;
+            fd.append('opacity', opacityVal);
+            fd.append('angle', angleVal);
+
+            if (wmMode === 'text') {
+                const textVal = document.getElementById('pwm-text-val')?.value || 'EduBot';
+                const colorVal = document.getElementById('pwm-color-val')?.value || '#6366f1';
+                const sizeVal = document.getElementById('pwm-size-val')?.value || 38;
+                fd.append('text', textVal);
+                fd.append('color', colorVal);
+                fd.append('font_size', sizeVal);
+            } else {
+                fd.append('logo', chosenLogo);
+            }
+
+            try {
+                const res = await api.watermarkPdf(fd);
+                TelegramApp.hapticFeedback('heavy');
+
+                document.getElementById('pwm-loading').classList.add('hidden');
+                document.getElementById('pwm-result').classList.remove('hidden');
+                document.getElementById('pwm-out-name').innerText = res.file_name;
+                document.getElementById('pwm-dl-btn').onclick = () => {
+                    TelegramApp.downloadFile(res.download_url);
+                };
+                refreshIcons();
+                loadRecentFiles();
+            } catch (err) {
+                document.getElementById('pwm-loading').classList.add('hidden');
+                document.getElementById('pwm-upload-box').classList.remove('hidden');
+                document.getElementById('pwm-options').classList.remove('hidden');
+                document.getElementById('pwm-action-btn').classList.remove('hidden');
+                TelegramApp.showAlert(`Xatolik: ${err.message}`);
+                refreshIcons();
+            }
+        };
+    };
+
+    // ─────────────────────────────────────────────────────────────
+    // TOOL 12: Hujjat Foto (3x4) Modal (Passport & ID Photos)
+    // ─────────────────────────────────────────────────────────────
+    window.openPhoto3x4Modal = () => {
+        TelegramApp.hapticFeedback();
+        openModal(`
+            <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+                <div class="liquid-glass-card max-w-lg w-full flex flex-col max-h-[92vh] overflow-hidden bg-white/95 dark:bg-slate-900/95 border border-white/80 dark:border-slate-700/80 shadow-2xl">
+                    <!-- Header -->
+                    <div class="p-4 border-b border-white/60 dark:border-slate-800 flex items-center justify-between shrink-0">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center">
+                                <i data-lucide="contact" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-900 dark:text-white">Hujjat foto (3×4)</h3>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400">Pasport, viza, talaba guvohnomasi uchun standart 30×40 mm</p>
+                            </div>
+                        </div>
+                        <button onclick="closeModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600">
+                            <i data-lucide="x" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <!-- Body -->
+                    <div class="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
+                        <!-- Upload Box -->
+                        <div id="p34-upload-box" class="p-5 rounded-2xl border-2 border-dashed border-purple-300/80 hover:border-purple-500 transition-colors bg-purple-50/20 dark:bg-purple-950/10 text-center cursor-pointer" onclick="document.getElementById('p34-file-input').click()">
+                            <i data-lucide="camera" class="w-8 h-8 mx-auto text-purple-600 mb-1.5"></i>
+                            <span class="text-xs font-bold text-slate-800 dark:text-slate-200 block" id="p34-file-label">Suratingizni tanlang (yoki rasmga oling)</span>
+                            <span class="text-[11px] text-slate-500 mt-0.5 block">Telefon kamerasi yoki galereyadan portret rasm</span>
+                            <input type="file" id="p34-file-input" accept="image/*" class="hidden">
+                        </div>
+
+                        <!-- Options & Preview Area -->
+                        <div id="p34-options-area" class="space-y-4">
+                            <!-- Live Preview Box -->
+                            <div id="p34-preview-box" class="hidden flex items-center justify-center p-3 rounded-2xl bg-slate-100/70 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700">
+                                <div class="relative rounded-lg overflow-hidden border-2 border-purple-500 shadow-md" style="width: 105px; height: 140px;">
+                                    <img id="p34-preview-img" class="w-full h-full object-cover" src="">
+                                    <span class="absolute bottom-1 right-1 bg-black/60 text-white font-mono text-[9px] px-1 rounded">3×4 cm</span>
+                                </div>
+                            </div>
+
+                            <!-- 1. Fon rangini tanlash -->
+                            <div>
+                                <label class="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1.5 flex items-center gap-1.5">
+                                    <i data-lucide="palette" class="w-3.5 h-3.5 text-purple-600"></i>
+                                    Orqa fon rangi:
+                                </label>
+                                <div class="grid grid-cols-4 gap-2">
+                                    <button type="button" onclick="window.selectPhoto34Bg('#FFFFFF', true)" id="p34-bg-white" class="p-2 rounded-xl border-2 border-purple-500 bg-purple-50/40 dark:bg-purple-950/20 text-xs font-bold text-slate-800 dark:text-white flex flex-col items-center gap-1 shadow-sm">
+                                        <div class="w-4 h-4 rounded-full bg-white border border-slate-300"></div>
+                                        <span class="text-[10px]">Oq (Pasport)</span>
+                                    </button>
+                                    <button type="button" onclick="window.selectPhoto34Bg('#4A90E2', true)" id="p34-bg-blue" class="p-2 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-400 flex flex-col items-center gap-1">
+                                        <div class="w-4 h-4 rounded-full bg-blue-500 border border-slate-300"></div>
+                                        <span class="text-[10px]">Ko'k</span>
+                                    </button>
+                                    <button type="button" onclick="window.selectPhoto34Bg('#E2E8F0', true)" id="p34-bg-gray" class="p-2 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-400 flex flex-col items-center gap-1">
+                                        <div class="w-4 h-4 rounded-full bg-slate-300 border border-slate-300"></div>
+                                        <span class="text-[10px]">Kulrang</span>
+                                    </button>
+                                    <button type="button" onclick="window.selectPhoto34Bg('original', false)" id="p34-bg-orig" class="p-2 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-400 flex flex-col items-center gap-1">
+                                        <div class="w-4 h-4 rounded-full bg-gradient-to-tr from-amber-400 to-rose-400 border border-slate-300"></div>
+                                        <span class="text-[10px]">Asl fon</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- 2. Burchak (Doira kesma) talabi -->
+                            <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="crop" class="w-4 h-4 text-purple-600"></i>
+                                    <div>
+                                        <h4 class="text-xs font-bold text-slate-800 dark:text-white">O'ng burchak (Doira kesma)</h4>
+                                        <p class="text-[10px] text-slate-500">Ba'zi davlat guvohnomalarida talab qilinadi</p>
+                                    </div>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="p34-corner-toggle" class="sr-only peer">
+                                    <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                                </label>
+                            </div>
+
+                            <!-- 3. Yorug'lik va Kontrast -->
+                            <div class="grid grid-cols-2 gap-3 pt-1">
+                                <div>
+                                    <div class="flex items-center justify-between mb-1">
+                                        <label class="text-[10px] font-bold text-slate-500">Yorug'lik:</label>
+                                        <span id="p34-bright-label" class="text-[10px] font-bold text-purple-600">100%</span>
+                                    </div>
+                                    <input type="range" id="p34-bright-val" min="70" max="130" value="100" oninput="document.getElementById('p34-bright-label').innerText = this.value + '%'" class="w-full">
+                                </div>
+                                <div>
+                                    <div class="flex items-center justify-between mb-1">
+                                        <label class="text-[10px] font-bold text-slate-500">Kontrast:</label>
+                                        <span id="p34-contrast-label" class="text-[10px] font-bold text-purple-600">100%</span>
+                                    </div>
+                                    <input type="range" id="p34-contrast-val" min="80" max="130" value="100" oninput="document.getElementById('p34-contrast-label').innerText = this.value + '%'" class="w-full">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Loading State -->
+                        <div id="p34-loading" class="hidden py-8 text-center space-y-3">
+                            <i data-lucide="loader-2" class="w-9 h-9 mx-auto text-purple-600 animate-spin"></i>
+                            <p class="text-xs font-bold text-slate-800 dark:text-white">3×4 Hujjat fotosi tayyorlanmoqda...</p>
+                            <p class="text-[11px] text-slate-500">Yuz mutanosibligi va 10×15 sm varaq shakllantirilmoqda</p>
+                        </div>
+
+                        <!-- Success Result Box -->
+                        <div id="p34-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-3.5">
+                            <div class="w-11 h-11 mx-auto rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-purple-500/30">
+                                <i data-lucide="check-check" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-bold text-slate-900 dark:text-white" id="p34-out-name">Hujjat fotosi tayyor!</h4>
+                                <div class="mt-2 p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-left space-y-1">
+                                    <div class="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
+                                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                        <span>3×4 Surat va 6 talik varaq Telegramga yuborildi!</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
+                                        Brauzer yoki saytga kirmasdan to'g'ridan-to'g'ri Telegram chatidan yuklab olishingiz mumkin.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="space-y-2 pt-1">
+                                <button onclick="TelegramApp.closeApp()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-brand-600 to-blue-600 text-white text-xs font-bold shadow-md shadow-brand-500/25 flex items-center justify-center gap-2">
+                                    <i data-lucide="send" class="w-4 h-4"></i> Telegram chatida ochish ✓
+                                </button>
+                                <button id="p34-dl-single" class="w-full py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-white">
+                                    <i data-lucide="download" class="w-3.5 h-3.5"></i> 1 dona 3×4 fotoni yuklab olish
+                                </button>
+                                <button id="p34-dl-sheet" class="w-full py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-white">
+                                    <i data-lucide="printer" class="w-3.5 h-3.5"></i> 10×15 sm varaqni yuklab olish
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer Action -->
+                    <div class="p-3.5 border-t border-white/60 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/40 shrink-0">
+                        <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100">
+                            Bekor qilish
+                        </button>
+                        <button id="p34-action-btn" onclick="window.executePhoto34()" class="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-md shadow-purple-600/20 inline-flex items-center gap-1.5 transition-all">
+                            <i data-lucide="check" class="w-4 h-4"></i> 3×4 Foto yaratish
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `);
+        refreshIcons();
+
+        let chosenFile = null;
+        let selectedBg = '#FFFFFF';
+        let shouldChangeBg = true;
+
+        const fileInput = document.getElementById('p34-file-input');
+        const fileLabel = document.getElementById('p34-file-label');
+        const previewBox = document.getElementById('p34-preview-box');
+        const previewImg = document.getElementById('p34-preview-img');
+
+        fileInput.onchange = (e) => {
+            if (e.target.files && e.target.files[0]) {
+                chosenFile = e.target.files[0];
+                fileLabel.innerText = `Tanlandi: ${chosenFile.name}`;
+
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    previewImg.src = evt.target.result;
+                    previewBox.classList.remove('hidden');
+                };
+                reader.readAsDataURL(chosenFile);
+            }
+        };
+
+        window.selectPhoto34Bg = (bg, changeBgFlag) => {
+            selectedBg = bg;
+            shouldChangeBg = changeBgFlag;
+            TelegramApp.hapticFeedback('light');
+
+            ['white', 'blue', 'gray', 'orig'].forEach(k => {
+                const b = document.getElementById(`p34-bg-${k}`);
+                if (b) b.className = 'p-2 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-400 flex flex-col items-center gap-1';
+            });
+
+            let activeId = 'p34-bg-white';
+            if (bg === '#4A90E2') activeId = 'p34-bg-blue';
+            else if (bg === '#E2E8F0') activeId = 'p34-bg-gray';
+            else if (!changeBgFlag) activeId = 'p34-bg-orig';
+
+            const activeBtn = document.getElementById(activeId);
+            if (activeBtn) {
+                activeBtn.className = 'p-2 rounded-xl border-2 border-purple-500 bg-purple-50/40 dark:bg-purple-950/20 text-xs font-bold text-slate-800 dark:text-white flex flex-col items-center gap-1 shadow-sm';
+            }
+        };
+
+        window.executePhoto34 = async () => {
+            if (!chosenFile) {
+                TelegramApp.showAlert("Iltimos, avval fotosuratni tanlang!");
+                return;
+            }
+            TelegramApp.hapticFeedback('medium');
+
+            document.getElementById('p34-upload-box').classList.add('hidden');
+            document.getElementById('p34-options-area').classList.add('hidden');
+            document.getElementById('p34-action-btn').classList.add('hidden');
+            document.getElementById('p34-loading').classList.remove('hidden');
+            refreshIcons();
+
+            const fd = new FormData();
+            fd.append('file', chosenFile);
+            fd.append('bg_color', selectedBg);
+            fd.append('change_bg', shouldChangeBg ? 'true' : 'false');
+            
+            const hasCorner = document.getElementById('p34-corner-toggle')?.checked ? 'true' : 'false';
+            fd.append('add_corner', hasCorner);
+
+            const brightVal = (parseFloat(document.getElementById('p34-bright-val')?.value || 100) / 100).toFixed(2);
+            const contrastVal = (parseFloat(document.getElementById('p34-contrast-val')?.value || 100) / 100).toFixed(2);
+            fd.append('brightness', brightVal);
+            fd.append('contrast', contrastVal);
+
+            try {
+                const res = await api.generatePhoto3x4(fd);
+                TelegramApp.hapticFeedback('heavy');
+
+                document.getElementById('p34-loading').classList.add('hidden');
+                document.getElementById('p34-result').classList.remove('hidden');
+                document.getElementById('p34-out-name').innerText = res.single_file_name;
+
+                document.getElementById('p34-dl-single').onclick = () => {
+                    TelegramApp.downloadFile(res.single_download_url);
+                };
+                document.getElementById('p34-dl-sheet').onclick = () => {
+                    TelegramApp.downloadFile(res.sheet_download_url);
+                };
+
+                refreshIcons();
+                loadRecentFiles();
+            } catch (err) {
+                document.getElementById('p34-loading').classList.add('hidden');
+                document.getElementById('p34-upload-box').classList.remove('hidden');
+                document.getElementById('p34-options-area').classList.remove('hidden');
+                document.getElementById('p34-action-btn').classList.remove('hidden');
+                TelegramApp.showAlert(`Xatolik: ${err.message}`);
+                refreshIcons();
+            }
+        };
+    };
+
+
 
     // ─────────────────────────────────────────────────────────────
     // 2. AI ASSISTANT VIEW (Tool 7)
@@ -2553,76 +3696,291 @@ document.addEventListener('DOMContentLoaded', () => {
     // ─────────────────────────────────────────────────────────────
     // 3. SETTINGS & PROFILE VIEW
     // ─────────────────────────────────────────────────────────────
+    window.copyTelegramId = (id) => {
+        TelegramApp.hapticFeedback('medium');
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(String(id));
+            TelegramApp.showAlert(`📋 Telegram ID nusxalandi: #${id}`);
+        } else {
+            TelegramApp.showAlert(`Telegram ID raqamingiz: #${id}`);
+        }
+    };
+
+    window.openPhoneModal = () => {
+        TelegramApp.hapticFeedback('light');
+        const existing = document.getElementById('phone-modal');
+        if (existing) existing.remove();
+
+        const current = localStorage.getItem('edubot_user_phone') || '';
+        const modal = document.createElement('div');
+        modal.id = 'phone-modal';
+        modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in';
+        modal.innerHTML = `
+            <div class="liquid-glass-card max-w-sm w-full p-5 space-y-4 shadow-2xl border border-white/60 dark:border-white/10" onclick="event.stopPropagation()">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-sm">
+                        <i data-lucide="phone" class="w-4 h-4 text-brand-600"></i>
+                        <span>Telefon raqamni saqlash</span>
+                    </div>
+                    <button onclick="document.getElementById('phone-modal').remove()" class="text-slate-400 hover:text-slate-600 p-1">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Telegram profilingiz ma'lumotlarida ko'rsatish uchun telefon raqamingizni kiriting:
+                </p>
+                <div>
+                    <input id="user-phone-input" type="tel" value="${current}" placeholder="+998 90 123 45 67" 
+                        class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/80 text-slate-900 dark:text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50" />
+                </div>
+                <div class="flex gap-2 pt-1">
+                    <button onclick="document.getElementById('phone-modal').remove()" class="flex-1 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
+                        Bekor qilish
+                    </button>
+                    <button onclick="saveUserPhone()" class="flex-1 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs shadow-md shadow-brand-500/20 transition-colors">
+                        Saqlash ✓
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        refreshIcons(modal);
+        setTimeout(() => {
+            const inp = document.getElementById('user-phone-input');
+            if (inp) inp.focus();
+        }, 100);
+    };
+
+    window.saveUserPhone = () => {
+        const inp = document.getElementById('user-phone-input');
+        if (!inp) return;
+        const val = inp.value.trim();
+        if (val.length >= 7) {
+            const formatted = val.startsWith('+') ? val : ('+' + val);
+            localStorage.setItem('edubot_user_phone', formatted);
+            api.updatePhone(formatted).catch(() => {});
+            document.getElementById('phone-modal')?.remove();
+            TelegramApp.showAlert(`✅ Telefon raqamingiz saqlandi: ${formatted}`);
+            renderSettings();
+        } else if (val.length === 0) {
+            localStorage.removeItem('edubot_user_phone');
+            document.getElementById('phone-modal')?.remove();
+            TelegramApp.showAlert("Telefon raqami olib tashlandi.");
+            renderSettings();
+        } else {
+            TelegramApp.showAlert("⚠️ Iltimos, to'liq telefon raqamini kiriting!");
+        }
+    };
+
+    window.connectTelegramPhone = () => {
+        TelegramApp.hapticFeedback('medium');
+        const triggered = TelegramApp.requestContact((sent, event) => {
+            if (sent && event && event.response_unpacked && event.response_unpacked.contact) {
+                const phone = event.response_unpacked.contact.phone_number;
+                if (phone) {
+                    const formatted = phone.startsWith('+') ? phone : ('+' + phone);
+                    localStorage.setItem('edubot_user_phone', formatted);
+                    api.updatePhone(formatted).catch(() => {});
+                    TelegramApp.showAlert(`✅ Telegram telefon raqamingiz muvaffaqiyatli ulandi: ${formatted}`);
+                    renderSettings();
+                    return;
+                }
+            }
+            openPhoneModal();
+        });
+
+        if (!triggered) {
+            openPhoneModal();
+        }
+    };
+
     function renderSettings() {
+        const currentTgUser = TelegramApp.getUserData() || tgUser || {};
+        const firstName = currentTgUser.first_name || tgUser.first_name || "O'qituvchi";
+        const lastName = currentTgUser.last_name || tgUser.last_name || "";
+        const fullName = `${firstName} ${lastName}`.trim();
+        const username = currentTgUser.username || tgUser.username || "";
+        const userId = currentTgUser.id || tgUser.id || "Nomaʼlum";
+        const photoUrl = currentTgUser.photo_url || tgUser.photo_url || "";
+        const isPremium = Boolean(currentTgUser.is_premium || tgUser.is_premium);
+        const langCode = (currentTgUser.language_code || tgUser.language_code || "uz").toLowerCase();
+        const langNames = {
+            'uz': "O'zbekcha 🇺🇿",
+            'ru': "Русский 🇷🇺",
+            'en': "English 🇬🇧"
+        };
+        const displayLanguage = langNames[langCode] || `${langCode.toUpperCase()} 🌐`;
+        const userPhone = localStorage.getItem('edubot_user_phone') || currentTgUser.phone_number || "";
+        const userInitial = (firstName || 'O').charAt(0).toUpperCase();
+
         const adminSection = isCurrentUserAdmin ? `
             <div class="liquid-glass-card p-4 space-y-3">
-                <div class="flex items-center gap-2 text-slate-900 font-bold text-xs">
+                <div class="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-xs">
                     <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
                     <span>Tizim Zaxira Bazasi (Administrator paneli)</span>
                 </div>
-                <p class="text-xs text-slate-500 leading-relaxed">
+                <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                     Ma'lumotlar bazasi xavfsiz avtomatik sinxronizatsiya qilingan.
                 </p>
-                <div class="p-2.5 rounded-xl bg-white/50 border border-white/80 flex items-center justify-between text-xs">
-                    <span class="text-slate-600 font-medium">Holati:</span>
+                <div class="p-2.5 rounded-xl bg-white/50 dark:bg-white/5 border border-white/80 dark:border-white/10 flex items-center justify-between text-xs">
+                    <span class="text-slate-600 dark:text-slate-300 font-medium">Holati:</span>
                     <span class="font-mono text-emerald-600 font-bold">Faol va himoyalangan ✓</span>
                 </div>
+                <a href="/behruz620sh" target="_blank" class="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-brand-500/25 transition-all active:scale-95">
+                    <i data-lucide="shield" class="w-4 h-4"></i>
+                    <span>Admin Panelni Ochish (/behruz620sh) ➔</span>
+                </a>
             </div>
         ` : '';
 
         appDiv.innerHTML = `
             <div class="space-y-4 animate-fade-in">
                 <div>
-                    <h2 class="text-lg font-bold text-slate-900 tracking-tight">Foydalanuvchi Profili</h2>
-                    <p class="text-xs text-slate-500">Shaxsiy ma'lumotlar va ilova parametrlari</p>
+                    <h2 class="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Foydalanuvchi Profili</h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Shaxsiy Telegram hisobi ma'lumotlari</p>
                 </div>
 
-                <div class="liquid-glass-card p-4 flex items-center gap-3.5">
-                    <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-tr from-brand-600 via-indigo-600 to-purple-600 text-white flex items-center justify-center font-extrabold text-lg shadow-md shadow-brand-500/25 ring-1 ring-white/60">
-                        ${(tgUser.first_name || 'O').charAt(0)}
+                <!-- 1. ASOSIY TELEGRAM PROFIL KARTASI -->
+                <div class="liquid-glass-card p-4 sm:p-5 flex items-center gap-4">
+                    <div class="relative w-15 h-15 sm:w-18 sm:h-18 flex-shrink-0">
+                        ${photoUrl ? `
+                            <img src="${photoUrl}" 
+                                 alt="${fullName}" 
+                                 class="w-full h-full rounded-2xl object-cover shadow-lg shadow-brand-500/20 ring-2 ring-white/90 dark:ring-slate-700" 
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                            <div style="display:none;" class="w-full h-full rounded-2xl bg-gradient-to-tr from-brand-600 via-indigo-600 to-purple-600 text-white items-center justify-center font-black text-2xl shadow-lg shadow-brand-500/25 ring-2 ring-white/90 dark:ring-slate-700">
+                                ${userInitial}
+                            </div>
+                        ` : `
+                            <div class="w-full h-full rounded-2xl bg-gradient-to-tr from-brand-600 via-indigo-600 to-purple-600 text-white flex items-center justify-center font-black text-2xl shadow-lg shadow-brand-500/25 ring-2 ring-white/90 dark:ring-slate-700">
+                                ${userInitial}
+                            </div>
+                        `}
+                        ${isPremium ? `
+                            <div class="absolute -bottom-1 -right-1 bg-gradient-to-tr from-amber-400 to-yellow-500 text-slate-950 p-1 rounded-lg shadow-md border border-white dark:border-slate-800" title="Telegram Premium">
+                                <i data-lucide="star" class="w-3.5 h-3.5 fill-current"></i>
+                            </div>
+                        ` : `
+                            <div class="absolute -bottom-1 -right-1 bg-emerald-500 text-white p-1 rounded-lg shadow-md border border-white dark:border-slate-800" title="Faol Telegram Hisob">
+                                <i data-lucide="check" class="w-3 h-3 stroke-[3]"></i>
+                            </div>
+                        `}
                     </div>
                     <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-2">
-                            <h3 class="text-sm sm:text-base font-bold text-slate-900 truncate">${tgUser.first_name || "O'qituvchi"} ${tgUser.last_name || ""}</h3>
-                            <span class="liquid-glass-pill px-2 py-0.5 rounded-md text-[10px] font-bold text-brand-600">${isCurrentUserAdmin ? 'Admin' : "Foydalanuvchi"}</span>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h3 class="text-base sm:text-lg font-bold text-slate-900 dark:text-white truncate">${fullName}</h3>
+                            <span class="liquid-glass-pill px-2 py-0.5 rounded-md text-[10px] font-bold ${isCurrentUserAdmin ? 'text-emerald-600 bg-emerald-500/10 border-emerald-500/20' : (isPremium ? 'text-amber-600 bg-amber-500/10 border-amber-500/20' : 'text-brand-600 bg-brand-500/10 border-brand-500/20')} border">
+                                ${isCurrentUserAdmin ? '🛡️ Admin' : (isPremium ? '⭐ Premium' : 'Foydalanuvchi')}
+                            </span>
                         </div>
-                        <p class="text-xs text-slate-500 font-medium mt-0.5">${tgUser.username ? '@' + tgUser.username : 'EduBot foydalanuvchisi'}</p>
+                        <p class="text-xs text-brand-600 dark:text-brand-400 font-semibold mt-1 flex items-center gap-1 truncate">
+                            <i data-lucide="at-sign" class="w-3.5 h-3.5 flex-shrink-0"></i>
+                            <span>${username ? username : "Username o'rnatilmagan"}</span>
+                        </p>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                            ID: #${userId}
+                        </p>
                     </div>
                 </div>
 
-                <div class="liquid-glass-card p-4 space-y-3">
-                    <div class="flex items-center gap-2 text-slate-900 font-bold text-xs">
-                        <i data-lucide="check-check" class="w-4 h-4 text-brand-600"></i>
-                        <span>Ulangan Asboblar (7 ta)</span>
+                <!-- 2. TELEGRAM AKKAUNT MA'LUMOTLARI (ULANGAN ASBOBLAR O'RNIGA) -->
+                <div class="liquid-glass-card p-4 sm:p-5 space-y-3.5">
+                    <div class="flex items-center justify-between pb-2.5 border-b border-slate-200/60 dark:border-white/10">
+                        <div class="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-xs sm:text-sm">
+                            <i data-lucide="badge-check" class="w-4 h-4 text-brand-600"></i>
+                            <span>Telegram Akkaunt Ma'lumotlari</span>
+                        </div>
+                        <span class="liquid-glass-pill px-2.5 py-0.5 rounded-full text-[10px] font-bold text-emerald-600 bg-emerald-500/10 border border-emerald-500/20">
+                            ● Bog'langan
+                        </span>
                     </div>
-                    <div class="grid grid-cols-2 gap-2 text-xs">
-                        <div class="p-2.5 rounded-xl bg-white/40 border border-white/70">
-                            <span class="text-slate-500 text-[10px] block">1. PDF ➔ DOCX</span>
-                            <span class="font-bold text-slate-800">Tayyor</span>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                        <!-- 1. Ismi -->
+                        <div class="p-3 rounded-xl bg-white/50 dark:bg-white/5 border border-white/80 dark:border-white/10 flex items-center justify-between">
+                            <div class="min-w-0 pr-2">
+                                <span class="text-slate-500 dark:text-slate-400 text-[10px] block font-medium">To'liq ism (Ismi)</span>
+                                <span class="font-bold text-slate-900 dark:text-white truncate block text-xs sm:text-sm mt-0.5">${fullName}</span>
+                            </div>
+                            <div class="w-8 h-8 rounded-lg bg-brand-500/10 text-brand-600 flex items-center justify-center flex-shrink-0">
+                                <i data-lucide="user" class="w-4 h-4"></i>
+                            </div>
                         </div>
-                        <div class="p-2.5 rounded-xl bg-white/40 border border-white/70">
-                            <span class="text-slate-500 text-[10px] block">2. DOCX ➔ PDF</span>
-                            <span class="font-bold text-slate-800">Tayyor (Word COM)</span>
+
+                        <!-- 2. Username -->
+                        <div class="p-3 rounded-xl bg-white/50 dark:bg-white/5 border border-white/80 dark:border-white/10 flex items-center justify-between">
+                            <div class="min-w-0 pr-2">
+                                <span class="text-slate-500 dark:text-slate-400 text-[10px] block font-medium">Telegram Username</span>
+                                <span class="font-bold text-brand-600 dark:text-brand-400 truncate block text-xs sm:text-sm mt-0.5">${username ? '@' + username : "O'rnatilmagan"}</span>
+                            </div>
+                            ${username ? `
+                                <button onclick="TelegramApp.openLink('https://t.me/${username}')" class="w-8 h-8 rounded-lg bg-brand-500/10 text-brand-600 hover:bg-brand-500/20 flex items-center justify-center flex-shrink-0 transition-colors" title="Profilga o'tish">
+                                    <i data-lucide="external-link" class="w-4 h-4"></i>
+                                </button>
+                            ` : `
+                                <div class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-400 flex items-center justify-center flex-shrink-0">
+                                    <i data-lucide="at-sign" class="w-4 h-4"></i>
+                                </div>
+                            `}
                         </div>
-                        <div class="p-2.5 rounded-xl bg-white/40 border border-white/70">
-                            <span class="text-slate-500 text-[10px] block">3. DOCX tahrirlash</span>
-                            <span class="font-bold text-slate-800">Tayyor</span>
+
+                        <!-- 3. Telegram ID (Raqami) -->
+                        <div class="p-3 rounded-xl bg-white/50 dark:bg-white/5 border border-white/80 dark:border-white/10 flex items-center justify-between">
+                            <div class="min-w-0 pr-2">
+                                <span class="text-slate-500 dark:text-slate-400 text-[10px] block font-medium">Telegram ID (Hisob raqami)</span>
+                                <span class="font-mono font-bold text-slate-900 dark:text-white truncate block text-xs sm:text-sm mt-0.5">#${userId}</span>
+                            </div>
+                            <button onclick="copyTelegramId('${userId}')" class="w-8 h-8 rounded-lg bg-brand-500/10 text-brand-600 hover:bg-brand-500/20 flex items-center justify-center flex-shrink-0 transition-colors" title="Nusxa olish">
+                                <i data-lucide="copy" class="w-4 h-4"></i>
+                            </button>
                         </div>
-                        <div class="p-2.5 rounded-xl bg-white/40 border border-white/70">
-                            <span class="text-slate-500 text-[10px] block">4. PDF tahrirlash</span>
-                            <span class="font-bold text-slate-800">Tayyor</span>
+
+                        <!-- 4. Telefon raqami (Raqami) -->
+                        <div class="p-3 rounded-xl bg-white/50 dark:bg-white/5 border border-white/80 dark:border-white/10 flex items-center justify-between">
+                            <div class="min-w-0 pr-2">
+                                <span class="text-slate-500 dark:text-slate-400 text-[10px] block font-medium">Telefon raqami</span>
+                                ${userPhone ? `
+                                    <span class="font-mono font-bold text-slate-900 dark:text-white truncate block text-xs sm:text-sm mt-0.5">${userPhone}</span>
+                                ` : `
+                                    <span class="text-amber-600 dark:text-amber-400 font-medium text-xs block mt-0.5">Ulanmagan</span>
+                                `}
+                            </div>
+                            <div class="flex items-center gap-1">
+                                ${userPhone ? `
+                                    <button onclick="openPhoneModal()" class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-200 flex items-center justify-center flex-shrink-0 transition-colors" title="O'zgartirish">
+                                        <i data-lucide="edit-3" class="w-4 h-4"></i>
+                                    </button>
+                                ` : `
+                                    <button onclick="connectTelegramPhone()" class="px-2.5 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-semibold text-[11px] flex items-center gap-1 shadow-sm transition-all active:scale-95">
+                                        <i data-lucide="phone-call" class="w-3 h-3"></i>
+                                        <span>Ulash</span>
+                                    </button>
+                                `}
+                            </div>
                         </div>
-                        <div class="p-2.5 rounded-xl bg-white/40 border border-white/70">
-                            <span class="text-slate-500 text-[10px] block">5. Rasmlar ➔ PDF</span>
-                            <span class="font-bold text-slate-800">Tayyor (A4)</span>
+
+                        <!-- 5. Akkaunt Holati -->
+                        <div class="p-3 rounded-xl bg-white/50 dark:bg-white/5 border border-white/80 dark:border-white/10 flex items-center justify-between">
+                            <div class="min-w-0 pr-2">
+                                <span class="text-slate-500 dark:text-slate-400 text-[10px] block font-medium">Telegram Holati</span>
+                                <span class="font-bold text-slate-900 dark:text-white truncate block text-xs sm:text-sm mt-0.5">
+                                    ${isPremium ? '⭐ Telegram Premium' : 'Standart Hisob'}
+                                </span>
+                            </div>
+                            <div class="w-8 h-8 rounded-lg ${isPremium ? 'bg-amber-500/10 text-amber-500' : 'bg-brand-500/10 text-brand-600'} flex items-center justify-center flex-shrink-0">
+                                <i data-lucide="${isPremium ? 'sparkles' : 'shield-check'}" class="w-4 h-4"></i>
+                            </div>
                         </div>
-                        <div class="p-2.5 rounded-xl bg-white/40 border border-white/70">
-                            <span class="text-slate-500 text-[10px] block">6. Rasmlarni ajratish</span>
-                            <span class="font-bold text-slate-800">Tayyor (ZIP)</span>
-                        </div>
-                        <div class="col-span-2 p-2.5 rounded-xl bg-white/40 border border-white/70">
-                            <span class="text-slate-500 text-[10px] block">7. AI Yordamchi</span>
-                            <span class="font-bold text-slate-800">Gemini 2.0 Flash</span>
+
+                        <!-- 6. Interfeys tili -->
+                        <div class="p-3 rounded-xl bg-white/50 dark:bg-white/5 border border-white/80 dark:border-white/10 flex items-center justify-between">
+                            <div class="min-w-0 pr-2">
+                                <span class="text-slate-500 dark:text-slate-400 text-[10px] block font-medium">Telegram Tili</span>
+                                <span class="font-bold text-slate-900 dark:text-white truncate block text-xs sm:text-sm mt-0.5">${displayLanguage}</span>
+                            </div>
+                            <div class="w-8 h-8 rounded-lg bg-brand-500/10 text-brand-600 flex items-center justify-center flex-shrink-0">
+                                <i data-lucide="globe" class="w-4 h-4"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2631,7 +3989,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 <div class="liquid-glass-card p-4">
                     <div class="flex items-center justify-between text-xs">
-                        <span class="text-slate-600 font-medium">Ilova talqini:</span>
+                        <span class="text-slate-600 dark:text-slate-300 font-medium">Ilova talqini:</span>
                         <span class="font-mono text-brand-600 font-bold liquid-glass-pill px-2.5 py-1 rounded-lg">v2.3 Pro</span>
                     </div>
                 </div>
@@ -2658,3 +4016,14 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('hashchange', router);
     router();
 });
+
+    window.sendRecentFileToTg = async (fileId) => {
+        TelegramApp.hapticFeedback('medium');
+        try {
+            await api.sendFileToTelegram(fileId);
+            TelegramApp.hapticFeedback('heavy');
+            TelegramApp.showAlert("📬 Fayl to'g'ridan-to'g'ri Telegram botingizga yuborildi! Chatga o'tib ko'rishingiz mumkin.");
+        } catch (e) {
+            TelegramApp.showAlert(`Yuborishda xatolik: ${e.message}`);
+        }
+    };

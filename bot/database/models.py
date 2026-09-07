@@ -10,6 +10,8 @@ class User(Base):
     telegram_id = Column(BigInteger, unique=True, index=True, nullable=False)
     full_name = Column(String, nullable=False)
     username = Column(String, nullable=True)
+    phone_number = Column(String, nullable=True)
+    photo_url = Column(String, nullable=True)
     language = Column(String, default='uz')
     created_at = Column(DateTime, default=datetime.utcnow)
     last_active = Column(DateTime, default=datetime.utcnow)

@@ -86,6 +86,21 @@ const TelegramApp = {
     getPlatform() {
         return tg?.platform || "web";
     },
+
+    requestContact(callback) {
+        if (tg?.requestContact) {
+            try {
+                tg.requestContact((sent, event) => {
+                    if (callback) callback(sent, event);
+                });
+                return true;
+            } catch (e) {
+                console.warn("requestContact warning:", e);
+            }
+        }
+        if (callback) callback(false, null);
+        return false;
+    },
     
     showAlert(message) {
         if (tg?.showAlert) {
@@ -117,18 +132,35 @@ const TelegramApp = {
         }
     },
 
-    downloadFile(url) {
-        const fullUrl = url.startsWith('http') ? url : (window.location.origin + url);
-        if (tg?.openLink) {
-            tg.openLink(fullUrl);
-        } else {
+    closeApp() {
+        if (tg?.close) {
+            tg.close();
+        }
+    },
+
+    downloadFile(url, fileName = "") {
+        // 1. Notify user clearly in Telegram Mini App that document is ready and sent to Telegram
+        this.hapticFeedback('medium');
+        this.showAlert(
+            "📬 Hujjatingiz to'g'ridan-to'g'ri Telegram botingizga yuborildi!\n\n" +
+            "Siz uni pastdagi 'Yopish' tugmasini bosib, bot chatidan yuklab olishingiz mumkin."
+        );
+
+        // 2. Also trigger direct device download in background without forcing navigation
+        try {
+            const fullUrl = url.startsWith('http') ? url : (window.location.origin + url);
             const a = document.createElement('a');
             a.href = fullUrl;
-            a.download = '';
-            a.target = '_blank';
+            if (fileName) a.download = fileName;
+            a.target = '_self';
+            a.style.display = 'none';
             document.body.appendChild(a);
             a.click();
-            document.body.removeChild(a);
+            setTimeout(() => {
+                if (document.body.contains(a)) document.body.removeChild(a);
+            }, 500);
+        } catch (e) {
+            console.warn("Direct download fallback error:", e);
         }
     }
 };

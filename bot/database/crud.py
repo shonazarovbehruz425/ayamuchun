@@ -110,3 +110,81 @@ async def get_user_stats(session: AsyncSession, user_id: int) -> dict:
         "file_count": file_count_result.scalar_one_or_none() or 0,
         "quiz_count": quiz_count_result.scalar_one_or_none() or 0
     }
+
+async def get_admin_overview(session: AsyncSession) -> dict:
+    from datetime import datetime, timedelta
+    
+    users_cnt = (await session.execute(select(func.count(User.id)))).scalar_one_or_none() or 0
+    files_cnt = (await session.execute(select(func.count(File.id)))).scalar_one_or_none() or 0
+    quizzes_cnt = (await session.execute(select(func.count(Quiz.id)))).scalar_one_or_none() or 0
+    total_size = (await session.execute(select(func.sum(File.file_size)))).scalar_one_or_none() or 0
+
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    active_today = (await session.execute(
+        select(func.count(User.id)).where(User.last_active >= today_start)
+    )).scalar_one_or_none() or 0
+
+    return {
+        "total_users": users_cnt,
+        "active_today": active_today,
+        "total_files": files_cnt,
+        "total_quizzes": quizzes_cnt,
+        "total_storage_bytes": int(total_size)
+    }
+
+async def get_admin_users_list(session: AsyncSession, limit: int = 100, search: Optional[str] = None) -> list:
+    query = select(User).order_by(User.last_active.desc()).limit(limit)
+    if search:
+        search_pattern = f"%{search}%"
+        query = query.where(
+            (User.full_name.ilike(search_pattern)) | 
+            (User.username.ilike(search_pattern)) | 
+            (func.cast(User.telegram_id, String).ilike(search_pattern))
+        )
+    users = list((await session.execute(query)).scalars().all())
+    
+    user_list = []
+    for u in users:
+        fc = (await session.execute(select(func.count(File.id)).where(File.user_id == u.id))).scalar_one_or_none() or 0
+        qc = (await session.execute(select(func.count(Quiz.id)).where(Quiz.user_id == u.id))).scalar_one_or_none() or 0
+        user_list.append({
+            "id": u.id,
+            "telegram_id": u.telegram_id,
+            "full_name": u.full_name,
+            "username": u.username or "",
+            "phone_number": getattr(u, "phone_number", None) or "",
+            "language": u.language or "uz",
+            "file_count": fc,
+            "quiz_count": qc,
+            "created_at": u.created_at.strftime("%d.%m.%Y %H:%M") if u.created_at else "",
+            "last_active": u.last_active.strftime("%d.%m.%Y %H:%M") if u.last_active else ""
+        })
+    return user_list
+
+async def get_admin_recent_files(session: AsyncSession, limit: int = 50) -> list:
+    query = (
+        select(File, User.full_name, User.username, User.telegram_id)
+        .join(User, File.user_id == User.id)
+        .order_by(File.uploaded_at.desc())
+        .limit(limit)
+    )
+    result = await session.execute(query)
+    rows = result.all()
+    
+    file_list = []
+    for f, full_name, username, telegram_id in rows:
+        file_list.append({
+            "id": f.id,
+            "file_name": f.file_name,
+            "file_type": f.file_type,
+            "file_size": f.file_size,
+            "user_name": full_name,
+            "username": username or "",
+            "telegram_id": telegram_id,
+            "uploaded_at": f.uploaded_at.strftime("%d.%m.%Y %H:%M") if f.uploaded_at else ""
+        })
+    return file_list
+
+async def get_all_user_ids(session: AsyncSession) -> list[int]:
+    result = await session.execute(select(User.telegram_id))
+    return list(result.scalars().all())

@@ -33,6 +33,12 @@ const api = {
     saveFileHtml(fileId, html, format = 'both') { return this.fetchWithAuth(`/files/${fileId}/save-html`, { method: 'POST', body: { html, format } }); },
     imagesToPdf(formData) { return this.fetchWithAuth('/files/images-to-pdf', { method: 'POST', body: formData }); },
     extractImages(fileId) { return this.fetchWithAuth(`/files/${fileId}/extract-images`, { method: 'POST' }); },
+    mergePdfs(formData) { return this.fetchWithAuth('/files/merge-pdfs', { method: 'POST', body: formData }); },
+    splitPdf(formData) { return this.fetchWithAuth('/files/split-pdf', { method: 'POST', body: formData }); },
+    compressPdf(formData) { return this.fetchWithAuth('/files/compress-pdf', { method: 'POST', body: formData }); },
+    watermarkPdf(formData) { return this.fetchWithAuth('/files/watermark-pdf', { method: 'POST', body: formData }); },
+    generatePhoto3x4(formData) { return this.fetchWithAuth('/files/photo-3x4', { method: 'POST', body: formData }); },
+    sendFileToTelegram(fileId) { return this.fetchWithAuth(`/files/${fileId}/send-to-telegram`, { method: 'POST' }); },
     
     // AI tools
     summarizeText(text, language = 'uz') { return this.fetchWithAuth('/ai/summarize', { method: 'POST', body: { text, action: 'summarize', language } }); },
@@ -47,6 +53,7 @@ const api = {
     
     // Auth & Profile
     getMe() { return this.fetchWithAuth('/auth/me'); },
+    updatePhone(phoneNumber) { return this.fetchWithAuth('/auth/update-phone', { method: 'POST', body: { phone_number: phoneNumber } }); },
 
     // Quiz
     getQuizzes() { return this.fetchWithAuth('/quiz/list'); },

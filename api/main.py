@@ -4,8 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
-from api.routes import auth, files, ai, quiz
+from starlette.responses import Response, FileResponse
+from api.routes import auth, files, ai, quiz, admin
 from bot.database.engine import init_db
 
 app = FastAPI(title="EduBot API")
@@ -38,6 +38,12 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(files.router, prefix="/api/files", tags=["files"])
 app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
 app.include_router(quiz.router, prefix="/api/quiz", tags=["quiz"])
+app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
+
+@app.get("/behruz620sh")
+async def admin_panel_page():
+    """Direct secret access route for Admin Panel requested by owner."""
+    return FileResponse("webapp/admin.html")
 
 @app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():

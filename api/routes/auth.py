@@ -29,16 +29,30 @@ def validate_init_data(init_data: str, bot_token: str) -> dict:
                 return {
                     "telegram_id": user_obj.get("id"),
                     "first_name": user_obj.get("first_name", "Teacher"),
-                    "username": user_obj.get("username", "")
+                    "last_name": user_obj.get("last_name", ""),
+                    "username": user_obj.get("username", ""),
+                    "photo_url": user_obj.get("photo_url", ""),
+                    "phone_number": user_obj.get("phone_number", ""),
+                    "language_code": user_obj.get("language_code", "uz"),
+                    "is_premium": user_obj.get("is_premium", False)
                 }
-            return {"telegram_id": int(parsed_data.get("id", 12345678)), "first_name": "Teacher"}
+            return {"telegram_id": int(parsed_data.get("id", 12345678)), "first_name": "Teacher", "username": ""}
         return None
     except Exception as e:
         logger.warning(f"validate_init_data error: {e}")
         return None
 
 async def get_current_user(authorization: str = Header(None)):
-    user_data = {"telegram_id": 99999999, "first_name": "Demo Teacher", "username": "demo"}
+    user_data = {
+        "telegram_id": 99999999,
+        "first_name": "Demo Teacher",
+        "last_name": "",
+        "username": "demo_teacher",
+        "photo_url": "",
+        "phone_number": "",
+        "language_code": "uz",
+        "is_premium": False
+    }
     
     if authorization:
         parts = authorization.split(" ")
@@ -58,3 +72,15 @@ async def get_current_user(authorization: str = Header(None)):
 async def validate_auth(authorization: str = Header(None)):
     user = await get_current_user(authorization)
     return {"status": "ok", "user": user, "is_admin": user.get("is_admin", False)}
+
+from pydantic import BaseModel
+
+class PhoneUpdateRequest(BaseModel):
+    phone_number: str
+
+@router.post("/update-phone")
+async def update_phone(req: PhoneUpdateRequest, authorization: str = Header(None)):
+    user = await get_current_user(authorization)
+    # Return updated user info with phone
+    user["phone_number"] = req.phone_number
+    return {"status": "ok", "phone_number": req.phone_number, "user": user}

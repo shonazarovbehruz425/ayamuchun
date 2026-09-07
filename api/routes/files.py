@@ -16,6 +16,8 @@ from bot.config import get_settings
 from bot.processors import get_processor
 from bot.processors.converter import FileConverter
 from bot.processors.word_processor import WordProcessor
+from bot.processors.pdf_processor import PDFProcessor
+from bot.processors.image_processor import ImageProcessor
 from bot.utils.helpers import sanitize_filename, generate_unique_filename
 
 logger = logging.getLogger(__name__)
@@ -23,7 +25,32 @@ router = APIRouter()
 settings = get_settings()
 converter = FileConverter()
 word_processor = WordProcessor()
+pdf_processor = PDFProcessor()
+image_processor = ImageProcessor()
 
+
+def format_file_size_human(size_bytes: int) -> str:
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size_bytes < 1024.0:
+            return f"{size_bytes:.1f} {unit}"
+        size_bytes /= 1024.0
+    return f"{size_bytes:.1f} GB"
+
+def build_file_caption(file_name: str, tool_name: str, details: list = None, file_size: int = None) -> str:
+    """Yuborilayotgan hujjat tagiga tushunarli, chiroyli va aniq ma'lumotli caption yasash."""
+    now_str = datetime.now().strftime("%d.%m.%Y, %H:%M")
+    lines = [
+        f"🎯 <b>{tool_name}</b>",
+        f"📄 <b>Fayl:</b> <code>{file_name}</code>"
+    ]
+    if file_size and file_size > 0:
+        lines.append(f"📦 <b>Hajmi:</b> {format_file_size_human(file_size)}")
+    if details:
+        for d in details:
+            lines.append(f"ℹ️ {d}")
+    lines.append(f"⏰ <b>Vaqt:</b> {now_str}")
+    lines.append("🤖 <i>EduBot Pro orqali tayyorlandi</i>")
+    return "\n".join(lines)
 
 async def send_file_to_telegram(telegram_id: int, file_path: str, caption: str = ""):
     """Tayyor bo'lgan faylni foydalanuvchining Telegram chatiga to'g'ridan-to'g'ri yuborish."""
@@ -35,7 +62,7 @@ async def send_file_to_telegram(telegram_id: int, file_path: str, caption: str =
         async with httpx.AsyncClient(timeout=60.0) as client:
             with open(file_path, "rb") as f:
                 files = {"document": (os.path.basename(file_path), f)}
-                data = {"chat_id": telegram_id, "caption": caption}
+                data = {"chat_id": telegram_id, "caption": caption, "parse_mode": "HTML"}
                 await client.post(url, data=data, files=files)
     except Exception as e:
         logger.warning(f"Telegramga fayl yuborishda xatolik: {e}")
@@ -139,12 +166,16 @@ async def convert_file(
                 file_size=os.path.getsize(out_path)
             )
 
-            # Auto-send to Telegram chat
-            await send_file_to_telegram(
-                user["telegram_id"],
-                out_path,
-                f"✅ {os.path.basename(out_path)} faylingiz tayyor bo'ldi!"
+            # Auto-send to Telegram chat with rich caption
+            tool_title = "Word ➔ PDF Konvertatsiyasi" if new_ext == "pdf" else "PDF ➔ Word (DOCX) Konvertatsiyasi"
+            extra_info = ["Asl matn, shrift va jadvallar to'liq saqlab qolindi"]
+            caption = build_file_caption(
+                file_name=new_record.file_name,
+                tool_name=tool_title,
+                details=extra_info,
+                file_size=os.path.getsize(out_path)
             )
+            await send_file_to_telegram(user["telegram_id"], out_path, caption)
 
             return {
                 "message": "Konvertatsiya muvaffaqiyatli yakunlandi",
@@ -751,11 +782,13 @@ async def save_file_html(
                 file_size=os.path.getsize(result["docx_path"]),
                 upsert=True
             )
-            await send_file_to_telegram(
-                user["telegram_id"],
-                result["docx_path"],
-                f"📝 {result['docx_name']} tahrirlangan Word hujjatingiz tayyor bo'ldi!"
+            docx_caption = build_file_caption(
+                file_name=result["docx_name"],
+                tool_name="Tahrirlangan Word Hujjati",
+                details=["Kiritilgan o'zgarishlar bilan saqlangan Word (DOCX) formati"],
+                file_size=os.path.getsize(result["docx_path"])
             )
+            await send_file_to_telegram(user["telegram_id"], result["docx_path"], docx_caption)
 
         if result.get("pdf_path") and os.path.exists(result["pdf_path"]):
             pdf_rec = await crud.save_file_record(
@@ -768,11 +801,13 @@ async def save_file_html(
                 file_size=os.path.getsize(result["pdf_path"]),
                 upsert=True
             )
-            await send_file_to_telegram(
-                user["telegram_id"],
-                result["pdf_path"],
-                f"📕 {result['pdf_name']} tahrirlangan PDF hujjatingiz tayyor bo'ldi!"
+            pdf_caption = build_file_caption(
+                file_name=result["pdf_name"],
+                tool_name="Tahrirlangan PDF Hujjati",
+                details=["Kiritilgan o'zgarishlar bilan saqlangan A4 PDF formati"],
+                file_size=os.path.getsize(result["pdf_path"])
             )
+            await send_file_to_telegram(user["telegram_id"], result["pdf_path"], pdf_caption)
 
         primary_rec = docx_rec if format_type == "docx" else (pdf_rec if format_type == "pdf" else (docx_rec or pdf_rec))
 
@@ -909,11 +944,13 @@ async def images_to_pdf(
             )
 
             # Auto-send to Telegram chat
-            await send_file_to_telegram(
-                user["telegram_id"],
-                out_path,
-                f"🖼️ {len(processed_pages)} ta rasmdan tayyorlangan PDF: {clean_title}"
+            img_caption = build_file_caption(
+                file_name=clean_title,
+                tool_name="Rasmlardan Yaratilgan PDF",
+                details=[f"Sahifalar soni: {len(processed_pages)} ta", f"Varaq o'lchami: {page_size.upper()}"],
+                file_size=os.path.getsize(out_path)
             )
+            await send_file_to_telegram(user["telegram_id"], out_path, img_caption)
 
             return {"status": "ok", "new_file_id": record.id, "new_file_name": clean_title}
     except Exception as e:
@@ -976,10 +1013,515 @@ async def extract_images_from_pdf(
         )
 
         # Auto-send to Telegram chat
-        await send_file_to_telegram(
-            user["telegram_id"],
-            zip_path,
-            f"🖼️ PDF dan ajratilgan {img_count} ta fotosurat arxivi (ZIP)!"
+        zip_caption = build_file_caption(
+            file_name=zip_name,
+            tool_name="PDF Rasmlari Arxivi",
+            details=[f"Ajratib olingan rasmlar: {img_count} ta", "Asl sifatdagi ZIP arxiv"],
+            file_size=os.path.getsize(zip_path)
         )
+        await send_file_to_telegram(user["telegram_id"], zip_path, zip_caption)
 
         return {"status": "ok", "new_file_id": record.id, "new_file_name": zip_name, "images_count": img_count}
+
+
+# ── New PDF Power Tools: Merge, Split, Compress, Watermark ───────────────────
+
+@router.post("/merge-pdfs")
+async def merge_pdfs_endpoint(
+    files: List[UploadFile] = File(...),
+    user: dict = Depends(get_current_user)
+):
+    """Bir nechta PDF fayllarni bitta hujjatga birlashtirish."""
+    if not files or len(files) < 2:
+        raise HTTPException(status_code=400, detail="Kamida 2 ta PDF fayl tanlanishi shart")
+
+    temp_paths = []
+    try:
+        timestamp = int(datetime.now().timestamp())
+        for idx, file in enumerate(files):
+            ext = os.path.splitext(file.filename)[1].lower()
+            if ext != '.pdf':
+                raise HTTPException(status_code=400, detail=f"'{file.filename}' PDF formatida emas")
+            t_path = os.path.join(settings.upload_dir, f"merge_in_{timestamp}_{idx}.pdf")
+            content = await file.read()
+            with open(t_path, "wb") as f:
+                f.write(content)
+            temp_paths.append(t_path)
+
+        out_name = f"birlashtirilgan_hujjat_{timestamp}.pdf"
+        out_path = os.path.join(settings.processed_dir, out_name)
+        await pdf_processor.merge_pdfs(temp_paths, out_path)
+
+        async with get_session() as session:
+            db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
+            record = await crud.save_file_record(
+                session=session,
+                user_id=db_user.id,
+                file_name=out_name,
+                file_type="pdf",
+                telegram_file_id="",
+                local_path=out_path,
+                file_size=os.path.getsize(out_path)
+            )
+
+        if user.get("telegram_id"):
+            try:
+                m_caption = build_file_caption(
+                    file_name=out_name,
+                    tool_name="Birlashtirilgan PDF Hujjati",
+                    details=[f"Birlashtirilgan fayllar soni: {len(files)} ta"],
+                    file_size=os.path.getsize(out_path)
+                )
+                await send_file_to_telegram(telegram_id=user["telegram_id"], file_path=out_path, caption=m_caption)
+            except Exception:
+                pass
+
+        return {
+            "success": True,
+            "file_id": record.id,
+            "file_name": out_name,
+            "download_url": f"/api/files/{record.id}/download",
+            "merged_count": len(files)
+        }
+    finally:
+        for p in temp_paths:
+            if os.path.exists(p):
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
+
+
+@router.post("/split-pdf")
+async def split_pdf_endpoint(
+    file: UploadFile = File(None),
+    file_id: int = Form(None),
+    split_mode: str = Form("range"),
+    page_range: str = Form("1"),
+    user: dict = Depends(get_current_user)
+):
+    """PDF'ni alohida sahifalarga yoki qismlarga ajratish."""
+    src_path = None
+    is_temp = False
+    timestamp = int(datetime.now().timestamp())
+
+    try:
+        async with get_session() as session:
+            db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
+            if file and file.filename:
+                src_path = os.path.join(settings.upload_dir, f"split_in_{timestamp}.pdf")
+                content = await file.read()
+                with open(src_path, "wb") as f:
+                    f.write(content)
+                is_temp = True
+            elif file_id:
+                files = await crud.get_user_files(session, db_user.id)
+                target = next((f for f in files if f.id == file_id), None)
+                if not target or not os.path.exists(target.local_path):
+                    raise HTTPException(status_code=404, detail="Fayl topilmadi")
+                src_path = target.local_path
+            else:
+                raise HTTPException(status_code=400, detail="PDF fayl yuklanishi kerak")
+
+            split_res = await pdf_processor.split_pdf_advanced(
+                file_path=src_path,
+                output_dir=settings.processed_dir,
+                split_mode=split_mode,
+                page_range_str=page_range
+            )
+
+            out_path = split_res["file_path"]
+            out_name = split_res["file_name"]
+            f_type = "zip" if split_res["is_zip"] else "pdf"
+
+            record = await crud.save_file_record(
+                session=session,
+                user_id=db_user.id,
+                file_name=out_name,
+                file_type=f_type,
+                telegram_file_id="",
+                local_path=out_path,
+                file_size=os.path.getsize(out_path)
+            )
+
+            if user.get("telegram_id"):
+                try:
+                    if split_res["is_zip"]:
+                        s_caption = build_file_caption(
+                            file_name=out_name,
+                            tool_name="PDF Sahifalari (Alohida ZIP)",
+                            details=[f"Jami sahifalar: {split_res['total_pages']} ta", f"Arxivlangan fayllar: {split_res['extracted_count']} ta"],
+                            file_size=os.path.getsize(out_path)
+                        )
+                    else:
+                        s_caption = build_file_caption(
+                            file_name=out_name,
+                            tool_name="PDF Ajratilgan Qismi",
+                            details=[f"Ajratilgan sahifalar: {page_range}", f"Sahifalar soni: {split_res['extracted_count']} ta"],
+                            file_size=os.path.getsize(out_path)
+                        )
+                    await send_file_to_telegram(user["telegram_id"], out_path, caption=s_caption)
+                except Exception:
+                    pass
+
+            return {
+                "success": True,
+                "file_id": record.id,
+                "file_name": out_name,
+                "download_url": f"/api/files/{record.id}/download",
+                "is_zip": split_res["is_zip"],
+                "total_pages": split_res["total_pages"],
+                "extracted_count": split_res["extracted_count"]
+            }
+    finally:
+        if is_temp and src_path and os.path.exists(src_path):
+            try:
+                os.remove(src_path)
+            except Exception:
+                pass
+
+
+@router.post("/compress-pdf")
+async def compress_pdf_endpoint(
+    file: UploadFile = File(None),
+    file_id: int = Form(None),
+    quality_level: str = Form("medium"),
+    user: dict = Depends(get_current_user)
+):
+    """PDF hajmini siqib, 50-80% gacha kamaytirish."""
+    src_path = None
+    is_temp = False
+    timestamp = int(datetime.now().timestamp())
+
+    try:
+        async with get_session() as session:
+            db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
+            orig_name = "document.pdf"
+            if file and file.filename:
+                orig_name = file.filename
+                src_path = os.path.join(settings.upload_dir, f"compress_in_{timestamp}.pdf")
+                content = await file.read()
+                with open(src_path, "wb") as f:
+                    f.write(content)
+                is_temp = True
+            elif file_id:
+                files = await crud.get_user_files(session, db_user.id)
+                target = next((f for f in files if f.id == file_id), None)
+                if not target or not os.path.exists(target.local_path):
+                    raise HTTPException(status_code=404, detail="Fayl topilmadi")
+                src_path = target.local_path
+                orig_name = target.file_name
+            else:
+                raise HTTPException(status_code=400, detail="PDF fayl yuklanishi kerak")
+
+            base = os.path.splitext(orig_name)[0]
+            clean_base = re.sub(r'(_siqilgan.*|_tahrirlangan.*)', '', base)
+            out_name = f"{clean_base}_siqilgan_{timestamp}.pdf"
+            out_path = os.path.join(settings.processed_dir, out_name)
+
+            stats = await pdf_processor.compress_pdf(
+                file_path=src_path,
+                output_path=out_path,
+                quality_level=quality_level
+            )
+
+            record = await crud.save_file_record(
+                session=session,
+                user_id=db_user.id,
+                file_name=out_name,
+                file_type="pdf",
+                telegram_file_id="",
+                local_path=out_path,
+                file_size=os.path.getsize(out_path)
+            )
+
+            if user.get("telegram_id"):
+                try:
+                    init_str = format_file_size_human(stats["initial_size"])
+                    fin_str = format_file_size_human(stats["final_size"])
+                    c_caption = build_file_caption(
+                        file_name=out_name,
+                        tool_name="Siqilgan PDF Hujjati",
+                        details=[
+                            f"Oldingi hajm: {init_str}",
+                            f"Yangi hajm: {fin_str}",
+                            f"Tejalgan joy: {stats['saved_percent']}%"
+                        ],
+                        file_size=stats["final_size"]
+                    )
+                    await send_file_to_telegram(user["telegram_id"], out_path, caption=c_caption)
+                except Exception:
+                    pass
+
+            return {
+                "success": True,
+                "file_id": record.id,
+                "file_name": out_name,
+                "download_url": f"/api/files/{record.id}/download",
+                "initial_size": stats["initial_size"],
+                "final_size": stats["final_size"],
+                "saved_percent": stats["saved_percent"]
+            }
+    finally:
+        if is_temp and src_path and os.path.exists(src_path):
+            try:
+                os.remove(src_path)
+            except Exception:
+                pass
+
+
+@router.post("/watermark-pdf")
+async def watermark_pdf_endpoint(
+    file: UploadFile = File(None),
+    file_id: int = Form(None),
+    mode: str = Form("text"),
+    text: str = Form("EduBot"),
+    font_size: int = Form(36),
+    opacity: float = Form(0.35),
+    angle: int = Form(45),
+    color: str = Form("#6366f1"),
+    logo: UploadFile = File(None),
+    user: dict = Depends(get_current_user)
+):
+    """PDF sahifalariga matn yoki logo watermark qo'yish."""
+    src_path = None
+    is_temp = False
+    temp_logo_path = None
+    timestamp = int(datetime.now().timestamp())
+
+    try:
+        async with get_session() as session:
+            db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
+            orig_name = "document.pdf"
+            if file and file.filename:
+                orig_name = file.filename
+                src_path = os.path.join(settings.upload_dir, f"wm_in_{timestamp}.pdf")
+                content = await file.read()
+                with open(src_path, "wb") as f:
+                    f.write(content)
+                is_temp = True
+            elif file_id:
+                files = await crud.get_user_files(session, db_user.id)
+                target = next((f for f in files if f.id == file_id), None)
+                if not target or not os.path.exists(target.local_path):
+                    raise HTTPException(status_code=404, detail="Fayl topilmadi")
+                src_path = target.local_path
+                orig_name = target.file_name
+            else:
+                raise HTTPException(status_code=400, detail="PDF fayl yuklanishi kerak")
+
+            if mode == "image" and logo and logo.filename:
+                logo_ext = os.path.splitext(logo.filename)[1].lower()
+                temp_logo_path = os.path.join(settings.upload_dir, f"logo_{timestamp}{logo_ext}")
+                logo_bytes = await logo.read()
+                with open(temp_logo_path, "wb") as f:
+                    f.write(logo_bytes)
+
+            base = os.path.splitext(orig_name)[0]
+            clean_base = re.sub(r'(_watermark.*|_tahrirlangan.*)', '', base)
+            out_name = f"{clean_base}_watermark_{timestamp}.pdf"
+            out_path = os.path.join(settings.processed_dir, out_name)
+
+            await pdf_processor.watermark_pdf(
+                file_path=src_path,
+                output_path=out_path,
+                mode=mode,
+                text=text or "EduBot",
+                font_size=int(font_size),
+                opacity=float(opacity),
+                angle=int(angle),
+                color_hex=color or "#6366f1",
+                logo_path=temp_logo_path
+            )
+
+            record = await crud.save_file_record(
+                session=session,
+                user_id=db_user.id,
+                file_name=out_name,
+                file_type="pdf",
+                telegram_file_id="",
+                local_path=out_path,
+                file_size=os.path.getsize(out_path)
+            )
+
+            if user.get("telegram_id"):
+                try:
+                    wm_info = f"Matn: '{text}'" if mode == "text" else "Shaxsiy logotip"
+                    wm_caption = build_file_caption(
+                        file_name=out_name,
+                        tool_name="Suv Belgisi (Watermark) Qo'yilgan PDF",
+                        details=[f"Belgi turi: {wm_info}", f"Shaffoflik: {int(float(opacity)*100)}%"],
+                        file_size=os.path.getsize(out_path)
+                    )
+                    await send_file_to_telegram(telegram_id=user["telegram_id"], file_path=out_path, caption=wm_caption)
+                except Exception:
+                    pass
+
+            return {
+                "success": True,
+                "file_id": record.id,
+                "file_name": out_name,
+                "download_url": f"/api/files/{record.id}/download"
+            }
+    finally:
+        if is_temp and src_path and os.path.exists(src_path):
+            try:
+                os.remove(src_path)
+            except Exception:
+                pass
+        if temp_logo_path and os.path.exists(temp_logo_path):
+            try:
+                os.remove(temp_logo_path)
+            except Exception:
+                pass
+
+
+@router.post("/photo-3x4")
+async def create_photo_3x4_endpoint(
+    file: UploadFile = File(None),
+    file_id: int = Form(None),
+    bg_color: str = Form("#FFFFFF"),
+    change_bg: str = Form("false"),
+    add_corner: str = Form("false"),
+    brightness: float = Form(1.0),
+    contrast: float = Form(1.0),
+    user: dict = Depends(get_current_user)
+):
+    """Pasport, viza, haydovchilik guvohnomasi uchun 3x4 sm rasm va 10x15 sm 6 talik varaq yaratish."""
+    src_path = None
+    is_temp = False
+    timestamp = int(datetime.now().timestamp())
+
+    try:
+        async with get_session() as session:
+            db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
+            orig_name = "photo.jpg"
+
+            if file and file.filename:
+                orig_name = file.filename
+                ext = os.path.splitext(orig_name)[1].lower() or ".jpg"
+                src_path = os.path.join(settings.upload_dir, f"photo3x4_in_{timestamp}{ext}")
+                content_bytes = await file.read()
+                with open(src_path, "wb") as f:
+                    f.write(content_bytes)
+                is_temp = True
+            elif file_id:
+                files = await crud.get_user_files(session, db_user.id)
+                target = next((f for f in files if f.id == file_id), None)
+                if not target or not os.path.exists(target.local_path):
+                    raise HTTPException(status_code=404, detail="Fayl topilmadi")
+                src_path = target.local_path
+                orig_name = target.file_name
+            else:
+                raise HTTPException(status_code=400, detail="Surat fayli yuklanishi kerak")
+
+            base = os.path.splitext(orig_name)[0]
+            clean_base = re.sub(r'(_3x4.*|_sheet.*)', '', base)
+
+            single_name = f"{clean_base}_foto_3x4_{timestamp}.jpg"
+            sheet_name = f"{clean_base}_foto_3x4_varaq_{timestamp}.jpg"
+
+            single_path = os.path.join(settings.processed_dir, single_name)
+            sheet_path = os.path.join(settings.processed_dir, sheet_name)
+
+            should_change_bg = change_bg.lower() in ("true", "1", "yes")
+            should_add_corner = add_corner.lower() in ("true", "1", "yes")
+
+            stats = await image_processor.process_photo_3x4(
+                input_path=src_path,
+                output_single_path=single_path,
+                output_sheet_path=sheet_path,
+                bg_color_hex=bg_color or "#FFFFFF",
+                change_bg=should_change_bg,
+                add_corner=should_add_corner,
+                brightness=float(brightness),
+                contrast=float(contrast),
+                dpi=300
+            )
+
+            # Save both records in DB
+            single_rec = await crud.save_file_record(
+                session=session,
+                user_id=db_user.id,
+                file_name=single_name,
+                file_type="jpg",
+                telegram_file_id="",
+                local_path=single_path,
+                file_size=os.path.getsize(single_path)
+            )
+
+            sheet_rec = await crud.save_file_record(
+                session=session,
+                user_id=db_user.id,
+                file_name=sheet_name,
+                file_type="jpg",
+                telegram_file_id="",
+                local_path=sheet_path,
+                file_size=os.path.getsize(sheet_path)
+            )
+
+            # Send both to Telegram chat
+            if user.get("telegram_id"):
+                try:
+                    single_caption = build_file_caption(
+                        file_name=single_name,
+                        tool_name="Hujjat Foto (3×4 cm)",
+                        details=["Standart 30×40 mm (300 DPI bosma sifat)", "Pasport, viza, talaba hujjatlari uchun"],
+                        file_size=os.path.getsize(single_path)
+                    )
+                    await send_file_to_telegram(telegram_id=user["telegram_id"], file_path=single_path, caption=single_caption)
+
+                    sheet_caption = build_file_caption(
+                        file_name=sheet_name,
+                        tool_name="10×15 sm Chop Etish Varaqasi",
+                        details=["6 ta 3×4 fotosurat", "Qaychi bilan to'g'ri kesish chiziqlari bilan"],
+                        file_size=os.path.getsize(sheet_path)
+                    )
+                    await send_file_to_telegram(telegram_id=user["telegram_id"], file_path=sheet_path, caption=sheet_caption)
+                except Exception as tg_err:
+                    logger.warning(f"Telegram photo 3x4 send error: {tg_err}")
+
+            return {
+                "success": True,
+                "single_file_id": single_rec.id,
+                "single_file_name": single_name,
+                "single_download_url": f"/api/files/{single_rec.id}/download",
+                "sheet_file_id": sheet_rec.id,
+                "sheet_file_name": sheet_name,
+                "sheet_download_url": f"/api/files/{sheet_rec.id}/download",
+                "dimensions": "30x40 mm (354x472 px)",
+                "sheet_info": "10x15 cm (6 ta foto)"
+            }
+    finally:
+        if is_temp and src_path and os.path.exists(src_path):
+            try:
+                os.remove(src_path)
+            except Exception:
+                pass
+
+
+@router.post("/{file_id}/send-to-telegram")
+async def resend_file_to_telegram_endpoint(
+    file_id: int,
+    user: dict = Depends(get_current_user)
+):
+    """Mavjud faylni foydalanuvchining Telegram chatiga qayta yuborish."""
+    tg_id = user.get("telegram_id")
+    if not tg_id:
+        raise HTTPException(status_code=400, detail="Telegram ID aniqlanmadi")
+
+    async with get_session() as session:
+        db_user = await crud.get_or_create_user(session, tg_id, user.get("first_name", "Teacher"))
+        files = await crud.get_user_files(session, db_user.id)
+        target = next((f for f in files if f.id == file_id), None)
+        if not target or not os.path.exists(target.local_path):
+            raise HTTPException(status_code=404, detail="Fayl topilmadi")
+
+        caption = build_file_caption(
+            file_name=target.file_name,
+            tool_name="EduBot Hujjati",
+            details=["Mening tayyor fayllarim ro'yxatidan yuborildi"],
+            file_size=target.file_size
+        )
+        await send_file_to_telegram(tg_id, target.local_path, caption)
+        return {"success": True, "message": "Fayl Telegram chatiga yuborildi!"}

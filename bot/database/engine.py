@@ -24,3 +24,24 @@ async def get_session():
 async def init_db():
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        
+        def migrate_users(sync_conn):
+            try:
+                cursor = sync_conn.connection.cursor()
+                cursor.execute("PRAGMA table_info(users)")
+                cols = [row[1] for row in cursor.fetchall()]
+                if 'phone_number' not in cols:
+                    try:
+                        cursor.execute("ALTER TABLE users ADD COLUMN phone_number VARCHAR")
+                    except Exception:
+                        pass
+                if 'photo_url' not in cols:
+                    try:
+                        cursor.execute("ALTER TABLE users ADD COLUMN photo_url VARCHAR")
+                    except Exception:
+                        pass
+                cursor.close()
+            except Exception:
+                pass
+
+        await conn.run_sync(migrate_users)

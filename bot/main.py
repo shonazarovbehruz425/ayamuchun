@@ -262,7 +262,6 @@ def build_application():
     # ── Command handlers ───────────────────────────────────────────────
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("backup", manual_backup_command))
     application.add_handler(CommandHandler(["ai", "chat", "test", "quiz", "konspekt", "dars", "tarjima", "xulosa"], handle_smart_chat_message))
 
     # ── AI conversation handler ────────────────────────────────────────

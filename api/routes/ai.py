@@ -2,6 +2,7 @@ import os
 import re
 import time
 import logging
+from typing import List, Optional, Dict, Any
 import docx
 import httpx
 from fastapi import APIRouter, Depends, HTTPException

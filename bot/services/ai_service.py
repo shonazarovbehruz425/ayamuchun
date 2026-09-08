@@ -449,9 +449,12 @@ class AIService:
         }
 
         max_retries = 3
+        timeout_config = httpx.Timeout(60.0, connect=10.0)
+        logger.info(f"Connecting to OpenAI-compatible endpoint: {url} | Model: {payload['model']}")
+
         for attempt in range(max_retries):
             try:
-                async with httpx.AsyncClient(timeout=120.0) as client:
+                async with httpx.AsyncClient(timeout=timeout_config) as client:
                     res = await client.post(url, headers=headers, json=payload)
                     if res.status_code == 200:
                         data = res.json()
@@ -516,9 +519,15 @@ class AIService:
                             pass
                         err_msg = err_msg or f"Xatolik kodi: {res.status_code}"
                         raise RuntimeError(f"AI provayder xatosi: {err_msg}")
+            except httpx.ConnectTimeout:
+                logger.error(f"OpenAI-compatible connection timeout to {url}")
+                raise RuntimeError(f"AI serveriga ulanib bo'lmadi ({url}). Server manzili noto'g'ri yoki ulanish bloklangan.")
+            except httpx.ReadTimeout:
+                logger.error(f"OpenAI-compatible read timeout from {url}")
+                raise RuntimeError(f"AI server ({url}) javob qaytarishda kechikdi (read timeout). Model serveri band bo'lishi mumkin.")
             except httpx.TimeoutException:
-                logger.error("OpenAI-compatible timeout")
-                raise RuntimeError("AI xizmati javob berish vaqti tugadi (timeout).")
+                logger.error(f"OpenAI-compatible timeout to {url}")
+                raise RuntimeError(f"AI xizmati javob berish vaqti tugadi ({url}).")
             except RuntimeError:
                 raise
             except Exception as e:

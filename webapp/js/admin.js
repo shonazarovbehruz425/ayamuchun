@@ -493,10 +493,10 @@ const AdminApp = {
                     badge.innerText = `${(cur.provider || 'gemini').toUpperCase()} (${cur.model || 'standart'})`;
                 }
                 this.aiPresets = {
-                    'nemotron': { provider: 'openrouter', model: 'nvidia/nemotron-3.5-lightning:free' },
-                    'deepseek': { provider: 'openrouter', model: 'deepseek/deepseek-chat:free' },
-                    'gemini-2': { provider: 'gemini', model: 'gemini-2.0-flash' },
-                    'gpt4o': { provider: 'openai', model: 'gpt-4o-mini' }
+                    'nemotron': { provider: 'openrouter', model: 'nvidia/nemotron-3.5-lightning:free', base_url: 'https://openrouter.ai/api/v1' },
+                    'deepseek': { provider: 'openrouter', model: 'deepseek/deepseek-chat:free', base_url: 'https://openrouter.ai/api/v1' },
+                    'gemini-2': { provider: 'gemini', model: 'gemini-2.0-flash', base_url: '' },
+                    'gpt4o': { provider: 'openai', model: 'gpt-4o-mini', base_url: 'https://api.openai.com/v1' }
                 };
             }
         } catch (e) {
@@ -507,15 +507,18 @@ const AdminApp = {
     applyAiPreset(presetKey) {
         const provInput = document.getElementById('ai-override-provider');
         const modelInput = document.getElementById('ai-override-model');
+        const baseUrlInput = document.getElementById('ai-override-base-url');
         if (presetKey === 'default') {
             if (provInput) provInput.value = '';
             if (modelInput) modelInput.value = '';
+            if (baseUrlInput) baseUrlInput.value = '';
             return;
         }
-        const preset = this.aiPresets[presetKey];
+        const preset = this.aiPresets ? this.aiPresets[presetKey] : null;
         if (preset) {
-            if (provInput) provInput.value = preset.provider;
-            if (modelInput) modelInput.value = preset.model;
+            if (provInput) provInput.value = preset.provider || '';
+            if (modelInput) modelInput.value = preset.model || '';
+            if (baseUrlInput) baseUrlInput.value = preset.base_url || '';
         }
     },
 
@@ -555,6 +558,7 @@ const AdminApp = {
         const systemInput = document.getElementById('ai-test-system');
         const provInput = document.getElementById('ai-override-provider');
         const modelInput = document.getElementById('ai-override-model');
+        const baseUrlInput = document.getElementById('ai-override-base-url');
         const keyInput = document.getElementById('ai-override-key');
         const sendBtn = document.getElementById('ai-test-send-btn');
         const responseBox = document.getElementById('ai-response-container');
@@ -595,6 +599,7 @@ const AdminApp = {
             system_instruction: systemInput?.value?.trim() || null,
             provider: provInput?.value?.trim() || null,
             model: modelInput?.value?.trim() || null,
+            base_url: baseUrlInput?.value?.trim() || null,
             api_key: keyInput?.value?.trim() || null
         };
 

@@ -13,6 +13,7 @@ from telegram.ext import ContextTypes
 from bot.config import get_settings
 from bot.processors.image_processor import ImageProcessor
 from bot.utils.helpers import format_file_size
+from bot.utils.animator import TelegramAiLoadingAnimation, VISION_STAGES
 
 logger = logging.getLogger(__name__)
 config = get_settings()
@@ -406,7 +407,14 @@ async def handle_photo_callback(update: Update, context: ContextTypes.DEFAULT_TY
             return
 
         elif any(k in user_wish for k in ["matn", "ocr", "yozuv", "oqish", "o'qish", "tahlil"]):
-            status_msg = await query.message.reply_text("🤖 <i>AI rasmdagi matn va mazmunni tahlil qilmoqda...</i>", parse_mode="HTML")
+            animator = await TelegramAiLoadingAnimation.create_and_start(
+                reply_target=query.message,
+                bot=context.bot,
+                chat_id=query.message.chat_id,
+                title="EduBot Vision AI",
+                initial_desc=f"{count} ta fotosurat tahlil qilinmoqda..." if count > 1 else "Fotosurat tahlil qilinmoqda...",
+                stages=VISION_STAGES
+            )
             try:
                 from bot.services.ai_service import get_ai_service
                 ai_srv = get_ai_service()
@@ -422,9 +430,16 @@ async def handle_photo_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     }
                 ]
                 reply = await ai_srv.generate_chat(ai_prompt)
-                await status_msg.edit_text(f"📝 <b>AI Tahlili Natijasi:</b>\n\n{reply}", parse_mode="HTML")
+                await animator.finish(
+                    final_text=f"📝 <b>AI Tahlili Natijasi:</b>\n\n{reply}",
+                    update_message=query.message
+                )
             except Exception as err:
-                await status_msg.edit_text(f"❌ Tahlilda xatolik: {err}")
+                await animator.stop()
+                try:
+                    await animator.message.edit_text(f"❌ Tahlilda xatolik: {err}")
+                except Exception:
+                    await query.message.reply_text(f"❌ Tahlilda xatolik: {err}")
             return
 
         else:

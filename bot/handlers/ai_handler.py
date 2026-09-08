@@ -19,6 +19,7 @@ from bot.database import crud
 logger = logging.getLogger(__name__)
 
 from bot.services.ai_service import get_ai_service
+from bot.utils.animator import TelegramAiLoadingAnimation, VISION_STAGES
 
 
 # Conversation states
@@ -503,9 +504,14 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
             return
 
         elif is_ocr and not is_greeting:
-            status_msg = await update.message.reply_text(
-                f"🤖 <i>AI {count} ta rasmdagi matnni o'qimoqda...</i>" if count > 1 else "🤖 <i>AI rasmdagi matnni o'qimoqda...</i>",
-                parse_mode="HTML"
+            ai_title = getattr(ai_service, "display_name", "EduBot AI") or "EduBot AI"
+            animator = await TelegramAiLoadingAnimation.create_and_start(
+                reply_target=update.message,
+                bot=context.bot,
+                chat_id=update.effective_chat.id,
+                title=f"{ai_title} Vision",
+                initial_desc=f"{count} ta rasmdagi matn o'qilmoqda..." if count > 1 else "Rasmdagi matn o'qilmoqda...",
+                stages=VISION_STAGES
             )
             try:
                 from bot.services.ai_service import get_ai_service
@@ -521,10 +527,17 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
                     }
                 ]
                 reply = await ai_srv.generate_chat(ai_prompt)
-                await status_msg.edit_text(f"📝 <b>Rasmdan olingan matn (OCR):</b>\n\n{reply}", parse_mode="HTML")
+                await animator.finish(
+                    final_text=f"📝 <b>Rasmdan olingan matn (OCR):</b>\n\n{reply}",
+                    update_message=update.message
+                )
                 return
             except Exception as err:
-                await status_msg.edit_text(f"❌ Matnni olishda xatolik: {err}")
+                await animator.stop()
+                try:
+                    await animator.message.edit_text(f"❌ Matnni olishda xatolik: {err}")
+                except Exception:
+                    await update.message.reply_text(f"❌ Matnni olishda xatolik: {err}")
                 return
 
         elif is_bg and not is_greeting:
@@ -603,7 +616,14 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
         await update.message.reply_text(msg, parse_mode="HTML")
         return
 
-    status_msg = await update.message.reply_text("⏳ <i>AI javob tayyorlamoqda...</i>", parse_mode="HTML")
+    ai_title = getattr(ai_service, "display_name", "EduBot AI") or "EduBot AI"
+    animator = await TelegramAiLoadingAnimation.create_and_start(
+        reply_target=update.message,
+        bot=context.bot,
+        chat_id=update.effective_chat.id,
+        title=ai_title,
+        initial_desc="Fikrlash boshlandi..."
+    )
 
     try:
         # Multi-turn conversational memory: restore from DB if RAM is empty
@@ -684,38 +704,15 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
         if has_doc_intent or (len(ai_reply) > 750 and any(h in ai_reply for h in ("Dars rejasi", "Test savollari", "Variant A", "Mavzu:", "Reja:"))):
             keyboard = build_ai_suggestions_keyboard(topic=clean_prompt[:30])
 
-        try:
-            await status_msg.delete()
-        except Exception:
-            pass
-
-        # Send response safely
-        if len(formatted_html) <= 4000:
-            try:
-                await update.message.reply_text(
-                    formatted_html,
-                    reply_markup=keyboard,
-                    parse_mode="HTML"
-                )
-            except Exception:
-                await update.message.reply_text(ai_reply, reply_markup=keyboard)
-        else:
-            chunks = [formatted_html[i:i + 3800] for i in range(0, len(formatted_html), 3800)]
-            for i, chunk in enumerate(chunks):
-                is_last = (i == len(chunks) - 1)
-                try:
-                    await update.message.reply_text(
-                        chunk,
-                        reply_markup=keyboard if is_last else None,
-                        parse_mode="HTML"
-                    )
-                except Exception:
-                    await update.message.reply_text(
-                        chunk,
-                        reply_markup=keyboard if is_last else None
-                    )
+        # Seamless in-place transform: edit animated loading message directly into response!
+        await animator.finish(
+            final_text=formatted_html,
+            reply_markup=keyboard,
+            update_message=update.message
+        )
 
     except Exception as e:
+        await animator.stop()
         logger.error(f"Error in handle_smart_chat_message: {e}", exc_info=True)
         # Rollback the last user message from memory so chat history is NOT poisoned
         chat_hist = context.user_data.get("telegram_chat_history", [])
@@ -731,8 +728,12 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
                 "Iltimos, qayta urinib ko'ring yoki savolingizni boshqacharoq yozing."
             )
         try:
-            await status_msg.edit_text(err_text, parse_mode="HTML")
+            await animator.message.edit_text(err_text, parse_mode="HTML")
         except Exception:
+            try:
+                await animator.message.delete()
+            except Exception:
+                pass
             await update.message.reply_text(err_text, parse_mode="HTML")
 
 

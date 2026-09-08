@@ -263,6 +263,65 @@ async def handle_menu_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await handle_smart_chat_message(update, context)
 
 
+async def merge_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /merge command."""
+    merge_files = context.user_data.get("merge_files", [])
+    if len(merge_files) >= 2:
+        from bot.processors.pdf_processor import PDFProcessor
+        proc = PDFProcessor()
+        msg = await update.message.reply_text("⏳ PDF hujjatlar birlashtirilmoqda...")
+        try:
+            timestamp = int(time.time())
+            out_name = f"birlashtirilgan_hujjat_{timestamp}.pdf"
+            out_path = os.path.join(config.processed_dir, out_name)
+
+            paths = [f["path"] if isinstance(f, dict) else f for f in merge_files]
+            names = [f["name"] if isinstance(f, dict) else os.path.basename(f) for f in merge_files]
+
+            stats = await proc.merge_pdfs(
+                file_paths=paths,
+                output_path=out_path,
+                add_bookmarks=True,
+                file_names=names
+            )
+
+            await msg.edit_text(f"✅ {stats['merged_count']} ta PDF muvaffaqiyatli birlashtirildi! ({stats['total_pages']} sahifa)")
+
+            with open(out_path, "rb") as f:
+                await update.message.reply_document(
+                    document=f,
+                    filename=out_name,
+                    caption=(
+                        f"🟥 <b>Birlashtirilgan PDF Hujjati:</b>\n\n"
+                        f"📑 Birlashtirilgan fayllar: <b>{stats['merged_count']} ta</b>\n"
+                        f"📄 Jami sahifalar: <b>{stats['total_pages']} varaq</b>\n"
+                        f"📌 Mundarija (Bookmarks): <b>Kiritilgan ✓</b>\n\n"
+                        f"⚡ <i>EduBot orqali tayyorlandi</i>"
+                    ),
+                    parse_mode="HTML"
+                )
+
+            context.user_data.pop("merge_mode", None)
+            context.user_data.pop("merge_files", None)
+        except Exception as e:
+            logger.error(f"Merge command error: {e}")
+            await msg.edit_text(f"❌ Birlashtirishda xatolik: {e}")
+    else:
+        context.user_data["merge_mode"] = True
+        if "merge_files" not in context.user_data:
+            context.user_data["merge_files"] = []
+        kb = []
+        if config.WEBAPP_URL:
+            kb.append([InlineKeyboardButton("🟥 PDF Birlashtirish (Mini App)", web_app=WebAppInfo(url=f"{config.WEBAPP_URL}#/?tool=merge"))])
+        await update.message.reply_text(
+            f"🟥 <b>PDF Birlashtirish:</b>\n\n"
+            f"Hozircha {len(merge_files)} ta PDF yuborilgan. Birlashtirish uchun kamida 2 ta PDF fayl kerak.\n"
+            f"Iltimos, PDF fayllarni botga ketma-ket yuboring yoki Mini App'dan foydalaning:",
+            reply_markup=InlineKeyboardMarkup(kb) if kb else None,
+            parse_mode="HTML"
+        )
+
+
 # ── Application builder ───────────────────────────────────────────────────
 
 def build_application():
@@ -278,6 +337,7 @@ def build_application():
     # ── Command handlers ───────────────────────────────────────────────
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("merge", merge_command))
     application.add_handler(CommandHandler("ai_status", ai_status_command))
     application.add_handler(CommandHandler(["set_ai_key", "set_gemini", "set_key"], set_ai_key_command))
     application.add_handler(CommandHandler(["ai", "chat", "test", "quiz", "konspekt", "dars", "tarjima", "xulosa"], handle_smart_chat_message))

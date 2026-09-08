@@ -1403,6 +1403,9 @@ async def extract_images_from_pdf(
 @router.post("/merge-pdfs")
 async def merge_pdfs_endpoint(
     files: List[UploadFile] = File(...),
+    title: Optional[str] = Form(None),
+    add_bookmarks: Optional[str] = Form("true"),
+    add_page_numbers: Optional[str] = Form("false"),
     user: dict = Depends(get_current_user)
 ):
     """Bir nechta PDF fayllarni bitta hujjatga birlashtirish."""
@@ -1410,19 +1413,41 @@ async def merge_pdfs_endpoint(
         raise HTTPException(status_code=400, detail="Kamida 2 ta PDF fayl tanlanishi shart")
 
     temp_paths = []
+    orig_names = []
     try:
         timestamp = int(datetime.now().timestamp())
         for idx, file in enumerate(files):
-            ext = os.path.splitext(file.filename)[1].lower()
+            ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
             if ext != '.pdf':
                 raise HTTPException(status_code=400, detail=f"'{file.filename}' PDF formatida emas")
             t_path = os.path.join(settings.upload_dir, f"merge_in_{timestamp}_{idx}.pdf")
             await save_upload_stream_safely(file, t_path)
             temp_paths.append(t_path)
+            orig_names.append(file.filename or f"Hujjat_{idx+1}.pdf")
 
-        out_name = f"birlashtirilgan_hujjat_{timestamp}.pdf"
+        if title and title.strip():
+            clean_title = re.sub(r'[^\w\-_\. ]', '_', title.strip()).strip()
+            clean_title = re.sub(r'\.pdf$', '', clean_title, flags=re.IGNORECASE)
+            out_name = f"{clean_title}.pdf"
+        else:
+            out_name = f"birlashtirilgan_hujjat_{timestamp}.pdf"
+
         out_path = os.path.join(settings.processed_dir, out_name)
-        await pdf_processor.merge_pdfs(temp_paths, out_path)
+
+        is_bookmarks = str(add_bookmarks).lower() in ("true", "1", "yes", "on")
+        is_page_nums = str(add_page_numbers).lower() in ("true", "1", "yes", "on")
+
+        merge_stats = await pdf_processor.merge_pdfs(
+            file_paths=temp_paths,
+            output_path=out_path,
+            add_bookmarks=is_bookmarks,
+            add_page_numbers=is_page_nums,
+            file_names=orig_names
+        )
+
+        total_pages = merge_stats.get("total_pages", 0)
+        file_size = merge_stats.get("file_size", os.path.getsize(out_path) if os.path.exists(out_path) else 0)
+        merged_count = merge_stats.get("merged_count", len(files))
 
         async with get_session() as session:
             db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
@@ -1441,8 +1466,13 @@ async def merge_pdfs_endpoint(
                 m_caption = build_file_caption(
                     file_name=out_name,
                     tool_name="Birlashtirilgan PDF Hujjati",
-                    details=[f"Birlashtirilgan fayllar soni: {len(files)} ta"],
-                    file_size=os.path.getsize(out_path)
+                    details=[
+                        f"Birlashtirilgan fayllar: {merged_count} ta",
+                        f"Jami sahifalar: {total_pages} varaq",
+                        f"Mundarija (Bookmarks): {'Kiritilgan ✓' if is_bookmarks else 'Yo\'q'}",
+                        f"Sahifa raqamlari: {'Qo\'yilgan ✓' if is_page_nums else 'Yo\'q'}"
+                    ],
+                    file_size=file_size
                 )
                 await send_file_to_telegram(telegram_id=user["telegram_id"], file_path=out_path, caption=m_caption, file_id=record.telegram_file_id)
             except Exception:
@@ -1453,7 +1483,9 @@ async def merge_pdfs_endpoint(
             "file_id": record.id,
             "file_name": out_name,
             "download_url": f"/api/files/{record.id}/download",
-            "merged_count": len(files)
+            "merged_count": merged_count,
+            "total_pages": total_pages,
+            "file_size": file_size
         }
     finally:
         for p in temp_paths:

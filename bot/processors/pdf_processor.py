@@ -337,18 +337,96 @@ class PDFProcessor(BaseProcessor):
             logger.error(f"PDF ga suv belgisi qo'yishda xatolik: {e}")
             raise
 
-    async def merge_pdfs(self, file_paths: list[str], output_path: str) -> str:
-        """Bir nechta PDF fayllarni bitta tartibli PDF hujjatga birlashtirish (PyMuPDF)."""
+    async def merge_pdfs(
+        self,
+        file_paths: list[str],
+        output_path: str,
+        add_bookmarks: bool = True,
+        add_page_numbers: bool = False,
+        file_names: list[str] = None
+    ) -> dict:
+        """
+        Bir nechta PDF fayllarni bitta tartibli PDF hujjatga birlashtirish (PyMuPDF).
+        Qo'shimcha imkoniyatlar:
+          - add_bookmarks: Har bir fayl uchun avtomatik mundarija (TOC / Bookmark) yaratish
+          - add_page_numbers: Barcha sahifalar ostiga '1 / N' ko'rinishida sahifa raqamini qo'yish
+          - deflate & garbage: Fayl hajmini avtomatik optimallashtirish
+        """
         def _merge():
             merged_doc = fitz.open()
-            for path in file_paths:
-                if os.path.exists(path):
+            toc = []
+            current_page = 1
+            merged_count = 0
+
+            for idx, path in enumerate(file_paths):
+                if not os.path.exists(path):
+                    continue
+                try:
                     doc = fitz.open(path)
+                    num_pages = len(doc)
+                    if num_pages == 0:
+                        doc.close()
+                        continue
+
+                    # Bookmarks (Mundarija) uchun sarlavha
+                    if file_names and idx < len(file_names) and file_names[idx]:
+                        doc_title = file_names[idx]
+                    else:
+                        doc_title = os.path.basename(path)
+
+                    if add_bookmarks:
+                        toc.append([1, doc_title, current_page])
+                        try:
+                            sub_toc = doc.get_toc()
+                            for item in sub_toc:
+                                lvl = min(item[0] + 1, 4)
+                                page_num = current_page + (item[2] - 1)
+                                toc.append([lvl, item[1], page_num])
+                        except Exception:
+                            pass
+
                     merged_doc.insert_pdf(doc)
+                    current_page += num_pages
+                    merged_count += 1
                     doc.close()
+                except Exception as doc_err:
+                    logger.warning(f"Faylni birlashtirishda xatolik ({path}): {doc_err}")
+
+            if merged_count == 0:
+                raise ValueError("Birlashtirish uchun birorta ham yaroqli PDF topilmadi")
+
+            if add_bookmarks and toc:
+                try:
+                    merged_doc.set_toc(toc)
+                except Exception as toc_err:
+                    logger.warning(f"Mundarija qo'yishda xatolik: {toc_err}")
+
+            total_pages = len(merged_doc)
+
+            # Sahifa raqamlarini qo'shish
+            if add_page_numbers and total_pages > 0:
+                for p_idx, page in enumerate(merged_doc):
+                    try:
+                        rect = page.rect
+                        num_str = f"{p_idx + 1} / {total_pages}"
+                        font_size = 9
+                        text_w = len(num_str) * font_size * 0.45
+                        pt = fitz.Point((rect.width - text_w) / 2, rect.height - 20)
+                        page.insert_text(pt, num_str, fontsize=font_size, color=(0.4, 0.4, 0.4), overlay=True)
+                    except Exception:
+                        pass
+
             merged_doc.save(output_path, garbage=3, deflate=True)
             merged_doc.close()
-            return output_path
+
+            file_size = os.path.getsize(output_path) if os.path.exists(output_path) else 0
+
+            return {
+                "output_path": output_path,
+                "total_pages": total_pages,
+                "file_size": file_size,
+                "merged_count": merged_count
+            }
 
         try:
             return await asyncio.to_thread(_merge)

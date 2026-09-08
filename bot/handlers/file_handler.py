@@ -117,6 +117,30 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         except Exception as dbe:
             logger.warning(f"Could not persist file record or backup to DB: {dbe}")
 
+        # Check if in PDF merge mode
+        if context.user_data.get("merge_mode") and ext_lower == "pdf":
+            merge_files = context.user_data.get("merge_files", [])
+            merge_files.append({"path": local_path, "name": file_name, "size": document.file_size})
+            context.user_data["merge_files"] = merge_files
+
+            from telegram import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+            kb = []
+            if len(merge_files) >= 2:
+                kb.append([InlineKeyboardButton("🟥 Hozir birlashtirish", callback_data="file_merge_execute")])
+            if config.WEBAPP_URL:
+                kb.append([InlineKeyboardButton("📱 Mini App'da tartiblash", web_app=WebAppInfo(url=f"{config.WEBAPP_URL}#/?tool=merge"))])
+            kb.append([InlineKeyboardButton("❌ Bekor qilish", callback_data="file_merge_cancel")])
+
+            files_summary = "\n".join([f"{i+1}. <b>{f['name']}</b> ({round(f['size']/1024)} KB)" for i, f in enumerate(merge_files)])
+            await msg.edit_text(
+                f"🟥 <b>PDF birlashtirish ro'yxati ({len(merge_files)} ta fayl):</b>\n\n"
+                f"{files_summary}\n\n"
+                f"ℹ️ <i>Yana PDF fayl yuborishingiz yoki tayyor bo'lsa «Hozir birlashtirish» tugmasini bosishingiz mumkin.</i>",
+                reply_markup=InlineKeyboardMarkup(kb),
+                parse_mode="HTML"
+            )
+            return
+
         # Get processor and metadata
         processor = get_processor(local_path)
         meta_text = ""
@@ -309,18 +333,73 @@ async def handle_file_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
         elif action == "file_merge":
             context.user_data["merge_mode"] = True
-            context.user_data["merge_files"] = [file_path]
+            context.user_data["merge_files"] = [{"path": file_path, "name": file_name, "size": os.path.getsize(file_path) if os.path.exists(file_path) else 0}]
+            from telegram import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
             keyboard = []
             if config.WEBAPP_URL:
                 keyboard.append([
                     InlineKeyboardButton("🟥 Mini App'da erkin birlashtirish", web_app=WebAppInfo(url=f"{config.WEBAPP_URL}#/?tool=merge"))
                 ])
+            keyboard.append([InlineKeyboardButton("❌ Bekor qilish", callback_data="file_merge_cancel")])
             await msg.edit_text(
-                "🟥 <b>Birlashtirish rejimi yoqildi!</b>\n\n"
-                "Birlashtirish uchun yana PDF fayllar yuboring. Tayyor bo'lganda /merge buyrug'ini yuboring yoki Mini App'da oching:",
-                reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None,
+                "🟥 <b>PDF Birlashtirish rejimi faollashdi!</b>\n\n"
+                f"1. <b>{file_name}</b> (ro'yxatga qo'shildi)\n\n"
+                "Endi navbatdagi PDF fayl(lar)ni yuboring. Kamida 2 ta fayl bo'lgach, «Hozir birlashtirish» tugmasi paydo bo'ladi.",
+                reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode="HTML"
             )
+
+        elif action == "file_merge_execute":
+            merge_files = context.user_data.get("merge_files", [])
+            if len(merge_files) < 2:
+                await msg.edit_text("❌ Birlashtirish uchun kamida 2 ta PDF fayl kerak.")
+                return
+
+            await msg.edit_text("⏳ PDF hujjatlar birlashtirilmoqda...")
+            try:
+                from bot.processors.pdf_processor import PDFProcessor
+                proc = PDFProcessor()
+                timestamp = int(time.time())
+                out_name = f"birlashtirilgan_hujjat_{timestamp}.pdf"
+                out_path = os.path.join(config.processed_dir, out_name)
+
+                paths = [f["path"] if isinstance(f, dict) else f for f in merge_files]
+                names = [f["name"] if isinstance(f, dict) else os.path.basename(f) for f in merge_files]
+
+                stats = await proc.merge_pdfs(
+                    file_paths=paths,
+                    output_path=out_path,
+                    add_bookmarks=True,
+                    file_names=names
+                )
+
+                reply_target = query.message if hasattr(query, "message") and query.message else msg
+                await msg.edit_text(f"✅ {stats['merged_count']} ta PDF muvaffaqiyatli birlashtirildi! ({stats['total_pages']} sahifa)")
+
+                with open(out_path, "rb") as f:
+                    await reply_target.reply_document(
+                        document=f,
+                        filename=out_name,
+                        caption=(
+                            f"🟥 <b>Birlashtirilgan PDF Hujjati:</b>\n\n"
+                            f"📑 Birlashtirilgan fayllar: <b>{stats['merged_count']} ta</b>\n"
+                            f"📄 Jami sahifalar: <b>{stats['total_pages']} varaq</b>\n"
+                            f"📌 Mundarija (Bookmarks): <b>Kiritilgan ✓</b>\n\n"
+                            f"⚡ <i>EduBot orqali tayyorlandi</i>"
+                        ),
+                        parse_mode="HTML"
+                    )
+
+                context.user_data.pop("merge_mode", None)
+                context.user_data.pop("merge_files", None)
+            except Exception as e:
+                logger.error(f"Merge execution error: {e}")
+                await msg.edit_text(f"❌ PDF larni birlashtirishda xatolik: {e}")
+
+        elif action == "file_merge_cancel":
+            context.user_data.pop("merge_mode", None)
+            context.user_data.pop("merge_files", None)
+            await msg.edit_text("❌ PDF birlashtirish bekor qilindi.")
 
         elif action == "file_protect":
             await msg.edit_text(

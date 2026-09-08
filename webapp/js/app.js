@@ -2692,7 +2692,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="flex items-center justify-between">
                                 <span class="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                                     <i data-lucide="layers" class="w-3.5 h-3.5 text-red-500"></i>
-                                    Tanlangan fayllar: <span id="pmerge-count-badge" class="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-mono text-[10px] font-bold">0 ta</span>
+                                    Tanlangan fayllar: <span id="pmerge-count-badge" class="px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 font-mono text-[10px] font-bold">0 ta</span>
+                                    <span id="pmerge-total-size" class="text-[10px] text-slate-400 font-normal"></span>
                                 </span>
                                 <div class="flex items-center gap-2">
                                     <button onclick="document.getElementById('pmerge-file-input').click()" class="text-[11px] font-bold text-red-600 hover:text-red-700 inline-flex items-center gap-1">
@@ -2706,11 +2707,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
                             <div id="pmerge-files-list" class="space-y-1.5 max-h-48 overflow-y-auto p-1"></div>
 
-                            <div class="pt-2">
-                                <label class="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">Yangi fayl nomi (ixtiyoriy):</label>
-                                <div class="relative">
-                                    <input type="text" id="pmerge-title" placeholder="birlashtirilgan_hujjat" class="w-full text-xs py-2 pl-3 pr-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-800 text-slate-900 dark:text-white">
-                                    <span class="absolute right-3 top-2 text-[11px] font-mono text-slate-400">.pdf</span>
+                            <div class="pt-1 space-y-2.5">
+                                <div>
+                                    <label class="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">Yangi fayl nomi (ixtiyoriy):</label>
+                                    <div class="relative">
+                                        <input type="text" id="pmerge-title" placeholder="birlashtirilgan_hujjat" class="w-full text-xs py-2 pl-3 pr-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-800 text-slate-900 dark:text-white">
+                                        <span class="absolute right-3 top-2 text-[11px] font-mono text-slate-400">.pdf</span>
+                                    </div>
+                                </div>
+
+                                <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 space-y-2 text-xs">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" id="pmerge-bookmarks" checked class="rounded text-red-600 focus:ring-red-500 w-4 h-4">
+                                        <span class="font-bold text-slate-700 dark:text-slate-200 text-[11px]">Mundarija (Bookmarks / TOC) yaratish</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="checkbox" id="pmerge-pagenums" class="rounded text-red-600 focus:ring-red-500 w-4 h-4">
+                                        <span class="text-slate-600 dark:text-slate-300 text-[11px]">Barcha sahifalar ostiga tartib raqami qo'yish (1 / N)</span>
+                                    </label>
                                 </div>
                             </div>
                         </div>
@@ -2723,19 +2737,23 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                             <div>
                                 <h4 class="text-xs font-bold text-slate-900 dark:text-white" id="pmerge-out-name">Fayl</h4>
+                                <div id="pmerge-stats" class="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-1"></div>
                                 <div class="mt-2 p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-left space-y-1">
                                     <div class="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
                                         <i data-lucide="send" class="w-3.5 h-3.5"></i>
-                                        <span>Birlashtirilgan PDF Telegram chatiga yuborildi!</span>
+                                        <span>Birlashtirilgan PDF tayyor bo'ldi!</span>
                                     </div>
                                     <p class="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
-                                        Fayllar to'liq ulanib, bitta hujjat sifatida bot chatiga yetkazildi.
+                                        Barcha fayllar tartibli ulandi. Faylni quyidagi tugma orqali yuklab oling yoki Telegram botingizdan oling.
                                     </p>
                                 </div>
                             </div>
-                            <div class="pt-1">
-                                <button onclick="TelegramApp.openChat(); closeModal();" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-pink-600 text-white text-xs font-extrabold shadow-lg shadow-red-500/25 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
-                                    <i data-lucide="send" class="w-4 h-4"></i> Telegram Chatiga O'tish (PDF faylni olish) ✓
+                            <div class="space-y-2 pt-1">
+                                <button id="pmerge-dl-btn" class="w-full py-3 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-bold border border-slate-200 dark:border-slate-700 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
+                                    <i data-lucide="download" class="w-4 h-4 text-red-600"></i> Birlashtirilgan PDF ni yuklab olish
+                                </button>
+                                <button onclick="TelegramApp.openChat(); closeModal();" class="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-pink-600 text-white text-xs font-extrabold shadow-lg shadow-red-500/25 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
+                                    <i data-lucide="send" class="w-4 h-4"></i> Telegram Chatiga O'tish (Botdan olish) ✓
                                 </button>
                             </div>
                         </div>
@@ -2760,6 +2778,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const filesList = document.getElementById('pmerge-files-list');
         const countBadge = document.getElementById('pmerge-count-badge');
         const actionBtn = document.getElementById('pmerge-action-btn');
+        const uploadBox = document.getElementById('pmerge-upload-box');
+
+        if (uploadBox) {
+            uploadBox.ondragover = (e) => { e.preventDefault(); uploadBox.classList.add('border-red-500', 'bg-red-50/40'); };
+            uploadBox.ondragleave = () => { uploadBox.classList.remove('border-red-500', 'bg-red-50/40'); };
+            uploadBox.ondrop = (e) => {
+                e.preventDefault();
+                uploadBox.classList.remove('border-red-500', 'bg-red-50/40');
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    const added = Array.from(e.dataTransfer.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+                    if (added.length === 0) {
+                        TelegramApp.showAlert("Iltimos, faqat PDF fayllarni tanlang!");
+                        return;
+                    }
+                    mergeFiles = [...mergeFiles, ...added];
+                    renderList();
+                }
+            };
+        }
 
         function renderList() {
             if (mergeFiles.length === 0) {
@@ -2769,6 +2806,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             previewArea.classList.remove('hidden');
             countBadge.innerText = `${mergeFiles.length} ta`;
+            const totalBytes = mergeFiles.reduce((acc, f) => acc + (f.size || 0), 0);
+            const totalMb = (totalBytes / (1024 * 1024)).toFixed(2);
+            const sizeEl = document.getElementById('pmerge-total-size');
+            if (sizeEl) sizeEl.innerText = `• Jami: ${totalMb} MB`;
             actionBtn.disabled = mergeFiles.length < 2;
 
             filesList.innerHTML = mergeFiles.map((f, i) => `
@@ -2832,6 +2873,10 @@ document.addEventListener('DOMContentLoaded', () => {
             mergeFiles.forEach(f => fd.append('files', f));
             const title = document.getElementById('pmerge-title')?.value;
             if (title && title.trim()) fd.append('title', title.trim());
+            const bookmarksVal = document.getElementById('pmerge-bookmarks')?.checked !== false;
+            const pagenumsVal = document.getElementById('pmerge-pagenums')?.checked === true;
+            fd.append('add_bookmarks', bookmarksVal ? 'true' : 'false');
+            fd.append('add_page_numbers', pagenumsVal ? 'true' : 'false');
 
             try {
                 let stopSim = null;
@@ -2869,6 +2914,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     previewArea.classList.add('hidden');
                     document.getElementById('pmerge-result').classList.remove('hidden');
                     document.getElementById('pmerge-out-name').innerText = res.file_name;
+                    
+                    const statPages = res.total_pages || 'Noma\'lum';
+                    const statMb = res.file_size ? (res.file_size / (1024 * 1024)).toFixed(2) + ' MB' : '';
+                    const statsText = `📑 ${res.merged_count || mergeFiles.length} ta fayl ulandi • <b>${statPages} sahifa</b> ${statMb ? `(${statMb})` : ''}`;
+                    const statsEl = document.getElementById('pmerge-stats');
+                    if (statsEl) statsEl.innerHTML = statsText;
+
                     const footer = document.getElementById('pmerge-footer');
                     if (footer) {
                         footer.innerHTML = `
@@ -2879,7 +2931,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
                     }
                     const mergeDlBtn = document.getElementById('pmerge-dl-btn');
-                    if (mergeDlBtn) {
+                    if (mergeDlBtn && res.download_url) {
                         mergeDlBtn.onclick = () => {
                             TelegramApp.downloadFile(res.download_url);
                         };

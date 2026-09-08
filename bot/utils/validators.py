@@ -65,6 +65,42 @@ def is_prompt_injection(text: str) -> bool:
     return False
 
 
+def sanitize_for_prompt(text: str, max_len: int = 100) -> str:
+    """
+    Sanitizes user-provided metadata (such as filename or label) before interpolating into LLM prompt.
+    Strips dangerous characters, system role delimiters, and checks for prompt injections.
+    """
+    if not text:
+        return "noma'lum_fayl"
+    # Keep only safe alphanumeric characters, underscores, dashes, dots, spaces
+    clean = re.sub(r'[^\w\s\.\-_]', '', text).strip()
+    # Normalize multiple whitespace
+    clean = re.sub(r'\s+', ' ', clean)
+    if is_prompt_injection(clean):
+        # Neutralize injection attempts completely
+        clean = "hujjat"
+    return clean[:max_len] or "hujjat"
+
+
+def clean_document_text(text: str, max_chars: int = 10000) -> str:
+    """
+    Cleans extracted document text before feeding into LLM prompt.
+    1. Truncates to max_chars.
+    2. Neutralizes prompt injection strings and system override tags.
+    """
+    if not text:
+        return ""
+    truncated = text.strip()[:max_chars]
+    # Neutralize common markdown/format prompt injection wrappers
+    neutralized = truncated
+    for regex in _INJECTION_REGEXES:
+        neutralized = regex.sub("[XAVFSIZLIK: BLOKLANGAN MATN]", neutralized)
+    # Neutralize system / role delimiters that could break chat structure
+    neutralized = re.sub(r'(?i)<\|im_start\|>|<\|im_end\|>|\[INST\]|\[/INST\]|<<SYS>>|<</SYS>>', ' ', neutralized)
+    return neutralized
+
+
+
 class SlidingWindowRateLimiter:
     """In-memory sliding-window rate limiter per user/key."""
 

@@ -18,7 +18,7 @@ from bot.processors.word_processor import WordProcessor
 from bot.processors.pdf_processor import PDFProcessor
 from bot.processors.image_processor import ImageProcessor
 from bot.utils.helpers import sanitize_filename, parse_lesson_subject_topic
-from bot.utils.validators import is_prompt_injection, rate_limiter
+from bot.utils.validators import is_prompt_injection, rate_limiter, sanitize_for_prompt, clean_document_text
 from .files import send_file_to_telegram, save_and_backup_user_file, build_file_caption, save_upload_stream_safely
 
 logger = logging.getLogger(__name__)
@@ -559,6 +559,9 @@ async def chat_with_files(
     if not files:
         raise HTTPException(status_code=400, detail="Kamida bitta fayl yuklanishi shart")
 
+    if len(files) > 10:
+        raise HTTPException(status_code=400, detail="Bir vaqtning o'zida ko'pi bilan 10 ta fayl yuklash mumkin")
+
     user_key = f"user_{user.get('telegram_id', 'unknown')}"
     rate_limiter.check(user_key, limit=10, window_seconds=60, action="fayllar bilan ishlash so'rovi")
 
@@ -576,9 +579,11 @@ async def chat_with_files(
 
     timestamp = int(time.time())
     saved_files = [] # list of (orig_name, ext, local_path, is_image, is_pdf, is_word)
+    total_batch_bytes = 0
+    MAX_BATCH_SIZE = 50 * 1024 * 1024  # 50 MB batch limit
 
     try:
-        # 1. Save all uploaded files to disk safely
+        # 1. Save all uploaded files to disk safely with batch size enforcement
         for idx, u_file in enumerate(files):
             orig_name = u_file.filename or f"file_{idx}"
             base_part, raw_ext = os.path.splitext(orig_name)
@@ -586,14 +591,34 @@ async def chat_with_files(
             clean_name = f"{sanitize_filename(base_part)}{ext}"
             save_path = os.path.join(user_upload_dir, f"ai_input_{timestamp}_{idx}_{clean_name}")
             
-            await save_upload_stream_safely(u_file, save_path)
+            written_bytes = await save_upload_stream_safely(u_file, save_path)
+            total_batch_bytes += written_bytes
+            if total_batch_bytes > MAX_BATCH_SIZE:
+                # Cleanup saved files from this batch
+                for f_item in saved_files:
+                    try:
+                        if os.path.exists(f_item["path"]):
+                            os.remove(f_item["path"])
+                    except Exception:
+                        pass
+                try:
+                    if os.path.exists(save_path):
+                        os.remove(save_path)
+                except Exception:
+                    pass
+                raise HTTPException(
+                    status_code=413,
+                    detail="Yuklangan barcha fayllarning umumiy hajmi 50 MB dan oshmasligi kerak"
+                )
 
             is_img = ext in (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".heic")
             is_pdf = ext == ".pdf"
             is_word = ext in (".docx", ".doc")
             file_size = os.path.getsize(save_path) if os.path.exists(save_path) else 0
+            safe_display_name = sanitize_for_prompt(orig_name, max_len=60)
             saved_files.append({
                 "orig_name": orig_name,
+                "safe_name": safe_display_name,
                 "clean_name": clean_name,
                 "ext": ext,
                 "path": save_path,
@@ -861,21 +886,25 @@ async def chat_with_files(
         extracted_texts = []
         for f_info in saved_files:
             try:
+                s_name = f_info.get("safe_name") or sanitize_for_prompt(f_info["orig_name"], max_len=60)
                 if f_info["is_pdf"]:
                     txt = await pdf_processor_tool.extract_text(f_info["path"])
                     if txt and txt.strip():
-                        extracted_texts.append(f"--- HUJJAT: {f_info['orig_name']} ---\n{txt.strip()[:10000]}")
+                        cleaned_txt = clean_document_text(txt, max_chars=10000)
+                        extracted_texts.append(f"--- HUJJAT: {s_name} ---\n{cleaned_txt}")
                 elif f_info["is_word"]:
                     txt = await word_processor_tool.extract_text(f_info["path"])
                     if txt and txt.strip():
-                        extracted_texts.append(f"--- HUJJAT: {f_info['orig_name']} ---\n{txt.strip()[:10000]}")
+                        cleaned_txt = clean_document_text(txt, max_chars=10000)
+                        extracted_texts.append(f"--- HUJJAT: {s_name} ---\n{cleaned_txt}")
                 elif f_info["ext"] in (".txt", ".md", ".csv", ".json"):
                     with open(f_info["path"], "r", encoding="utf-8", errors="ignore") as tf:
                         txt = tf.read()
                         if txt.strip():
-                            extracted_texts.append(f"--- FAYL: {f_info['orig_name']} ---\n{txt.strip()[:10000]}")
+                            cleaned_txt = clean_document_text(txt, max_chars=10000)
+                            extracted_texts.append(f"--- FAYL: {s_name} ---\n{cleaned_txt}")
             except Exception as read_err:
-                logger.warning(f"Fayl matnini o'qishda xatolik ({f_info['orig_name']}): {read_err}")
+                logger.warning(f"Fayl matnini o'qishda xatolik ({f_info.get('safe_name', 'file')}): {read_err}")
 
         # Agar hujjatlardan matn ajratib olingan bo'lsa
         if extracted_texts:
@@ -957,8 +986,8 @@ async def chat_with_files(
             }
 
         # Agar hech qanday matn o'qib bo'lmagan bo'lsa (masalan faqat rasm yuklangan, ammo konvertatsiya buyrug'i berilmagan)
-        file_names_str = ", ".join([f["orig_name"] for f in saved_files])
-        fallback_prompt = prompt or f"{file_names_str} fayllari qabul qilindi. Ushbu fayllar bilan nima qilishimni xohlaysiz? Masalan: 'PDF ga aylantir', '3x4 rasm qil', yoki matnli savol bering."
+        file_names_str = ", ".join([f.get("safe_name") or sanitize_for_prompt(f["orig_name"], max_len=60) for f in saved_files])
+        fallback_prompt = prompt_clean or f"{file_names_str} fayllari qabul qilindi. Ushbu fayllar bilan nima qilishimni xohlaysiz? Masalan: 'PDF ga aylantir', '3x4 rasm qil', yoki matnli savol bering."
         
         reply_text = await ai_service.generate_chat([
             {"role": "user", "content": f"Foydalanuvchi quyidagi fayllarni yukladi: {file_names_str}.\nFoydalanuvchi so'rovi: {fallback_prompt}"}

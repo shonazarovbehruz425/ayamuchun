@@ -985,13 +985,26 @@ async def chat_with_files(
                 "result_file": result_file_data
             }
 
-        # Agar hech qanday matn o'qib bo'lmagan bo'lsa (masalan faqat rasm yuklangan, ammo konvertatsiya buyrug'i berilmagan)
+        # Agar hech qanday matn o'qib bo'lmagan bo'lsa (masalan faqat rasm yuklangan)
         file_names_str = ", ".join([f.get("safe_name") or sanitize_for_prompt(f["orig_name"], max_len=60) for f in saved_files])
-        fallback_prompt = prompt_clean or f"{file_names_str} fayllari qabul qilindi. Ushbu fayllar bilan nima qilishimni xohlaysiz? Masalan: 'PDF ga aylantir', '3x4 rasm qil', yoki matnli savol bering."
+        fallback_prompt = prompt_clean or f"Ushbu rasm(lar)ni ko'rib chiqib, undagi barcha matn, ob'yektlar yoki savollarni tushuntirib bering."
         
-        reply_text = await ai_service.generate_chat([
-            {"role": "user", "content": f"Foydalanuvchi quyidagi fayllarni yukladi: {file_names_str}.\nFoydalanuvchi so'rovi: {fallback_prompt}"}
-        ])
+        # Multimodal: Agar rasm(lar) bo'lsa, ularni haqiqiy Vision orqali AIga uzatamiz
+        image_paths_for_ai = [img["path"] for img in all_images if os.path.exists(img.get("path", ""))]
+        if image_paths_for_ai:
+            reply_text = await ai_service.analyze_image(
+                image_paths=image_paths_for_ai,
+                prompt=fallback_prompt,
+                system_prompt=(
+                    "Siz yuksak intellektli va professional AI Vision assistentsiz. "
+                    "Foydalanuvchi yuklagan fotosurat(lar)ni sinchiklab ko'rib chiqing va foydalanuvchi so'roviga "
+                    "o'zbek tilida to'liq, ravshan va chiroyli javob bering."
+                )
+            )
+        else:
+            reply_text = await ai_service.generate_chat([
+                {"role": "user", "content": f"Foydalanuvchi quyidagi fayllarni yukladi: {file_names_str}.\nFoydalanuvchi so'rovi: {fallback_prompt}"}
+            ])
 
         # Log usage to DB
         try:

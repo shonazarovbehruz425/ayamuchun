@@ -6,6 +6,9 @@ Clean user-facing branding replaces third-party vendor names with custom mini ap
 import asyncio
 import json
 import logging
+import os
+import base64
+import mimetypes
 from typing import Optional, List, Dict, Any
 import httpx
 
@@ -201,25 +204,32 @@ class AIService:
 
     async def generate_response(
         self,
-        messages: Optional[List[Dict[str, str]]] = None,
         prompt: Optional[str] = None,
+        messages: Optional[List[Dict[str, str]]] = None,
         system_instruction: Optional[str] = None,
-        system_prompt: Optional[str] = None
+        system_prompt: Optional[str] = None,
+        image_paths: Optional[List[str]] = None
     ) -> str:
         """
-        Universal response generator method (supports both multi-turn messages and single prompt).
+        Universal response generator method (supports multi-turn messages, single prompt, and images).
         """
         sys = system_instruction or system_prompt
         if messages:
-            return await self.generate_chat(messages, system_prompt=sys)
+            return await self.generate_chat(messages, system_prompt=sys, image_paths=image_paths)
         if prompt:
-            return await self.generate_chat([{"role": "user", "content": prompt[:15000]}], system_prompt=sys)
-        return await self.generate_chat([{"role": "user", "content": "Salom"}], system_prompt=sys)
+            return await self.generate_chat([{"role": "user", "content": prompt[:15000]}], system_prompt=sys, image_paths=image_paths)
+        return await self.generate_chat([{"role": "user", "content": "Salom"}], system_prompt=sys, image_paths=image_paths)
 
-    async def generate_chat(self, messages: List[Dict[str, str]], system_prompt: Optional[str] = None) -> str:
+    async def generate_chat(
+        self,
+        messages: List[Dict[str, str]],
+        system_prompt: Optional[str] = None,
+        image_paths: Optional[List[str]] = None
+    ) -> str:
         """
         Interactive multi-turn conversation generation (like ChatGPT / Gemini).
-        Accepts list of {'role': 'user'|'assistant'|'system', 'content': str}.
+        Accepts list of {'role': 'user'|'assistant'|'system', 'content': str}
+        and optional image_paths for multimodal visual analysis.
         """
         if not self.api_key:
             raise RuntimeError(
@@ -234,6 +244,13 @@ class AIService:
             f"o'zbek tilida (yoki foydalanuvchi qaysi tilda yozsa o'sha tilda) aniq, tushunarli, chiroyli va qiziqarli javob ber."
         )
         effective_sys = system_prompt or default_sys
+
+        # Prepare PIL images for multimodal support if paths are provided
+        valid_image_paths = []
+        if image_paths:
+            for p in image_paths:
+                if p and os.path.exists(p):
+                    valid_image_paths.append(p)
 
         # 1. Gemini Native Flow
         if self.provider == "gemini":
@@ -250,9 +267,6 @@ class AIService:
                     raise RuntimeError("AI xizmatini ishga tushirib bo'lmadi.")
 
             # Format conversation history for Gemini:
-            # Gemini strictly requires:
-            # 1. First message must be 'user'
-            # 2. Alternates between 'user' and 'model'
             raw_turns = []
             for m in messages:
                 role = "user" if m.get("role") in ("user", "system") else "model"
@@ -260,7 +274,6 @@ class AIService:
                 if not content:
                     continue
                 if raw_turns and raw_turns[-1]["role"] == role:
-                    # Merge consecutive same-role messages
                     raw_turns[-1]["parts"][0] += f"\n\n{content}"
                 else:
                     raw_turns.append({"role": role, "parts": [content]})
@@ -270,13 +283,40 @@ class AIService:
                 raw_turns.pop(0)
 
             if not raw_turns:
-                raw_turns = [{"role": "user", "parts": ["Assalomu alaykum"]}]
+                raw_turns = [{"role": "user", "parts": ["Ushbu tasvirni ko'rib chiqib, tahlil qilib bering."] if valid_image_paths else ["Assalomu alaykum"]}]
+
+            # Multimodal: append PIL images to the last user turn parts
+            if valid_image_paths:
+                try:
+                    from PIL import Image
+                    for img_p in valid_image_paths:
+                        try:
+                            im = Image.open(img_p)
+                            if im.mode in ("RGBA", "P"):
+                                im = im.convert("RGB")
+                            # Find last user turn
+                            last_user_turn = None
+                            for turn in reversed(raw_turns):
+                                if turn["role"] == "user":
+                                    last_user_turn = turn
+                                    break
+                            if last_user_turn is not None:
+                                last_user_turn["parts"].append(im)
+                            else:
+                                raw_turns.append({"role": "user", "parts": [im]})
+                        except Exception as im_err:
+                            logger.warning(f"Could not load image {img_p} for Gemini: {im_err}")
+                except Exception as e:
+                    logger.warning(f"Failed to process images for Gemini multimodal: {e}")
 
             gemini_contents = raw_turns
 
-            # Prepend system instruction safely to the first user turn
+            # Prepend system instruction safely to the first user turn text
             if effective_sys and gemini_contents:
-                gemini_contents[0]["parts"][0] = f"[Yo'riqnoma: {effective_sys}]\n\n" + gemini_contents[0]["parts"][0]
+                for idx, part in enumerate(gemini_contents[0]["parts"]):
+                    if isinstance(part, str):
+                        gemini_contents[0]["parts"][idx] = f"[Yo'riqnoma: {effective_sys}]\n\n" + part
+                        break
 
             # Retry with exponential backoff on 429/rate-limit
             max_retries = 3
@@ -301,7 +341,6 @@ class AIService:
                         logger.debug(f"Could not parse Gemini usage_metadata: {meta_e}")
                         self.last_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
-                    # Safely extract text from response
                     try:
                         text_result = response.text
                     except Exception:
@@ -316,21 +355,17 @@ class AIService:
                     return text_result
                 except Exception as e:
                     err_str = str(e).lower()
-                    # If 400 with api key invalid
                     if "api key not valid" in err_str or "api_key_invalid" in err_str or "401" in err_str or "unauthenticated" in err_str:
                         logger.error(f"Gemini auth error: {e}")
                         raise RuntimeError("AI API kaliti yaroqsiz yoki noto'g'ri kiritilgan. Iltimos, API kalitni tekshiring.")
-                    # If 403 / permission / region
                     if "403" in err_str or "permission_denied" in err_str or "location" in err_str:
                         logger.error(f"Gemini permission error: {e}")
                         raise RuntimeError("AI xizmatiga ulanish rad etildi (403). API kalit ruxsati yoki hududiy cheklov mavjud.")
-                    # If 429 (ResourceExhausted / Rate limit) -> retry with backoff
                     if ("429" in err_str or "resourceexhausted" in err_str or "quota" in err_str) and attempt < max_retries - 1:
                         backoff = (2 ** attempt) * 1.5
                         logger.warning(f"Gemini rate limited (429), retrying in {backoff}s (attempt {attempt + 1}/{max_retries})...")
                         await asyncio.sleep(backoff)
                         continue
-                    # If timeout -> raise friendly timeout error
                     if "timeout" in err_str or "deadline" in err_str:
                         logger.error(f"Gemini timeout error: {e}")
                         raise RuntimeError("AI xizmati javob berish vaqti tugadi (timeout). Iltimos, qayta urinib ko'ring.")
@@ -338,7 +373,7 @@ class AIService:
                     logger.error(f"Gemini API error on attempt {attempt + 1}: {e}")
                     if self.base_url:
                         logger.info("Attempting OpenAI-compatible fallback...")
-                        return await self._chat_openai_compatible(messages, effective_sys)
+                        return await self._chat_openai_compatible(messages, effective_sys, image_paths=valid_image_paths)
                     
                     if "quota" in err_str or "resourceexhausted" in err_str or "429" in err_str:
                         raise RuntimeError("AI so'rovlar limiti (kvota) tugadi. Iltimos, birozdan so'ng urinib ko'ring yoki yangi API kalit kiriting.")
@@ -346,10 +381,15 @@ class AIService:
                     raise RuntimeError(f"AI xizmati vaqtincha javob bermayapti ({e}).")
 
         # 2. OpenAI / OpenRouter / DeepSeek / Custom Endpoint Flow
-        return await self._chat_openai_compatible(messages, effective_sys)
+        return await self._chat_openai_compatible(messages, effective_sys, image_paths=valid_image_paths)
 
-    async def _chat_openai_compatible(self, messages: List[Dict[str, str]], system_prompt: str) -> str:
-        """Send chat messages to an OpenAI-compatible REST endpoint with retry, endpoint fallback and backoff."""
+    async def _chat_openai_compatible(
+        self,
+        messages: List[Dict[str, str]],
+        system_prompt: str,
+        image_paths: Optional[List[str]] = None
+    ) -> str:
+        """Send chat messages to an OpenAI-compatible REST endpoint with retry, endpoint fallback, backoff, and vision image support."""
         target_base = getattr(self, "raw_base_url", None) or self.base_url or "https://api.openai.com/v1"
         url = self.resolve_chat_url(target_base)
         tried_alt_url = False
@@ -362,12 +402,44 @@ class AIService:
             headers["HTTP-Referer"] = "https://ayamuchun.onrender.com"
             headers["X-Title"] = self.display_name
 
+        # Prepare base64 images for OpenAI Vision format if image_paths provided
+        image_content_items = []
+        if image_paths:
+            for img_p in image_paths:
+                if img_p and os.path.exists(img_p):
+                    try:
+                        mime_type, _ = mimetypes.guess_type(img_p)
+                        if not mime_type or not mime_type.startswith("image/"):
+                            mime_type = "image/jpeg"
+                        with open(img_p, "rb") as f_img:
+                            b64_data = base64.b64encode(f_img.read()).decode("utf-8")
+                        image_content_items.append({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{b64_data}"
+                            }
+                        })
+                    except Exception as b64_err:
+                        logger.warning(f"Could not encode image {img_p} to base64: {b64_err}")
+
         chat_messages = [{"role": "system", "content": system_prompt}]
-        for m in messages:
+        for idx, m in enumerate(messages):
             r = m.get("role", "user")
             c = (m.get("content", "") or "").strip()
-            if c:
+            # If this is the last user message and we have images, format as multimodal content list
+            is_last_message = (idx == len(messages) - 1)
+            if is_last_message and image_content_items and r == "user":
+                parts = [{"type": "text", "text": c[:15000] if c else "Ushbu rasm(lar)ni ko'rib chiqib tahlil qiling va savolga javob bering."}]
+                parts.extend(image_content_items)
+                chat_messages.append({"role": r, "content": parts})
+            elif c:
                 chat_messages.append({"role": r, "content": c[:15000]})
+
+        # If no user message was added but we have images
+        if image_content_items and not any(m.get("role") == "user" for m in chat_messages):
+            parts = [{"type": "text", "text": "Ushbu tasvirni to'liq tahlil qilib bering."}]
+            parts.extend(image_content_items)
+            chat_messages.append({"role": "user", "content": parts})
 
         payload = {
             "model": self.model_name,
@@ -619,6 +691,23 @@ class AIService:
             f"Hujjat matni:\n{text[:15000]}"
         )
         return await self._generate(prompt)
+
+    async def analyze_image(
+        self,
+        image_paths: List[str],
+        prompt: str = "Ushbu tasvirni to'liq tahlil qilib, mazmunini, undagi barcha matn va tafsilotlarni tushuntirib bering.",
+        system_prompt: Optional[str] = None
+    ) -> str:
+        """Analyze one or more images using Multimodal Vision capabilities."""
+        if not image_paths:
+            return await self.generate_response(prompt=prompt, system_prompt=system_prompt)
+        messages = [{"role": "user", "content": prompt}]
+        return await self.generate_chat(
+            messages=messages,
+            system_prompt=system_prompt,
+            image_paths=image_paths
+        )
+
 
 
 # Helper singleton factory

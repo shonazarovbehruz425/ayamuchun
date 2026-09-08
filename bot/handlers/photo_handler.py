@@ -32,7 +32,10 @@ def photo_batch_keyboard(count: int = 1) -> InlineKeyboardMarkup:
             InlineKeyboardButton("📄 PDF ga aylantirish", callback_data="photo_to_pdf")
         ])
     keyboard.append([
-        InlineKeyboardButton("📸 3×4 Hujjat fotosi", callback_data="photo_process_3x4"),
+        InlineKeyboardButton("🧠 AI tahlil & Savol berish", callback_data="photo_ai_ask"),
+        InlineKeyboardButton("📸 3×4 Hujjat fotosi", callback_data="photo_process_3x4")
+    ])
+    keyboard.append([
         InlineKeyboardButton("🔍 Matnni olish (OCR)", callback_data="photo_ocr_extract")
     ])
     if config.WEBAPP_URL:
@@ -45,6 +48,7 @@ def photo_batch_keyboard(count: int = 1) -> InlineKeyboardMarkup:
 
 def photo_actions_keyboard() -> InlineKeyboardMarkup:
     keyboard = [
+        [InlineKeyboardButton("🧠 AI tahlil & Savol berish", callback_data="photo_ai_ask")],
         [InlineKeyboardButton("📸 3×4 Hujjat fotosi tayyorlash", callback_data="photo_process_3x4")],
         [InlineKeyboardButton("🖼️ PDF ga aylantirish", callback_data="photo_to_pdf")],
     ]
@@ -255,6 +259,51 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     context.user_data["photo_batch"] = batch
     context.user_data["last_photo"] = photo_item
 
+    # If user sent a photo with a caption (e.g., "buni yechib ber", "bu nima", "tarjima qil", "savol")
+    caption = (update.message.caption or "").strip()
+    if caption:
+        context.user_data["last_photo_user_wish"] = caption
+        lower_cap = caption.lower()
+        is_pdf_cmd = any(k in lower_cap for k in ["pdf", "kitob"])
+        is_3x4_cmd = any(k in lower_cap for k in ["3x4", "3*4", "hujjat foto", "pasport"])
+        if not is_pdf_cmd and not is_3x4_cmd:
+            # Route straight to AI Vision processing with loading animation
+            ai_title = getattr(config, "AI_DISPLAY_NAME", "EduBot AI") or "EduBot AI"
+            animator = await TelegramAiLoadingAnimation.create_and_start(
+                reply_target=update.message,
+                bot=context.bot,
+                chat_id=update.effective_chat.id,
+                title=f"{ai_title} Vision",
+                initial_desc="Fotosurat tahlil qilinmoqda...",
+                stages=VISION_STAGES
+            )
+            try:
+                from bot.services.ai_service import get_ai_service
+                ai_srv = get_ai_service()
+                ai_reply = await ai_srv.analyze_image(
+                    image_paths=[local_path],
+                    prompt=caption,
+                    system_prompt=(
+                        "Siz yuksak intellektli va ko'p qirrali AI Vision yordamchisisan. "
+                        "Foydalanuvchi yuborgan fotosuratni diqqat bilan o'rganib chiq, undagi matn, grafik, masalalar "
+                        "yoki tafsilotlarni aniq tahlil qil va foydalanuvchi savoliga o'zbek tilida to'liq, "
+                        "tushunarli va professional javob ber."
+                    )
+                )
+                await animator.finish(
+                    final_text=f"🧠 <b>AI Javobi:</b>\n\n{ai_reply}",
+                    update_message=update.message
+                )
+                return
+            except Exception as cap_err:
+                logger.error(f"Error analyzing photo with caption: {cap_err}")
+                await animator.stop()
+                try:
+                    await animator.message.edit_text(f"❌ Rasmni tahlil qilishda xatolik: {cap_err}")
+                except Exception:
+                    await update.message.reply_text(f"❌ Rasmni tahlil qilishda xatolik: {cap_err}")
+                return
+
     expected_tool = context.user_data.get("expected_tool")
     if expected_tool == "photo_3x4":
         context.user_data.pop("expected_tool", None)
@@ -281,22 +330,24 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             f"📸 <b>{count} ta rasm qabul qilindi!</b>\n\n"
             "Ushbu rasmlar bilan nima qilmoqchisiz?\n\n"
             "Mavjud imkoniyatlar:\n"
+            "• <b>🧠 AI tahlil & Savol berish</b> — Rasmni AI ko'radi va istalgan savolingizga javob beradi\n"
             f"• <b>PDF yaratish</b> — Barcha {count} ta rasmni bitta sifatli PDF hujjatga birlashtirish\n"
             "• <b>3×4 Hujjat fotosi</b> — Rasmlardan 3×4 hujjat fotosi tayyorlash\n"
             "• <b>Matnni olish (OCR / AI)</b> — Rasmlardagi yozuvlarni matnga aylantirish\n"
             "• <b>Fonini almashtirish</b> — Rasmlar fonini oq yoki ko'k rangga o'tkazish\n\n"
-            "✍️ <i>Iltimos, nima qilish kerakligini yozing (masalan: «Barchasini bitta PDF qil», «PDF ga aylantir», «3x4 qil» yoki o'zingiz xohlagan vazifani ayting):</i>"
+            "✍️ <i>Iltimos, nima qilish kerakligini yozing (masalan: «buni yechib ber», «matnini ol», «PDF qil», «3x4 qil» yoki o'z savolingizni bering):</i>"
         )
     else:
         text = (
             "📸 <b>Suratingiz qabul qilindi!</b>\n\n"
             "Ushbu rasm bilan nima qilmoqchisiz?\n\n"
             "Mavjud imkoniyatlar:\n"
+            "• <b>🧠 AI tahlil & Savol berish</b> — Rasmni AI ko'radi va istalgan savolingizga javob beradi\n"
             "• <b>3×4 Hujjat fotosi</b> — Pasport yoki viza uchun foto va 6 talik chop etish varag'i\n"
             "• <b>PDF ga aylantirish</b> — A4 formatidagi toza PDF hujjat qilish\n"
             "• <b>Rasm ichidagi matnni olish (OCR / AI tahlil)</b> — Rasmdagi yozuvlarni matnga aylantirish yoki tahlil qilish\n"
             "• <b>Fonini almashtirish</b> — Oq, ko'k yoki kulrang fonga o'tkazish\n\n"
-            "✍️ <i>Iltimos, nima qilish kerakligini yozing (masalan: «3x4 qilib ber», «PDF qil», «matnini ol» yoki o'zingiz xohlagan vazifani ayting):</i>"
+            "✍️ <i>Iltimos, nima qilish kerakligini yozing (masalan: «buni yechib ber», «bu nima?», «PDF qil», «3x4 qilib ber» yoki savolingizni ayting):</i>"
         )
 
     await update.message.reply_text(text, reply_markup=photo_batch_keyboard(count), parse_mode="HTML")
@@ -324,7 +375,43 @@ async def handle_photo_callback(update: Update, context: ContextTypes.DEFAULT_TY
         paths = [input_path]
     count = len(paths)
 
-    if data == "photo_manual_options":
+    if data == "photo_ai_ask":
+        # Foydalanuvchi "AI tahlil & Savol berish" tugmasini bosdi: to'g'ridan-to'g'ri AI Vision tahlili boshlanadi
+        ai_title = getattr(config, "AI_DISPLAY_NAME", "EduBot AI") or "EduBot AI"
+        animator = await TelegramAiLoadingAnimation.create_and_start(
+            reply_target=query.message,
+            bot=context.bot,
+            chat_id=query.message.chat_id,
+            title=f"{ai_title} Vision",
+            initial_desc=f"{count} ta fotosurat AI tomonidan ko'rib chiqilmoqda..." if count > 1 else "Fotosurat AI tomonidan ko'rib chiqilmoqda...",
+            stages=VISION_STAGES
+        )
+        try:
+            from bot.services.ai_service import get_ai_service
+            ai_srv = get_ai_service()
+            prompt = (
+                f"Foydalanuvchi {count} ta surat yukladi. Ushbu rasm(lar)ni diqqat bilan o'rganib chiq: "
+                f"undagi barcha matnlar, ob'yektlar, formulalar, savollar yoki mazmunni aniqlab, "
+                f"o'zbek tilida batafsil va tushunarli tahlil qilib ber."
+            )
+            reply = await ai_srv.analyze_image(
+                image_paths=paths,
+                prompt=prompt
+            )
+            await animator.finish(
+                final_text=f"🧠 <b>AI Tahlil Natijasi:</b>\n\n{reply}\n\n💬 <i>Ushbu rasm bo'yicha qo'shimcha savollaringiz bo'lsa, chatda bemalol yozavering!</i>",
+                update_message=query.message
+            )
+        except Exception as err:
+            logger.error(f"Error in photo_ai_ask callback: {err}")
+            await animator.stop()
+            try:
+                await animator.message.edit_text(f"❌ AI tahlilida xatolik yuz berdi: {err}")
+            except Exception:
+                await query.message.reply_text(f"❌ AI tahlilida xatolik: {err}")
+        return
+
+    elif data == "photo_manual_options":
         # Foydalanuvchi "Qo'lda qilish"ni tanladi: unga to'liq inline sozlamalar paneli ko'rsatiladi
         await query.message.reply_text(
             "🛠️ <b>Qo'lda boshqarish menyusi:</b>\n\n"
@@ -347,17 +434,11 @@ async def handle_photo_callback(update: Update, context: ContextTypes.DEFAULT_TY
         try:
             from bot.services.ai_service import get_ai_service
             ai_srv = get_ai_service()
-            ai_prompt = [
-                {
-                    "role": "system",
-                    "content": "Siz rasmli hujjatlar bo'yicha kuchli AI OCR assistentsiz. Foydalanuvchi yuborgan rasmdagi barcha matnlarni aniq, to'liq va tartibli ko'rinishda ajratib bering."
-                },
-                {
-                    "role": "user",
-                    "content": f"Foydalanuvchi {count} ta fotosurat yukladi. Undagi barcha matn va yozuvlarni to'liq o'qib, o'zbek tilida tartibli qilib chiqarib ber."
-                }
-            ]
-            reply = await ai_srv.generate_chat(ai_prompt)
+            reply = await ai_srv.analyze_image(
+                image_paths=paths,
+                prompt="Ushbu fotosuratdagi barcha matn va yozuvlarni to'liq, xatosiz o'qib, o'zbek tilida tartibli OCR ko'rinishida chiqarib ber.",
+                system_prompt="Siz rasmli hujjatlar bo'yicha kuchli AI OCR assistentsiz."
+            )
             await status_msg.edit_text(f"📝 <b>Rasmdan olingan matn (OCR):</b>\n\n{reply}", parse_mode="HTML")
         except Exception as err:
             await status_msg.edit_text(f"❌ Matnni olishda xatolik: {err}")
@@ -418,18 +499,12 @@ async def handle_photo_callback(update: Update, context: ContextTypes.DEFAULT_TY
             try:
                 from bot.services.ai_service import get_ai_service
                 ai_srv = get_ai_service()
-                
-                ai_prompt = [
-                    {
-                        "role": "system",
-                        "content": "Siz rasmli hujjatlar va ta'lim materiallari bo'yicha kuchli AI assistentsiz. Foydalanuvchi rasm yubordi va uning mazmunini tushunishni xohladi. Unga o'zbek tilida aniq va professional tushuntirish va matn xulosasini bering."
-                    },
-                    {
-                        "role": "user",
-                        "content": f"Foydalanuvchi {count} ta fotosurat yukladi va quyidagilarni so'radi: {user_wish or 'Mazmunini toliq ochib ber'}. Ushbu mavzu bo'yicha tushuntirish va foydali tavsiyalar ber."
-                    }
-                ]
-                reply = await ai_srv.generate_chat(ai_prompt)
+                prompt = f"Foydalanuvchi {count} ta fotosurat yukladi va quyidagilarni so'radi: {user_wish or 'Mazmunini toliq ochib ber'}. Ushbu mavzu bo'yicha tushuntirish, yozuvlar va foydali tavsiyalar ber."
+                reply = await ai_srv.analyze_image(
+                    image_paths=paths,
+                    prompt=prompt,
+                    system_prompt="Siz rasmli hujjatlar va ta'lim materiallari bo'yicha kuchli AI Vision assistentsiz. Unga o'zbek tilida aniq va professional tushuntirish va matn xulosasini bering."
+                )
                 await animator.finish(
                     final_text=f"📝 <b>AI Tahlili Natijasi:</b>\n\n{reply}",
                     update_message=query.message

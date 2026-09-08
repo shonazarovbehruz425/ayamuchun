@@ -516,17 +516,11 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
             try:
                 from bot.services.ai_service import get_ai_service
                 ai_srv = get_ai_service()
-                ai_prompt = [
-                    {
-                        "role": "system",
-                        "content": "Siz rasmli hujjatlar bo'yicha kuchli AI OCR assistentsiz. Foydalanuvchi yuborgan rasmdagi barcha matnlarni aniq, to'liq va tartibli ko'rinishda ajratib bering."
-                    },
-                    {
-                        "role": "user",
-                        "content": f"Foydalanuvchi {count} ta fotosurat yukladi va: «{raw_text}» deb so'radi. Rasmdagi matn va yozuvlarni to'liq o'qib, o'zbek tilida tartibli qilib chiqarib ber."
-                    }
-                ]
-                reply = await ai_srv.generate_chat(ai_prompt)
+                reply = await ai_srv.analyze_image(
+                    image_paths=paths,
+                    prompt=f"Foydalanuvchi fotosurat yukladi va: «{raw_text}» deb so'radi. Rasmdagi barcha yozuv va matnlarni to'liq o'qib, o'zbek tilida tartibli chiqarib ber.",
+                    system_prompt="Siz rasmli hujjatlar bo'yicha kuchli AI OCR assistentsiz."
+                )
                 await animator.finish(
                     final_text=f"📝 <b>Rasmdan olingan matn (OCR):</b>\n\n{reply}",
                     update_message=update.message
@@ -538,6 +532,43 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
                     await animator.message.edit_text(f"❌ Matnni olishda xatolik: {err}")
                 except Exception:
                     await update.message.reply_text(f"❌ Matnni olishda xatolik: {err}")
+                return
+
+        elif not is_greeting and not is_bg and not is_manual and not is_3x4 and not is_pdf:
+            # Foydalanuvchi rasm yuborgandan so'ng unga oid savol yoki topshiriq yozdi (masalan: "buni yech", "bu nima", "tarjima qil")
+            ai_title = getattr(ai_service, "display_name", "EduBot AI") or "EduBot AI"
+            animator = await TelegramAiLoadingAnimation.create_and_start(
+                reply_target=update.message,
+                bot=context.bot,
+                chat_id=update.effective_chat.id,
+                title=f"{ai_title} Vision",
+                initial_desc="Fotosurat AI tomonidan tahlil qilinmoqda...",
+                stages=VISION_STAGES
+            )
+            try:
+                from bot.services.ai_service import get_ai_service
+                ai_srv = get_ai_service()
+                reply = await ai_srv.analyze_image(
+                    image_paths=paths,
+                    prompt=raw_text,
+                    system_prompt=(
+                        "Siz yuksak intellektli va ko'p qirrali AI Vision yordamchisisan. "
+                        "Foydalanuvchi yuborgan fotosuratni diqqat bilan o'rganib chiq, "
+                        "undagi matn, topshiriq, masala yoki tafsilotlarni tahlil qilib, foydalanuvchi so'roviga "
+                        "o'zbek tilida aniq, tushunarli va professional javob ber."
+                    )
+                )
+                await animator.finish(
+                    final_text=f"🧠 <b>AI Javobi:</b>\n\n{reply}",
+                    update_message=update.message
+                )
+                return
+            except Exception as err:
+                await animator.stop()
+                try:
+                    await animator.message.edit_text(f"❌ Rasm tahlilida xatolik: {err}")
+                except Exception:
+                    await update.message.reply_text(f"❌ Rasm tahlilida xatolik: {err}")
                 return
 
         elif is_bg and not is_greeting:

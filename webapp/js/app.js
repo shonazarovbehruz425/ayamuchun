@@ -2081,7 +2081,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
 
                     <!-- Footer Action Buttons -->
-                    <div class="p-3.5 border-t border-white/60 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/40 shrink-0">
+                    <div id="img2pdf-footer" class="p-3.5 border-t border-white/60 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/40 shrink-0">
                         <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
                             Bekor qilish
                         </button>
@@ -2259,8 +2259,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 TelegramApp.hapticFeedback('heavy');
 
                 loading.classList.add('hidden');
+                box.classList.add('hidden');
+                previewArea.classList.add('hidden');
                 result.classList.remove('hidden');
                 outName.innerText = res.new_file_name;
+                const footer = document.getElementById('img2pdf-footer');
+                if (footer) {
+                    footer.innerHTML = `
+                        <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 ml-auto">
+                            Yopish
+                        </button>
+                    `;
+                    footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
+                }
                 if (dlBtn) {
                     dlBtn.onclick = () => {
                         TelegramApp.downloadFile(`/api/files/${res.new_file_id}/download`);
@@ -2270,6 +2281,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadRecentFiles();
             } catch (err) {
                 loading.classList.add('hidden');
+                result.classList.add('hidden');
                 previewArea.classList.remove('hidden');
                 generateBtn.classList.remove('hidden');
                 TelegramApp.showAlert(`Xatolik: ${err.message}`);
@@ -2474,7 +2486,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
 
-                    <div class="p-3.5 border-t border-white/60 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/40 shrink-0">
+                    <div id="pmerge-footer" class="p-3.5 border-t border-white/60 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/40 shrink-0">
                         <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100">
                             Bekor qilish
                         </button>
@@ -2567,8 +2579,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 TelegramApp.hapticFeedback('heavy');
 
                 document.getElementById('pmerge-loading').classList.add('hidden');
+                document.getElementById('pmerge-upload-box').classList.add('hidden');
+                previewArea.classList.add('hidden');
                 document.getElementById('pmerge-result').classList.remove('hidden');
                 document.getElementById('pmerge-out-name').innerText = res.file_name;
+                const footer = document.getElementById('pmerge-footer');
+                if (footer) {
+                    footer.innerHTML = `
+                        <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 ml-auto">
+                            Yopish
+                        </button>
+                    `;
+                    footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
+                }
                 const mergeDlBtn = document.getElementById('pmerge-dl-btn');
                 if (mergeDlBtn) {
                     mergeDlBtn.onclick = () => {
@@ -2579,6 +2602,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadRecentFiles();
             } catch (err) {
                 document.getElementById('pmerge-loading').classList.add('hidden');
+                document.getElementById('pmerge-result').classList.add('hidden');
                 previewArea.classList.remove('hidden');
                 actionBtn.classList.remove('hidden');
                 TelegramApp.showAlert(`Xatolik: ${err.message}`);
@@ -2668,7 +2692,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
 
-                    <div class="p-3.5 border-t border-white/60 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/40">
+                    <div id="psplit-footer" class="p-3.5 border-t border-white/60 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/40">
                         <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100">
                             Bekor qilish
                         </button>
@@ -2737,8 +2761,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 TelegramApp.hapticFeedback('heavy');
 
                 document.getElementById('psplit-loading').classList.add('hidden');
+                document.getElementById('psplit-upload-box').classList.add('hidden');
+                document.getElementById('psplit-options').classList.add('hidden');
                 document.getElementById('psplit-result').classList.remove('hidden');
                 document.getElementById('psplit-out-name').innerText = res.file_name;
+                const footer = document.getElementById('psplit-footer');
+                if (footer) {
+                    footer.innerHTML = `
+                        <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 ml-auto">
+                            Yopish
+                        </button>
+                    `;
+                    footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
+                }
                 const splitDlBtn = document.getElementById('psplit-dl-btn');
                 if (splitDlBtn) {
                     splitDlBtn.onclick = () => {
@@ -2749,11 +2784,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadRecentFiles();
             } catch (err) {
                 document.getElementById('psplit-loading').classList.add('hidden');
+                document.getElementById('psplit-result').classList.add('hidden');
                 document.getElementById('psplit-upload-box').classList.remove('hidden');
                 document.getElementById('psplit-options').classList.remove('hidden');
                 document.getElementById('psplit-action-btn').classList.remove('hidden');
                 TelegramApp.showAlert(`Xatolik: ${err.message}`);
-                refreshIcons();
+            }    refreshIcons();
             }
         };
     };
@@ -2838,7 +2874,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
 
-                    <div class="p-3.5 border-t border-white/60 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/40">
+                    <div id="pcomp-footer" class="p-3.5 border-t border-white/60 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/40">
                         <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100">
                             Bekor qilish
                         </button>
@@ -2900,12 +2936,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 TelegramApp.hapticFeedback('heavy');
 
                 document.getElementById('pcomp-loading').classList.add('hidden');
+                document.getElementById('pcomp-upload-box').classList.add('hidden');
+                document.getElementById('pcomp-options').classList.add('hidden');
                 document.getElementById('pcomp-result').classList.remove('hidden');
                 document.getElementById('pcomp-out-name').innerText = res.file_name;
                 
                 const initMb = (res.initial_size / (1024 * 1024)).toFixed(2);
                 const finMb = (res.final_size / (1024 * 1024)).toFixed(2);
                 document.getElementById('pcomp-stats').innerHTML = `📉 ${initMb} MB ➔ <b>${finMb} MB</b> (${res.saved_percent}% tejandi)`;
+
+                const footer = document.getElementById('pcomp-footer');
+                if (footer) {
+                    footer.innerHTML = `
+                        <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 ml-auto">
+                            Yopish
+                        </button>
+                    `;
+                    footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
+                }
 
                 const compDlBtn = document.getElementById('pcomp-dl-btn');
                 if (compDlBtn) {
@@ -2917,6 +2965,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadRecentFiles();
             } catch (err) {
                 document.getElementById('pcomp-loading').classList.add('hidden');
+                document.getElementById('pcomp-result').classList.add('hidden');
                 document.getElementById('pcomp-upload-box').classList.remove('hidden');
                 document.getElementById('pcomp-options').classList.remove('hidden');
                 document.getElementById('pcomp-action-btn').classList.remove('hidden');
@@ -3038,7 +3087,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
 
-                    <div class="p-3.5 border-t border-white/60 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/40 shrink-0">
+                    <div id="pwm-footer" class="p-3.5 border-t border-white/60 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/40 shrink-0">
                         <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100">
                             Bekor qilish
                         </button>
@@ -3137,8 +3186,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 TelegramApp.hapticFeedback('heavy');
 
                 document.getElementById('pwm-loading').classList.add('hidden');
+                document.getElementById('pwm-upload-box').classList.add('hidden');
+                document.getElementById('pwm-options').classList.add('hidden');
                 document.getElementById('pwm-result').classList.remove('hidden');
                 document.getElementById('pwm-out-name').innerText = res.file_name;
+
+                const footer = document.getElementById('pwm-footer');
+                if (footer) {
+                    footer.innerHTML = `
+                        <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 ml-auto">
+                            Yopish
+                        </button>
+                    `;
+                    footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
+                }
+
                 const wmDlBtn = document.getElementById('pwm-dl-btn');
                 if (wmDlBtn) {
                     wmDlBtn.onclick = () => {
@@ -3149,6 +3211,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadRecentFiles();
             } catch (err) {
                 document.getElementById('pwm-loading').classList.add('hidden');
+                document.getElementById('pwm-result').classList.add('hidden');
                 document.getElementById('pwm-upload-box').classList.remove('hidden');
                 document.getElementById('pwm-options').classList.remove('hidden');
                 document.getElementById('pwm-action-btn').classList.remove('hidden');
@@ -3296,7 +3359,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
 
                     <!-- Footer Action -->
-                    <div class="p-3.5 border-t border-white/60 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/40 shrink-0">
+                    <div id="p34-footer" class="p-3.5 border-t border-white/60 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/40 shrink-0">
                         <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100">
                             Bekor qilish
                         </button>
@@ -3384,8 +3447,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 TelegramApp.hapticFeedback('heavy');
 
                 document.getElementById('p34-loading').classList.add('hidden');
+                document.getElementById('p34-upload-box').classList.add('hidden');
+                document.getElementById('p34-options-area').classList.add('hidden');
                 document.getElementById('p34-result').classList.remove('hidden');
                 document.getElementById('p34-out-name').innerText = res.single_file_name;
+
+                const footer = document.getElementById('p34-footer');
+                if (footer) {
+                    footer.innerHTML = `
+                        <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 ml-auto">
+                            Yopish
+                        </button>
+                    `;
+                    footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
+                }
 
                 const p34DlSingle = document.getElementById('p34-dl-single');
                 if (p34DlSingle) {
@@ -3404,6 +3479,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadRecentFiles();
             } catch (err) {
                 document.getElementById('p34-loading').classList.add('hidden');
+                document.getElementById('p34-result').classList.add('hidden');
                 document.getElementById('p34-upload-box').classList.remove('hidden');
                 document.getElementById('p34-options-area').classList.remove('hidden');
                 document.getElementById('p34-action-btn').classList.remove('hidden');

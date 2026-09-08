@@ -47,6 +47,7 @@ const api = {
     checkGrammar(text) { return this.fetchWithAuth('/ai/grammar', { method: 'POST', body: { text, action: 'grammar' } }); },
     improveText(text, language = 'uz') { return this.fetchWithAuth('/ai/improve', { method: 'POST', body: { text, action: 'improve', language } }); },
     explainTopic(text, language = 'uz') { return this.fetchWithAuth('/ai/explain', { method: 'POST', body: { text, action: 'explain', language } }); },
+    extractKeyPoints(text, language = 'uz') { return this.fetchWithAuth('/ai/key-points', { method: 'POST', body: { text, action: 'key_points', language } }); },
     createQuizAI(text, language = 'uz') { return this.fetchWithAuth('/ai/quiz', { method: 'POST', body: { text, action: 'quiz', language } }); },
     exportAIDocx(title, text) { return this.fetchWithAuth('/ai/export-docx', { method: 'POST', body: { title, text } }); },
     sendAIToTelegram(title, text, actionType = 'text') { return this.fetchWithAuth('/ai/send-to-telegram', { method: 'POST', body: { title, text, action_type: actionType } }); },

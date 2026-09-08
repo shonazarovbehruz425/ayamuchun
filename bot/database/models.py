@@ -55,6 +55,9 @@ class UsageLog(Base):
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     action_type = Column(String, nullable=False)
     details = Column(String, nullable=True)
+    prompt_tokens = Column(Integer, nullable=True, default=0)
+    completion_tokens = Column(Integer, nullable=True, default=0)
+    total_tokens = Column(Integer, nullable=True, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="usage_logs")

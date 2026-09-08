@@ -2,6 +2,7 @@ import os
 import re
 import json
 import logging
+from html.parser import HTMLParser
 from typing import List
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse as FastFileResponse

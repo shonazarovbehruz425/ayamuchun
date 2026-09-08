@@ -1,4 +1,5 @@
 import os
+import time
 
 SUPPORTED_EXTENSIONS = {'.pdf', '.docx', '.xlsx', '.pptx', '.doc', '.xls', '.ppt', '.csv'}
 
@@ -63,3 +64,61 @@ def is_prompt_injection(text: str) -> bool:
             return True
     return False
 
+
+class SlidingWindowRateLimiter:
+    """In-memory sliding-window rate limiter per user/key."""
+
+    def __init__(self):
+        # key -> list of timestamps
+        self._requests = {}
+        self._cleanup_interval = 300  # 5 minutes
+        self._last_cleanup = time.time()
+
+    def _cleanup(self, current_time: float):
+        """Periodically remove expired timestamps to prevent memory growth."""
+        if current_time - self._last_cleanup < self._cleanup_interval:
+            return
+        self._last_cleanup = current_time
+        cutoff = current_time - 600
+        keys_to_delete = []
+        for key, timestamps in self._requests.items():
+            valid = [ts for ts in timestamps if ts > cutoff]
+            if valid:
+                self._requests[key] = valid
+            else:
+                keys_to_delete.append(key)
+        for key in keys_to_delete:
+            self._requests.pop(key, None)
+
+    def is_rate_limited(self, key: str, limit: int, window_seconds: int) -> bool:
+        """
+        Returns True if key exceeded the rate limit in window_seconds, False otherwise.
+        Appends the current timestamp if not rate-limited.
+        """
+        now = time.time()
+        self._cleanup(now)
+
+        window_start = now - window_seconds
+        timestamps = self._requests.get(key, [])
+
+        valid_timestamps = [ts for ts in timestamps if ts > window_start]
+        self._requests[key] = valid_timestamps
+
+        if len(valid_timestamps) >= limit:
+            return True
+
+        self._requests[key].append(now)
+        return False
+
+    def check(self, key: str, limit: int = 20, window_seconds: int = 60, action: str = "so'rov"):
+        """Checks rate limit and raises HTTPException 429 if exceeded."""
+        from fastapi import HTTPException
+        if self.is_rate_limited(key, limit, window_seconds):
+            raise HTTPException(
+                status_code=429,
+                detail=f"Juda ko'p {action} yuborildi. Iltimos, biroz kuting va qayta urinib ko'ring (limit: {limit} ta / {window_seconds} soniya)."
+            )
+
+
+# Global rate limiter instance
+rate_limiter = SlidingWindowRateLimiter()

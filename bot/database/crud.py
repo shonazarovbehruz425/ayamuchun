@@ -111,8 +111,23 @@ async def get_user_quizzes(session: AsyncSession, user_id: int, limit: int = 20)
     result = await session.execute(query)
     return list(result.scalars().all())
 
-async def log_usage(session: AsyncSession, user_id: int, action_type: str, details: Optional[str] = None):
-    log = UsageLog(user_id=user_id, action_type=action_type, details=details)
+async def log_usage(
+    session: AsyncSession,
+    user_id: int,
+    action_type: str,
+    details: Optional[str] = None,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    total_tokens: int = 0
+):
+    log = UsageLog(
+        user_id=user_id,
+        action_type=action_type,
+        details=details,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=total_tokens
+    )
     session.add(log)
     await session.commit()
 

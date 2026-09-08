@@ -79,6 +79,12 @@ class AIService:
         else:
             logger.info(f"AIService: REST engine initialized (provider={self.provider}, model={self.model_name}, endpoint={self.base_url or 'default'})")
 
+        self.last_token_usage = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0
+        }
+
     @property
     def is_configured(self) -> bool:
         """Returns True if an API key is configured."""
@@ -136,6 +142,24 @@ class AIService:
             for attempt in range(max_retries):
                 try:
                     response = await self.gemini_model.generate_content_async(gemini_contents)
+                    # Capture token usage from Gemini usage_metadata
+                    try:
+                        u_meta = getattr(response, "usage_metadata", None)
+                        if u_meta:
+                            p_tok = getattr(u_meta, "prompt_token_count", 0) or 0
+                            c_tok = getattr(u_meta, "candidates_token_count", 0) or 0
+                            t_tok = getattr(u_meta, "total_token_count", 0) or (p_tok + c_tok)
+                            self.last_token_usage = {
+                                "prompt_tokens": p_tok,
+                                "completion_tokens": c_tok,
+                                "total_tokens": t_tok
+                            }
+                        else:
+                            self.last_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+                    except Exception as meta_e:
+                        logger.debug(f"Could not parse Gemini usage_metadata: {meta_e}")
+                        self.last_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+
                     return response.text
                 except Exception as e:
                     err_str = str(e).lower()
@@ -197,6 +221,15 @@ class AIService:
                     res = await client.post(url, headers=headers, json=payload)
                     if res.status_code == 200:
                         data = res.json()
+                        usage = data.get("usage", {})
+                        p_tok = usage.get("prompt_tokens", 0) or 0
+                        c_tok = usage.get("completion_tokens", 0) or 0
+                        t_tok = usage.get("total_tokens", 0) or (p_tok + c_tok)
+                        self.last_token_usage = {
+                            "prompt_tokens": p_tok,
+                            "completion_tokens": c_tok,
+                            "total_tokens": t_tok
+                        }
                         choices = data.get("choices", [])
                         if choices and "message" in choices[0]:
                             return choices[0]["message"].get("content", "").strip()

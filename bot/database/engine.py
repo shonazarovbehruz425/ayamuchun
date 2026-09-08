@@ -61,6 +61,16 @@ async def init_db():
                         cursor.execute("ALTER TABLE files ADD COLUMN channel_message_id INTEGER")
                     except Exception:
                         pass
+
+                cursor.execute("PRAGMA table_info(usage_logs)")
+                u_cols = [row[1] for row in cursor.fetchall()]
+                for token_col in ['prompt_tokens', 'completion_tokens', 'total_tokens']:
+                    if token_col not in u_cols:
+                        try:
+                            cursor.execute(f"ALTER TABLE usage_logs ADD COLUMN {token_col} INTEGER DEFAULT 0")
+                        except Exception:
+                            pass
+
                 cursor.close()
             except Exception:
                 pass

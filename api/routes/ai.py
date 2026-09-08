@@ -18,7 +18,7 @@ from bot.processors.word_processor import WordProcessor
 from bot.processors.pdf_processor import PDFProcessor
 from bot.processors.image_processor import ImageProcessor
 from bot.utils.helpers import sanitize_filename, parse_lesson_subject_topic
-from bot.utils.validators import is_prompt_injection
+from bot.utils.validators import is_prompt_injection, rate_limiter
 from .files import send_file_to_telegram, save_and_backup_user_file, build_file_caption, save_upload_stream_safely
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,19 @@ class ChatMessage(BaseModel):
 
 
 class AIChatRequest(BaseModel):
-    messages: List[ChatMessage]
+    messages: List[ChatMessage] = Field(..., min_length=1, max_length=20)
+
+    @field_validator('messages')
+    @classmethod
+    def validate_messages_total_chars(cls, v: List[ChatMessage]) -> List[ChatMessage]:
+        if not v:
+            raise ValueError("Xabarlar ro'yxati bo'sh bo'lishi mumkin emas")
+        if len(v) > 20:
+            raise ValueError("Suhbat kontekstida maksimal 20 ta xabar yuborish mumkin")
+        total_len = sum(len(m.content) for m in v)
+        if total_len > 35000:
+            raise ValueError(f"Umumiy suhbat konteksti hajmi juda katta ({total_len} belgi, ruxsat etilgan: 35 000)")
+        return v
 
 
 class AIChatResponse(BaseModel):
@@ -73,16 +85,28 @@ class AIChatResponse(BaseModel):
 @router.post("/chat", response_model=AIChatResponse)
 async def chat_with_ai(req: AIChatRequest, user: dict = Depends(get_current_user)):
     """To'liq interaktiv AI Chat (ChatGPT / Gemini kabi jonli muloqot va suhbat xotirasi)."""
+    user_key = f"user_{user.get('telegram_id', 'unknown')}"
+    rate_limiter.check(user_key, limit=20, window_seconds=60, action="chat xabari")
+
     try:
         dict_messages = [{"role": m.role, "content": m.content} for m in req.messages]
         reply_text = await ai_service.generate_chat(dict_messages)
 
         # Persist messages & log usage in database
         try:
+            tokens = getattr(ai_service, "last_token_usage", {}) or {}
             async with get_session() as session:
                 db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "User"))
                 last_user_msg = next((m.content for m in reversed(req.messages) if m.role == "user"), "")
-                await crud.log_usage(session, db_user.id, "ai_chat", last_user_msg[:60])
+                await crud.log_usage(
+                    session,
+                    db_user.id,
+                    "ai_chat",
+                    last_user_msg[:60],
+                    prompt_tokens=tokens.get("prompt_tokens", 0),
+                    completion_tokens=tokens.get("completion_tokens", 0),
+                    total_tokens=tokens.get("total_tokens", 0)
+                )
                 if last_user_msg:
                     await crud.save_chat_message(session, db_user.id, "user", last_user_msg, session_id="web")
                 await crud.save_chat_message(session, db_user.id, "assistant", reply_text, session_id="web")
@@ -198,12 +222,22 @@ def create_clean_docx(title: str, text: str, output_path: str) -> str:
 
 @router.post("/summarize", response_model=AIResponse)
 async def summarize(req: AIRequest, user: dict = Depends(get_current_user)):
+    user_key = f"user_{user.get('telegram_id', 'unknown')}"
+    rate_limiter.check(user_key, limit=20, window_seconds=60, action="xulosa so'rovi")
     try:
         result = await ai_service.summarize_text(req.text, req.language)
+        tokens = getattr(ai_service, "last_token_usage", {}) or {}
         async with get_session() as session:
             db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
-            await crud.log_usage(session, db_user.id, "ai_summarize", req.text[:50])
+            await crud.log_usage(
+                session, db_user.id, "ai_summarize", req.text[:50],
+                prompt_tokens=tokens.get("prompt_tokens", 0),
+                completion_tokens=tokens.get("completion_tokens", 0),
+                total_tokens=tokens.get("total_tokens", 0)
+            )
         return AIResponse(result=result, action="summarize")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"AI summarize error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Xulosa tayyorlashda xatolik yuz berdi.")
@@ -211,13 +245,23 @@ async def summarize(req: AIRequest, user: dict = Depends(get_current_user)):
 
 @router.post("/translate", response_model=AIResponse)
 async def translate(req: AIRequest, user: dict = Depends(get_current_user)):
+    user_key = f"user_{user.get('telegram_id', 'unknown')}"
+    rate_limiter.check(user_key, limit=20, window_seconds=60, action="tarjima so'rovi")
     try:
         target_lang = req.language or "uz"
         result = await ai_service.translate_text(req.text, target_lang)
+        tokens = getattr(ai_service, "last_token_usage", {}) or {}
         async with get_session() as session:
             db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
-            await crud.log_usage(session, db_user.id, "ai_translate", f"[{target_lang}] {req.text[:60]}")
+            await crud.log_usage(
+                session, db_user.id, "ai_translate", f"[{target_lang}] {req.text[:60]}",
+                prompt_tokens=tokens.get("prompt_tokens", 0),
+                completion_tokens=tokens.get("completion_tokens", 0),
+                total_tokens=tokens.get("total_tokens", 0)
+            )
         return AIResponse(result=result, action="translate")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"AI translate error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Tarjima qilishda xatolik yuz berdi.")
@@ -225,13 +269,23 @@ async def translate(req: AIRequest, user: dict = Depends(get_current_user)):
 
 @router.post("/lesson-plan", response_model=AIResponse)
 async def lesson_plan(req: AIRequest, user: dict = Depends(get_current_user)):
+    user_key = f"user_{user.get('telegram_id', 'unknown')}"
+    rate_limiter.check(user_key, limit=20, window_seconds=60, action="dars rejasi so'rovi")
     try:
         subject, topic = parse_lesson_subject_topic(req.text)
         result = await ai_service.generate_lesson_plan(subject, topic, language=req.language)
+        tokens = getattr(ai_service, "last_token_usage", {}) or {}
         async with get_session() as session:
             db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
-            await crud.log_usage(session, db_user.id, "ai_lesson_plan", f"{subject} — {topic}"[:60])
+            await crud.log_usage(
+                session, db_user.id, "ai_lesson_plan", f"{subject} — {topic}"[:60],
+                prompt_tokens=tokens.get("prompt_tokens", 0),
+                completion_tokens=tokens.get("completion_tokens", 0),
+                total_tokens=tokens.get("total_tokens", 0)
+            )
         return AIResponse(result=result, action="lesson-plan")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"AI lesson plan error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Dars rejasi yaratishda xatolik yuz berdi.")
@@ -239,12 +293,22 @@ async def lesson_plan(req: AIRequest, user: dict = Depends(get_current_user)):
 
 @router.post("/grammar", response_model=AIResponse)
 async def grammar(req: AIRequest, user: dict = Depends(get_current_user)):
+    user_key = f"user_{user.get('telegram_id', 'unknown')}"
+    rate_limiter.check(user_key, limit=20, window_seconds=60, action="grammatika tekshirish")
     try:
         result = await ai_service.check_grammar(req.text)
+        tokens = getattr(ai_service, "last_token_usage", {}) or {}
         async with get_session() as session:
             db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
-            await crud.log_usage(session, db_user.id, "ai_grammar", req.text[:50])
+            await crud.log_usage(
+                session, db_user.id, "ai_grammar", req.text[:50],
+                prompt_tokens=tokens.get("prompt_tokens", 0),
+                completion_tokens=tokens.get("completion_tokens", 0),
+                total_tokens=tokens.get("total_tokens", 0)
+            )
         return AIResponse(result=result, action="grammar")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"AI grammar error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Grammatika tekshirishda xatolik yuz berdi.")
@@ -252,12 +316,22 @@ async def grammar(req: AIRequest, user: dict = Depends(get_current_user)):
 
 @router.post("/improve", response_model=AIResponse)
 async def improve(req: AIRequest, user: dict = Depends(get_current_user)):
+    user_key = f"user_{user.get('telegram_id', 'unknown')}"
+    rate_limiter.check(user_key, limit=20, window_seconds=60, action="matnni yaxshilash")
     try:
         result = await ai_service.improve_text(req.text, req.language)
+        tokens = getattr(ai_service, "last_token_usage", {}) or {}
         async with get_session() as session:
             db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
-            await crud.log_usage(session, db_user.id, "ai_improve", req.text[:50])
+            await crud.log_usage(
+                session, db_user.id, "ai_improve", req.text[:50],
+                prompt_tokens=tokens.get("prompt_tokens", 0),
+                completion_tokens=tokens.get("completion_tokens", 0),
+                total_tokens=tokens.get("total_tokens", 0)
+            )
         return AIResponse(result=result, action="improve")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"AI improve error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Matnni yaxshilashda xatolik yuz berdi.")
@@ -265,21 +339,56 @@ async def improve(req: AIRequest, user: dict = Depends(get_current_user)):
 
 @router.post("/explain", response_model=AIResponse)
 async def explain(req: AIRequest, user: dict = Depends(get_current_user)):
+    user_key = f"user_{user.get('telegram_id', 'unknown')}"
+    rate_limiter.check(user_key, limit=20, window_seconds=60, action="tushuntirish so'rovi")
     try:
         result = await ai_service.explain_topic(req.text, req.language)
+        tokens = getattr(ai_service, "last_token_usage", {}) or {}
         async with get_session() as session:
             db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
-            await crud.log_usage(session, db_user.id, "ai_explain", req.text[:50])
+            await crud.log_usage(
+                session, db_user.id, "ai_explain", req.text[:50],
+                prompt_tokens=tokens.get("prompt_tokens", 0),
+                completion_tokens=tokens.get("completion_tokens", 0),
+                total_tokens=tokens.get("total_tokens", 0)
+            )
         return AIResponse(result=result, action="explain")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"AI explain error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Mavzuni tushuntirishda xatolik yuz berdi.")
 
 
+@router.post("/key-points", response_model=AIResponse)
+async def key_points_endpoint(req: AIRequest, user: dict = Depends(get_current_user)):
+    """Extract key points and bullet insights from text."""
+    user_key = f"user_{user.get('telegram_id', 'unknown')}"
+    rate_limiter.check(user_key, limit=20, window_seconds=60, action="asosiy fikrlarni ajratish")
+    try:
+        result = await ai_service.extract_key_points(req.text, req.language)
+        tokens = getattr(ai_service, "last_token_usage", {}) or {}
+        async with get_session() as session:
+            db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
+            await crud.log_usage(
+                session, db_user.id, "ai_key_points", req.text[:50],
+                prompt_tokens=tokens.get("prompt_tokens", 0),
+                completion_tokens=tokens.get("completion_tokens", 0),
+                total_tokens=tokens.get("total_tokens", 0)
+            )
+        return AIResponse(result=result, action="key_points")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"AI key points error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Asosiy fikrlarni ajratishda xatolik yuz berdi.")
+
 
 @router.post("/quiz", response_model=AIResponse)
 async def create_quiz_ai(req: AIRequest, user: dict = Depends(get_current_user)):
     """Generate structured quiz questions with multiple choice options."""
+    user_key = f"user_{user.get('telegram_id', 'unknown')}"
+    rate_limiter.check(user_key, limit=15, window_seconds=60, action="test tuzish")
     try:
         topic = req.text
         count = 5
@@ -290,6 +399,7 @@ async def create_quiz_ai(req: AIRequest, user: dict = Depends(get_current_user))
             topic = re.sub(r'(\d+)\s*ta\s*savol[:—\s]*', '', topic, flags=re.IGNORECASE).strip()
             
         quiz_data = await ai_service.generate_quiz(topic, num_questions=min(20, max(3, count)), language=req.language or "uz")
+        tokens = getattr(ai_service, "last_token_usage", {}) or {}
         
         lines = [f"📋 **{topic}** mavzusi bo'yicha test savollari\n"]
         for idx, q in enumerate(quiz_data, 1):
@@ -303,9 +413,16 @@ async def create_quiz_ai(req: AIRequest, user: dict = Depends(get_current_user))
             
         async with get_session() as session:
             db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
-            await crud.log_usage(session, db_user.id, "ai_quiz", topic[:50])
+            await crud.log_usage(
+                session, db_user.id, "ai_quiz", topic[:50],
+                prompt_tokens=tokens.get("prompt_tokens", 0),
+                completion_tokens=tokens.get("completion_tokens", 0),
+                total_tokens=tokens.get("total_tokens", 0)
+            )
             
         return AIResponse(result="\n".join(lines), action="quiz")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"AI quiz error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Test savollarini tuzishda xatolik yuz berdi.")
@@ -441,6 +558,9 @@ async def chat_with_files(
     """
     if not files:
         raise HTTPException(status_code=400, detail="Kamida bitta fayl yuklanishi shart")
+
+    user_key = f"user_{user.get('telegram_id', 'unknown')}"
+    rate_limiter.check(user_key, limit=10, window_seconds=60, action="fayllar bilan ishlash so'rovi")
 
     prompt_clean = (prompt or "").strip()
     if prompt_clean:
@@ -812,6 +932,24 @@ async def chat_with_files(
                     "download_url": f"/api/files/{rec.id}/download"
                 }
 
+            # Log usage for document analysis
+            try:
+                tokens = getattr(ai_service, "last_token_usage", {}) or {}
+                async with get_session() as session:
+                    db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "User"))
+                    file_cnt = len(saved_files)
+                    await crud.log_usage(
+                        session,
+                        db_user.id,
+                        "ai_chat_with_files",
+                        f"{file_cnt} ta fayl: {user_instruction[:40]}",
+                        prompt_tokens=tokens.get("prompt_tokens", 0),
+                        completion_tokens=tokens.get("completion_tokens", 0),
+                        total_tokens=tokens.get("total_tokens", 0)
+                    )
+            except Exception as log_err:
+                logger.warning(f"Could not log chat-with-files usage: {log_err}")
+
             return {
                 "message": reply_text,
                 "role": "assistant",
@@ -828,10 +966,19 @@ async def chat_with_files(
 
         # Log usage to DB
         try:
+            tokens = getattr(ai_service, "last_token_usage", {}) or {}
             async with get_session() as session:
                 db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "User"))
                 file_cnt = len(saved_files)
-                await crud.log_usage(session, db_user.id, "ai_chat_with_files", f"{file_cnt} ta fayl: {prompt[:40]}")
+                await crud.log_usage(
+                    session,
+                    db_user.id,
+                    "ai_chat_with_files",
+                    f"{file_cnt} ta fayl: {prompt[:40]}",
+                    prompt_tokens=tokens.get("prompt_tokens", 0),
+                    completion_tokens=tokens.get("completion_tokens", 0),
+                    total_tokens=tokens.get("total_tokens", 0)
+                )
         except Exception as log_err:
             logger.warning(f"Could not log chat-with-files usage: {log_err}")
 

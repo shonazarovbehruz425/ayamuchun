@@ -301,9 +301,18 @@ async def process_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         # Log usage to DB
         try:
+            tokens = getattr(ai_service, "last_token_usage", {}) or {}
             async with get_session() as session:
                 db_user = await crud.get_or_create_user(session, update.effective_user.id, update.effective_user.full_name or "User")
-                await crud.log_usage(session, db_user.id, f"ai_{action}", text[:60])
+                await crud.log_usage(
+                    session,
+                    db_user.id,
+                    f"ai_{action}",
+                    text[:60],
+                    prompt_tokens=tokens.get("prompt_tokens", 0),
+                    completion_tokens=tokens.get("completion_tokens", 0),
+                    total_tokens=tokens.get("total_tokens", 0)
+                )
         except Exception as log_err:
             logger.warning(f"Could not log AI usage to DB: {log_err}")
 

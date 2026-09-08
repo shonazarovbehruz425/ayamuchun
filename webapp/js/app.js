@@ -804,9 +804,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadingBox.classList.add('hidden');
                 resultBox.classList.remove('hidden');
                 outName.innerText = converted.new_file_name;
-                dlBtn.onclick = () => {
-                    TelegramApp.downloadFile(`/api/files/${converted.new_file_id}/download`);
-                };
+                if (dlBtn) {
+                    dlBtn.onclick = () => {
+                        TelegramApp.downloadFile(`/api/files/${converted.new_file_id}/download`);
+                    };
+                }
                 refreshIcons();
                 loadRecentFiles();
             } catch (err) {
@@ -911,9 +913,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadingBox.classList.add('hidden');
                 resultBox.classList.remove('hidden');
                 outName.innerText = converted.new_file_name;
-                dlBtn.onclick = () => {
-                    TelegramApp.downloadFile(`/api/files/${converted.new_file_id}/download`);
-                };
+                if (dlBtn) {
+                    dlBtn.onclick = () => {
+                        TelegramApp.downloadFile(`/api/files/${converted.new_file_id}/download`);
+                    };
+                }
                 refreshIcons();
                 loadRecentFiles();
             } catch (err) {
@@ -2257,9 +2261,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 loading.classList.add('hidden');
                 result.classList.remove('hidden');
                 outName.innerText = res.new_file_name;
-                dlBtn.onclick = () => {
-                    TelegramApp.downloadFile(`/api/files/${res.new_file_id}/download`);
-                };
+                if (dlBtn) {
+                    dlBtn.onclick = () => {
+                        TelegramApp.downloadFile(`/api/files/${res.new_file_id}/download`);
+                    };
+                }
                 refreshIcons();
                 loadRecentFiles();
             } catch (err) {
@@ -2365,9 +2371,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 loading.classList.add('hidden');
                 result.classList.remove('hidden');
                 outMsg.innerText = `${extracted.images_count} ta rasm ZIP arxivga yig'ildi!`;
-                dlBtn.onclick = () => {
-                    TelegramApp.downloadFile(`/api/files/${extracted.new_file_id}/download`);
-                };
+                if (dlBtn) {
+                    dlBtn.onclick = () => {
+                        TelegramApp.downloadFile(`/api/files/${extracted.new_file_id}/download`);
+                    };
+                }
                 refreshIcons();
                 loadRecentFiles();
             } catch (err) {
@@ -2561,9 +2569,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('pmerge-loading').classList.add('hidden');
                 document.getElementById('pmerge-result').classList.remove('hidden');
                 document.getElementById('pmerge-out-name').innerText = res.file_name;
-                document.getElementById('pmerge-dl-btn').onclick = () => {
-                    TelegramApp.downloadFile(res.download_url);
-                };
+                const mergeDlBtn = document.getElementById('pmerge-dl-btn');
+                if (mergeDlBtn) {
+                    mergeDlBtn.onclick = () => {
+                        TelegramApp.downloadFile(res.download_url);
+                    };
+                }
                 refreshIcons();
                 loadRecentFiles();
             } catch (err) {
@@ -2728,9 +2739,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('psplit-loading').classList.add('hidden');
                 document.getElementById('psplit-result').classList.remove('hidden');
                 document.getElementById('psplit-out-name').innerText = res.file_name;
-                document.getElementById('psplit-dl-btn').onclick = () => {
-                    TelegramApp.downloadFile(res.download_url);
-                };
+                const splitDlBtn = document.getElementById('psplit-dl-btn');
+                if (splitDlBtn) {
+                    splitDlBtn.onclick = () => {
+                        TelegramApp.downloadFile(res.download_url);
+                    };
+                }
                 refreshIcons();
                 loadRecentFiles();
             } catch (err) {
@@ -2893,9 +2907,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const finMb = (res.final_size / (1024 * 1024)).toFixed(2);
                 document.getElementById('pcomp-stats').innerHTML = `📉 ${initMb} MB ➔ <b>${finMb} MB</b> (${res.saved_percent}% tejandi)`;
 
-                document.getElementById('pcomp-dl-btn').onclick = () => {
-                    TelegramApp.downloadFile(res.download_url);
-                };
+                const compDlBtn = document.getElementById('pcomp-dl-btn');
+                if (compDlBtn) {
+                    compDlBtn.onclick = () => {
+                        TelegramApp.downloadFile(res.download_url);
+                    };
+                }
                 refreshIcons();
                 loadRecentFiles();
             } catch (err) {
@@ -3122,9 +3139,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('pwm-loading').classList.add('hidden');
                 document.getElementById('pwm-result').classList.remove('hidden');
                 document.getElementById('pwm-out-name').innerText = res.file_name;
-                document.getElementById('pwm-dl-btn').onclick = () => {
-                    TelegramApp.downloadFile(res.download_url);
-                };
+                const wmDlBtn = document.getElementById('pwm-dl-btn');
+                if (wmDlBtn) {
+                    wmDlBtn.onclick = () => {
+                        TelegramApp.downloadFile(res.download_url);
+                    };
+                }
                 refreshIcons();
                 loadRecentFiles();
             } catch (err) {
@@ -3367,12 +3387,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('p34-result').classList.remove('hidden');
                 document.getElementById('p34-out-name').innerText = res.single_file_name;
 
-                document.getElementById('p34-dl-single').onclick = () => {
-                    TelegramApp.downloadFile(res.single_download_url);
-                };
-                document.getElementById('p34-dl-sheet').onclick = () => {
-                    TelegramApp.downloadFile(res.sheet_download_url);
-                };
+                const p34DlSingle = document.getElementById('p34-dl-single');
+                if (p34DlSingle) {
+                    p34DlSingle.onclick = () => {
+                        TelegramApp.downloadFile(res.single_download_url);
+                    };
+                }
+                const p34DlSheet = document.getElementById('p34-dl-sheet');
+                if (p34DlSheet) {
+                    p34DlSheet.onclick = () => {
+                        TelegramApp.downloadFile(res.sheet_download_url);
+                    };
+                }
 
                 refreshIcons();
                 loadRecentFiles();

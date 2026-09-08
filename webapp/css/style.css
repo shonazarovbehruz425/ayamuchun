@@ -957,20 +957,37 @@ html.dark .chat-input-bar {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   Double Scrollbar Elimination & Clean Fullscreen AI Chat
+   Clean Fullscreen AI Chat & Fixed Composer Bar Above Nav Dock
 ───────────────────────────────────────────────────────────── */
 body.route-ai {
-    overflow: hidden !important;
-    height: 100vh !important;
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
     height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    touch-action: none !important;
+}
+
+body.route-ai header {
+    flex-shrink: 0 !important;
+    position: relative !important;
+    z-index: 40 !important;
 }
 
 body.route-ai main#app {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    width: 100% !important;
     padding-top: 0.25rem !important;
-    padding-bottom: calc(90px + max(env(safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px))) !important;
-    height: calc(100vh - 80px) !important;
-    height: calc(100dvh - 80px) !important;
-    max-height: calc(100dvh - 80px) !important;
+    padding-bottom: calc(76px + max(env(safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px))) !important;
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
@@ -978,10 +995,10 @@ body.route-ai main#app {
 }
 
 body.route-ai .chat-container-card {
-    height: 100% !important;
+    flex: 1 1 0% !important;
     min-height: 0 !important;
+    height: 100% !important;
     max-height: 100% !important;
-    flex: 1 1 auto !important;
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
@@ -990,14 +1007,20 @@ body.route-ai .chat-container-card {
 }
 
 body.route-ai #ai-chat-stream {
-    flex: 1 1 auto !important;
+    flex: 1 1 0% !important;
     min-height: 0 !important;
     overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-y !important;
 }
 
 body.route-ai .chat-input-bar {
     flex-shrink: 0 !important;
-    margin-bottom: 14px !important;
+    margin-bottom: 2px !important;
+    position: relative !important;
+    z-index: 30 !important;
+    touch-action: manipulation !important;
 }
 
 /* Eliminate native scrollbar visual bar completely */

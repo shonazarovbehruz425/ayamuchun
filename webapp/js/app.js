@@ -327,6 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. DASHBOARD VIEW (Interactive Hub for All 7 Tools)
     // ─────────────────────────────────────────────────────────────
     async function renderDashboard() {
+        document.body.classList.remove('route-ai');
         appDiv.innerHTML = `
             <div class="space-y-5 animate-fade-in">
                 <!-- Welcome Banner (Liquid Glass) -->
@@ -3489,6 +3490,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderAI() {
+        document.body.classList.add('route-ai');
         const aiName = window.aiDisplayName || "EduBot AI";
 
         // Restore chat history from server if localStorage was wiped or in incognito
@@ -3639,7 +3641,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Auto-expand textarea & handle Enter key to send
         const textarea = document.getElementById('ai-chat-input');
         if (textarea) {
-            textarea.focus();
             textarea.addEventListener('input', function() {
                 this.style.height = 'auto';
                 this.style.height = (this.scrollHeight) + 'px';
@@ -4241,6 +4242,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     function renderSettings() {
+        document.body.classList.remove('route-ai');
         const profile = window.activeUserProfile || {};
         const currentTgUser = TelegramApp.getUserData() || tgUser || {};
         const firstName = currentTgUser.first_name || profile.first_name || tgUser.first_name || "O'qituvchi";

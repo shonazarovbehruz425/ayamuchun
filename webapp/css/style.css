@@ -967,10 +967,10 @@ body.route-ai {
 
 body.route-ai main#app {
     padding-top: 0.25rem !important;
-    padding-bottom: calc(75px + max(env(safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px))) !important;
-    height: calc(100vh - 110px) !important;
-    height: calc(100dvh - 110px) !important;
-    max-height: calc(100dvh - 110px) !important;
+    padding-bottom: calc(90px + max(env(safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px))) !important;
+    height: calc(100vh - 80px) !important;
+    height: calc(100dvh - 80px) !important;
+    max-height: calc(100dvh - 80px) !important;
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
@@ -997,7 +997,7 @@ body.route-ai #ai-chat-stream {
 
 body.route-ai .chat-input-bar {
     flex-shrink: 0 !important;
-    margin-bottom: 2px !important;
+    margin-bottom: 14px !important;
 }
 
 /* Eliminate native scrollbar visual bar completely */

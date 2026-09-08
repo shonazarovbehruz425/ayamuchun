@@ -331,6 +331,21 @@ class AIService:
                         if choices and "message" in choices[0]:
                             return choices[0]["message"].get("content", "").strip()
                         return ""
+                    elif res.status_code in (400, 404) and "openrouter" in base:
+                        err_text_low = res.text.lower()
+                        if ("unavailable for free" in err_text_low or "not found" in err_text_low or "does not exist" in err_text_low) and payload["model"] != "nvidia/nemotron-3.5-lightning:free":
+                            logger.warning(f"OpenRouter model {payload['model']} is unavailable. Falling back to nvidia/nemotron-3.5-lightning:free...")
+                            payload["model"] = "nvidia/nemotron-3.5-lightning:free"
+                            self.model_name = "nvidia/nemotron-3.5-lightning:free"
+                            continue
+                        
+                        err_msg = ""
+                        try:
+                            err_msg = res.json().get("error", {}).get("message", "")
+                        except Exception:
+                            pass
+                        err_msg = err_msg or f"Model mavjud emas ({res.status_code})"
+                        raise RuntimeError(f"AI model xatosi: {err_msg}")
                     elif res.status_code == 401:
                         logger.error(f"OpenAI-compatible 401 Unauthorized: {res.text}")
                         raise RuntimeError("AI autentifikatsiya xatosi: API kalit yaroqsiz.")
@@ -341,7 +356,13 @@ class AIService:
                         continue
                     else:
                         logger.error(f"OpenAI-compatible error ({res.status_code}): {res.text}")
-                        raise RuntimeError(f"AI xizmati xatolik qaytardi ({res.status_code}).")
+                        err_msg = ""
+                        try:
+                            err_msg = res.json().get("error", {}).get("message", "")
+                        except Exception:
+                            pass
+                        err_msg = err_msg or f"Xatolik kodi: {res.status_code}"
+                        raise RuntimeError(f"AI provayder xatosi: {err_msg}")
             except httpx.TimeoutException:
                 logger.error("OpenAI-compatible timeout")
                 raise RuntimeError("AI xizmati javob berish vaqti tugadi (timeout).")

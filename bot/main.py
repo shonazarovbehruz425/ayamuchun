@@ -37,6 +37,8 @@ from bot.handlers.ai_handler import (
     handle_photo_during_ai,
     handle_smart_chat_message,
     handle_chat_ai_callback,
+    ai_status_command,
+    set_ai_key_command,
     cancel_ai,
     WAITING_TEXT,
 )
@@ -273,6 +275,8 @@ def build_application():
     # ── Command handlers ───────────────────────────────────────────────
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("ai_status", ai_status_command))
+    application.add_handler(CommandHandler(["set_ai_key", "set_gemini", "set_key"], set_ai_key_command))
     application.add_handler(CommandHandler(["ai", "chat", "test", "quiz", "konspekt", "dars", "tarjima", "xulosa"], handle_smart_chat_message))
 
     cancel_filter = filters.Regex("^(🔙 Orqaga|❌ Bekor qilish)$")

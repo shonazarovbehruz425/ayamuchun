@@ -30,6 +30,25 @@ class AIService:
         raw_provider = (provider or settings.AI_PROVIDER or "gemini").lower().strip()
         self.base_url = (base_url or settings.AI_BASE_URL or "").strip()
         self.display_name = (display_name or settings.AI_DISPLAY_NAME or "EduBot AI").strip()
+        explicit_model = (model or settings.AI_MODEL or "").strip()
+
+        # Check storage/ai_key.json if api_key not set via env
+        if not self.api_key:
+            try:
+                import os, json
+                key_file = os.path.join(settings.STORAGE_PATH, "ai_key.json")
+                if os.path.exists(key_file):
+                    with open(key_file, "r", encoding="utf-8") as f:
+                        saved_cfg = json.load(f)
+                        self.api_key = saved_cfg.get("api_key", "").strip()
+                        if saved_cfg.get("provider"):
+                            raw_provider = saved_cfg.get("provider")
+                        if saved_cfg.get("model"):
+                            explicit_model = saved_cfg.get("model")
+                        if saved_cfg.get("base_url"):
+                            self.base_url = saved_cfg.get("base_url")
+            except Exception as fe:
+                logger.debug(f"Could not load saved ai_key.json: {fe}")
 
         # Intelligent provider normalization:
         if "openrouter" in raw_provider or "openrouter" in self.base_url.lower():
@@ -46,7 +65,6 @@ class AIService:
             self.provider = "gemini"
 
         # Resolve model name
-        explicit_model = (model or settings.AI_MODEL or "").strip()
         if explicit_model:
             self.model_name = explicit_model
         elif self.provider in ("openai", "custom", "openrouter"):
@@ -84,6 +102,46 @@ class AIService:
             "completion_tokens": 0,
             "total_tokens": 0
         }
+
+    def update_config(self, api_key: str, provider: Optional[str] = None, model: Optional[str] = None, base_url: Optional[str] = None) -> None:
+        """Update API credentials at runtime and persist to storage/ai_key.json."""
+        self.api_key = api_key.strip()
+        if provider:
+            self.provider = provider.strip().lower()
+        if model:
+            self.model_name = model.strip()
+        if base_url:
+            self.base_url = base_url.strip()
+
+        # Re-initialize Gemini if applicable
+        self.gemini_model = None
+        if self.provider == "gemini" and self.api_key:
+            try:
+                import google.generativeai as genai
+                genai.configure(api_key=self.api_key)
+                self.gemini_model = genai.GenerativeModel(
+                    self.model_name,
+                    generation_config={"max_output_tokens": 4096}
+                )
+                logger.info(f"AIService: reconfigured Gemini engine (model={self.model_name})")
+            except Exception as e:
+                logger.error(f"Failed to reconfigure Gemini engine: {e}")
+
+        # Persist to storage/ai_key.json
+        try:
+            import os, json
+            settings = get_settings()
+            os.makedirs(settings.STORAGE_PATH, exist_ok=True)
+            key_file = os.path.join(settings.STORAGE_PATH, "ai_key.json")
+            with open(key_file, "w", encoding="utf-8") as f:
+                json.dump({
+                    "api_key": self.api_key,
+                    "provider": self.provider,
+                    "model": self.model_name,
+                    "base_url": self.base_url
+                }, f)
+        except Exception as se:
+            logger.warning(f"Could not persist ai_key.json: {se}")
 
     @property
     def is_configured(self) -> bool:
@@ -127,15 +185,34 @@ class AIService:
                     logger.error(f"Gemini config error: {ce}")
                     raise RuntimeError("AI xizmatini ishga tushirib bo'lmadi.")
 
-            # Format conversation history for Gemini
-            gemini_contents = []
+            # Format conversation history for Gemini:
+            # Gemini strictly requires:
+            # 1. First message must be 'user'
+            # 2. Alternates between 'user' and 'model'
+            raw_turns = []
             for m in messages:
                 role = "user" if m.get("role") in ("user", "system") else "model"
-                gemini_contents.append({"role": role, "parts": [m.get("content", "")[:15000]]})
-            
-            # Prepend system instruction if possible
+                content = (m.get("content") or "").strip()[:15000]
+                if not content:
+                    continue
+                if raw_turns and raw_turns[-1]["role"] == role:
+                    # Merge consecutive same-role messages
+                    raw_turns[-1]["parts"][0] += f"\n\n{content}"
+                else:
+                    raw_turns.append({"role": role, "parts": [content]})
+
+            # Strip leading model turns
+            while raw_turns and raw_turns[0]["role"] != "user":
+                raw_turns.pop(0)
+
+            if not raw_turns:
+                raw_turns = [{"role": "user", "parts": ["Assalomu alaykum"]}]
+
+            gemini_contents = raw_turns
+
+            # Prepend system instruction safely to the first user turn
             if effective_sys and gemini_contents:
-                gemini_contents[0]["parts"].insert(0, f"[Yo'riqnoma: {effective_sys}]\n\n")
+                gemini_contents[0]["parts"][0] = f"[Yo'riqnoma: {effective_sys}]\n\n" + gemini_contents[0]["parts"][0]
 
             # Retry with exponential backoff on 429/rate-limit
             max_retries = 3
@@ -160,13 +237,29 @@ class AIService:
                         logger.debug(f"Could not parse Gemini usage_metadata: {meta_e}")
                         self.last_token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
-                    return response.text
+                    # Safely extract text from response
+                    try:
+                        text_result = response.text
+                    except Exception:
+                        text_result = ""
+                        try:
+                            if response.candidates and response.candidates[0].content:
+                                text_result = "".join(getattr(p, "text", "") for p in response.candidates[0].content.parts)
+                        except Exception:
+                            pass
+                    if not text_result:
+                        text_result = "Kechirasiz, javob matnini shakllantirib bo'lmadi. Iltimos, savolingizni boshqacharoq yozing."
+                    return text_result
                 except Exception as e:
                     err_str = str(e).lower()
-                    # If 401 or Invalid API key -> fail immediately, do not retry
-                    if "401" in err_str or "unauthenticated" in err_str or "invalid api key" in err_str or "api_key_invalid" in err_str:
+                    # If 400 with api key invalid
+                    if "api key not valid" in err_str or "api_key_invalid" in err_str or "401" in err_str or "unauthenticated" in err_str:
                         logger.error(f"Gemini auth error: {e}")
-                        raise RuntimeError("AI autentifikatsiya xatosi: API kalit yaroqsiz.")
+                        raise RuntimeError("AI API kaliti yaroqsiz yoki noto'g'ri kiritilgan. Iltimos, API kalitni tekshiring.")
+                    # If 403 / permission / region
+                    if "403" in err_str or "permission_denied" in err_str or "location" in err_str:
+                        logger.error(f"Gemini permission error: {e}")
+                        raise RuntimeError("AI xizmatiga ulanish rad etildi (403). API kalit ruxsati yoki hududiy cheklov mavjud.")
                     # If 429 (ResourceExhausted / Rate limit) -> retry with backoff
                     if ("429" in err_str or "resourceexhausted" in err_str or "quota" in err_str) and attempt < max_retries - 1:
                         backoff = (2 ** attempt) * 1.5
@@ -182,7 +275,11 @@ class AIService:
                     if self.base_url:
                         logger.info("Attempting OpenAI-compatible fallback...")
                         return await self._chat_openai_compatible(messages, effective_sys)
-                    raise RuntimeError("AI xizmati vaqtincha javob bermayapti. Iltimos, birozdan so'ng qayta urinib ko'ring.")
+                    
+                    if "quota" in err_str or "resourceexhausted" in err_str or "429" in err_str:
+                        raise RuntimeError("AI so'rovlar limiti (kvota) tugadi. Iltimos, birozdan so'ng urinib ko'ring yoki yangi API kalit kiriting.")
+                    
+                    raise RuntimeError(f"AI xizmati vaqtincha javob bermayapti ({e}).")
 
         # 2. OpenAI / OpenRouter / DeepSeek / Custom Endpoint Flow
         return await self._chat_openai_compatible(messages, effective_sys)

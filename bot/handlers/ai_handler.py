@@ -1,5 +1,6 @@
 """AI Handler — Handles AI-related menu items and conversation flows."""
 
+import html as html_lib
 import logging
 import os
 import tempfile
@@ -516,6 +517,27 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
         )
         return
 
+    # Check if AI service is configured
+    if not ai_service.is_configured:
+        is_admin = (update.effective_user.id in _config.ADMIN_IDS) or not _config.ADMIN_IDS
+        if is_admin:
+            msg = (
+                "ℹ️ <b>EduBot AI tizimi sozlanmagan</b>\n\n"
+                "AI suhbat xizmati ishlashi uchun <b>Google Gemini</b> yoki <b>OpenAI</b> API kaliti talab qilinadi.\n\n"
+                "🔑 <b>Kalitni faollashtirish:</b>\n"
+                "Botga quyidagi buyruq orqali kalitingizni yuboring:\n"
+                "<code>/set_ai_key SIZNING_API_KALITINGIZ</code>\n\n"
+                "<i>Yoki server muhitida (Render Environment) <code>GEMINI_API_KEY</code> yoki <code>AI_API_KEY</code> o'zgaruvchisini kiriting.</i>"
+            )
+        else:
+            msg = (
+                "ℹ️ <b>EduBot AI yordamchisi sozlanmoqda</b>\n\n"
+                "Hozirda AI xizmati server sozlamalari yangilanmoqda. Tez orada to'liq faollashadi!\n"
+                "Boshqa barcha fayl asboblari va tahrirlash imkoniyatlaridan menyu orqali foydalanishingiz mumkin."
+            )
+        await update.message.reply_text(msg, parse_mode="HTML")
+        return
+
     status_msg = await update.message.reply_text("⏳ <i>AI javob tayyorlamoqda...</i>", parse_mode="HTML")
 
     try:
@@ -619,14 +641,23 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
 
     except Exception as e:
         logger.error(f"Error in handle_smart_chat_message: {e}", exc_info=True)
-        err_text = (
-            "⚠️ <b>Javob berishda xatolik yuz berdi.</b>\n"
-            "Iltimos, qayta urinib ko'ring yoki savolingizni boshqacharoq yozing."
-        )
+        # Rollback the last user message from memory so chat history is NOT poisoned
+        chat_hist = context.user_data.get("telegram_chat_history", [])
+        if chat_hist and chat_hist[-1].get("role") == "user" and chat_hist[-1].get("content") == clean_prompt:
+            chat_hist.pop()
+            context.user_data["telegram_chat_history"] = chat_hist
+
+        if isinstance(e, RuntimeError):
+            err_text = f"⚠️ <b>{html_lib.escape(str(e))}</b>"
+        else:
+            err_text = (
+                "⚠️ <b>Javob berishda kutilmagan xatolik yuz berdi.</b>\n"
+                "Iltimos, qayta urinib ko'ring yoki savolingizni boshqacharoq yozing."
+            )
         try:
             await status_msg.edit_text(err_text, parse_mode="HTML")
         except Exception:
-            await update.message.reply_text("⚠️ Xatolik yuz berdi. Iltimos, qayta urinib ko'ring.")
+            await update.message.reply_text(err_text, parse_mode="HTML")
 
 
 async def handle_chat_ai_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -747,5 +778,72 @@ async def handle_chat_ai_callback(update: Update, context: ContextTypes.DEFAULT_
         await query.message.reply_text(
             "🧹 <b>Yangi suhbat boshlandi!</b>\n\n"
             "Menga xohlagan savolingiz, mavzungiz, konspekt yoki test tuzish bo'yicha topshirig'ingizni yozishingiz mumkin.",
+            parse_mode="HTML"
+        )
+
+
+async def ai_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Check current AI engine configuration and health (Admin diagnostic)."""
+    user_id = update.effective_user.id
+    is_admin = (user_id in _config.ADMIN_IDS) or not _config.ADMIN_IDS
+    if not is_admin:
+        await update.message.reply_text("⛔ Ushbu buyruq faqat bot administratori uchun mo'ljallangan.")
+        return
+
+    configured = ai_service.is_configured
+    key_preview = f"{ai_service.api_key[:6]}...{ai_service.api_key[-4:]}" if ai_service.api_key and len(ai_service.api_key) > 10 else ("O'rnatilgan" if ai_service.api_key else "❌ O'rnatilmagan")
+    
+    msg = (
+        "🤖 <b>AI Tizimi Holati:</b>\n\n"
+        f"• <b>Tizim nomi:</b> {ai_service.display_name}\n"
+        f"• <b>Provayder:</b> <code>{ai_service.provider}</code>\n"
+        f"• <b>Model:</b> <code>{ai_service.model_name}</code>\n"
+        f"• <b>API Kalit:</b> <code>{key_preview}</code>\n"
+        f"• <b>Holat:</b> {'✅ Faol' if configured else '❌ Kalit kiritilmagan'}\n\n"
+        "<i>Kalitni o'rnatish yoki yangilash:</i>\n"
+        "<code>/set_ai_key SIZNING_KALITINGIZ</code>"
+    )
+    await update.message.reply_text(msg, parse_mode="HTML")
+
+
+async def set_ai_key_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Set or update AI API key directly via Telegram bot (Admin only)."""
+    user_id = update.effective_user.id
+    is_admin = (user_id in _config.ADMIN_IDS) or not _config.ADMIN_IDS
+    if not is_admin:
+        await update.message.reply_text("⛔ Ushbu buyruq faqat bot administratori uchun mo'ljallangan.")
+        return
+
+    args = context.args
+    if not args:
+        await update.message.reply_text(
+            "ℹ️ <b>Foydalanish:</b>\n"
+            "<code>/set_ai_key SIZNING_GEMINI_API_KALITINGIZ</code>\n\n"
+            "Masalan:\n<code>/set_ai_key AIzaSyD0123456789...</code>",
+            parse_mode="HTML"
+        )
+        return
+
+    new_key = args[0].strip()
+    wait_msg = await update.message.reply_text("⏳ Yangi API kalit tekshirilmoqda va sinovdan o'tkazilmoqda...")
+
+    try:
+        # Update config & persist to storage/ai_key.json
+        ai_service.update_config(api_key=new_key)
+        test_reply = await ai_service.generate_chat([{"role": "user", "content": "Salom"}])
+        await wait_msg.edit_text(
+            f"✅ <b>AI API kaliti muvaffaqiyatli saqlandi va sinovdan o'tdi!</b>\n\n"
+            f"• <b>Provayder:</b> <code>{ai_service.provider}</code>\n"
+            f"• <b>Model:</b> <code>{ai_service.model_name}</code>\n"
+            f"• <b>Test javobi:</b> <i>{html_lib.escape(test_reply[:80])}...</i>\n\n"
+            "Endi barcha foydalanuvchilar botga xabar yozganda AI xizmatidan to'liq foydalana oladilar.",
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        logger.error(f"Error validating new AI key: {e}")
+        await wait_msg.edit_text(
+            f"⚠️ <b>Kalit qabul qilindi, lekin test so'rovida xatolik yuz berdi:</b>\n"
+            f"<code>{html_lib.escape(str(e))}</code>\n\n"
+            "Iltimos, API kalit to'g'riligini yoki internet aloqasini tekshiring.",
             parse_mode="HTML"
         )

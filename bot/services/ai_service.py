@@ -17,6 +17,47 @@ logger = logging.getLogger(__name__)
 class AIService:
     """Universal Service for AI-powered interactive chat, text processing, summarization, lesson planning and quiz generation."""
 
+    @staticmethod
+    def normalize_base_url(raw_url: str) -> str:
+        """
+        AI Base URL ni tozalab, standart base_url (/v1 prefiksli, chat/completions siz) ko'rinishiga keltiradi.
+        Quyidagi barcha variantlarni qabul qiladi:
+          - https://api.b.ai/v1/chat/completions -> https://api.b.ai/v1
+          - https://api.b.ai/v1                 -> https://api.b.ai/v1
+          - https://api.b.ai                    -> https://api.b.ai/v1
+          - https://api.b.ai/chat/completions   -> https://api.b.ai
+        """
+        if not raw_url:
+            return ""
+        clean = raw_url.strip().strip("'\"").rstrip("/")
+        if clean.endswith("/chat/completions"):
+            clean = clean[:-len("/chat/completions")].rstrip("/")
+            return clean
+        if clean.endswith("/v1") or clean.endswith("/v2") or clean.endswith("/v3"):
+            return clean
+        if "://" in clean:
+            return f"{clean}/v1"
+        return clean
+
+    @staticmethod
+    def resolve_chat_url(raw_url: str) -> str:
+        """
+        AI chat completions endpoint URL sini aniqlaydi.
+        Moslashuvchan ravishda barcha formatlarni qo'llab-quvvatlaydi:
+          - https://api.b.ai/v1/chat/completions -> https://api.b.ai/v1/chat/completions
+          - https://api.b.ai/v1                 -> https://api.b.ai/v1/chat/completions
+          - https://api.b.ai                    -> https://api.b.ai/v1/chat/completions
+          - https://api.b.ai/chat/completions   -> https://api.b.ai/chat/completions
+        """
+        if not raw_url:
+            return "https://api.openai.com/v1/chat/completions"
+        clean = raw_url.strip().strip("'\"").rstrip("/")
+        if clean.endswith("/chat/completions"):
+            return clean
+        if clean.endswith("/v1") or clean.endswith("/v2") or clean.endswith("/v3"):
+            return f"{clean}/chat/completions"
+        return f"{clean}/v1/chat/completions"
+
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -28,7 +69,9 @@ class AIService:
         settings = get_settings()
         self.api_key = (api_key or settings.AI_API_KEY or settings.GEMINI_API_KEY or "").strip()
         raw_provider = (provider or settings.AI_PROVIDER or "gemini").lower().strip()
-        self.base_url = (base_url or settings.AI_BASE_URL or "").strip()
+        raw_base = (base_url or settings.AI_BASE_URL or "").strip().strip("'\"")
+        self.raw_base_url = raw_base
+        self.base_url = self.normalize_base_url(raw_base) if raw_base else ""
         self.display_name = (display_name or settings.AI_DISPLAY_NAME or "EduBot AI").strip()
         explicit_model = (model or settings.AI_MODEL or "").strip()
 
@@ -46,7 +89,9 @@ class AIService:
                         if saved_cfg.get("model"):
                             explicit_model = saved_cfg.get("model")
                         if saved_cfg.get("base_url"):
-                            self.base_url = saved_cfg.get("base_url")
+                            raw_saved_base = saved_cfg.get("base_url").strip().strip("'\"")
+                            self.raw_base_url = raw_saved_base
+                            self.base_url = self.normalize_base_url(raw_saved_base)
             except Exception as fe:
                 logger.debug(f"Could not load saved ai_key.json: {fe}")
 
@@ -111,7 +156,9 @@ class AIService:
         if model:
             self.model_name = model.strip()
         if base_url:
-            self.base_url = base_url.strip()
+            raw_base = base_url.strip().strip("'\"")
+            self.raw_base_url = raw_base
+            self.base_url = self.normalize_base_url(raw_base)
 
         # Re-initialize Gemini if applicable
         self.gemini_model = None
@@ -285,15 +332,16 @@ class AIService:
         return await self._chat_openai_compatible(messages, effective_sys)
 
     async def _chat_openai_compatible(self, messages: List[Dict[str, str]], system_prompt: str) -> str:
-        """Send chat messages to an OpenAI-compatible REST endpoint with retry and backoff."""
-        base = (self.base_url or "https://api.openai.com/v1").rstrip("/")
-        url = f"{base}/chat/completions"
+        """Send chat messages to an OpenAI-compatible REST endpoint with retry, endpoint fallback and backoff."""
+        target_base = getattr(self, "raw_base_url", None) or self.base_url or "https://api.openai.com/v1"
+        url = self.resolve_chat_url(target_base)
+        tried_alt_url = False
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
-        if "openrouter" in base:
+        if "openrouter" in (self.base_url or "").lower() or "openrouter" in url.lower():
             headers["HTTP-Referer"] = "https://ayamuchun.onrender.com"
             headers["X-Title"] = self.display_name
 
@@ -331,20 +379,36 @@ class AIService:
                         if choices and "message" in choices[0]:
                             return choices[0]["message"].get("content", "").strip()
                         return ""
-                    elif res.status_code in (400, 404) and "openrouter" in base:
-                        err_text_low = res.text.lower()
-                        if ("unavailable for free" in err_text_low or "not found" in err_text_low or "does not exist" in err_text_low) and payload["model"] != "nvidia/nemotron-3.5-lightning:free":
-                            logger.warning(f"OpenRouter model {payload['model']} is unavailable. Falling back to nvidia/nemotron-3.5-lightning:free...")
-                            payload["model"] = "nvidia/nemotron-3.5-lightning:free"
-                            self.model_name = "nvidia/nemotron-3.5-lightning:free"
-                            continue
-                        
+                    elif res.status_code in (400, 404):
+                        # 1. OpenRouter model unavailability check
+                        if "openrouter" in (self.base_url or "").lower() or "openrouter" in url.lower():
+                            err_text_low = res.text.lower()
+                            if ("unavailable for free" in err_text_low or "not found" in err_text_low or "does not exist" in err_text_low) and payload["model"] != "nvidia/nemotron-3.5-lightning:free":
+                                logger.warning(f"OpenRouter model {payload['model']} is unavailable. Falling back to nvidia/nemotron-3.5-lightning:free...")
+                                payload["model"] = "nvidia/nemotron-3.5-lightning:free"
+                                self.model_name = "nvidia/nemotron-3.5-lightning:free"
+                                continue
+
+                        # 2. Endpoint 404 bo'lsa, moslashuvchan muqobil endpoint sinab ko'rish (/v1/chat/completions <-> /chat/completions)
+                        if res.status_code == 404 and not tried_alt_url:
+                            tried_alt_url = True
+                            if "/v1/chat/completions" in url:
+                                alt_url = url.replace("/v1/chat/completions", "/chat/completions")
+                                logger.info(f"AI endpoint 404 berdi, muqobil endpoint sinab ko'rilmoqda: {alt_url}")
+                                url = alt_url
+                                continue
+                            elif "/chat/completions" in url and "/v1" not in url:
+                                alt_url = url.replace("/chat/completions", "/v1/chat/completions")
+                                logger.info(f"AI endpoint 404 berdi, muqobil endpoint sinab ko'rilmoqda: {alt_url}")
+                                url = alt_url
+                                continue
+
                         err_msg = ""
                         try:
                             err_msg = res.json().get("error", {}).get("message", "")
                         except Exception:
                             pass
-                        err_msg = err_msg or f"Model mavjud emas ({res.status_code})"
+                        err_msg = err_msg or f"Model yoki endpoint topilmadi ({res.status_code})"
                         raise RuntimeError(f"AI model xatosi: {err_msg}")
                     elif res.status_code == 401:
                         logger.error(f"OpenAI-compatible 401 Unauthorized: {res.text}")

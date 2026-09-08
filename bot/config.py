@@ -71,6 +71,9 @@ class Settings(BaseSettings):
         values["DATABASE_CHANNEL_ID"] = db_val
         values["BACKUP_CHANNEL_ID"] = db_val
         values["CHANNEL_DB_ID"] = db_val
+        # Clean AI_BASE_URL (strip whitespace and surrounding quotes)
+        raw_base_url = (values.get("AI_BASE_URL") or os.getenv("AI_BASE_URL", "") or "").strip().strip("'\"")
+        values["AI_BASE_URL"] = raw_base_url
 
         return values
 

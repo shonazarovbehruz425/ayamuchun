@@ -40,10 +40,12 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     # Get file extension
     file_name = document.file_name or "unknown"
-    ext = get_file_extension(file_name).lower()
+    raw_ext = get_file_extension(file_name).lower().strip()
+    ext_with_dot = raw_ext if raw_ext.startswith('.') else f".{raw_ext}"
+    ext_clean = ext_with_dot.lstrip('.')
     supported = {".pdf", ".docx", ".xlsx", ".pptx", ".doc", ".xls", ".csv", ".jpg", ".jpeg", ".png", ".webp"}
 
-    if f".{ext}" not in supported and ext not in [e.lstrip('.') for e in supported]:
+    if ext_with_dot not in supported and ext_clean not in [e.lstrip('.') for e in supported]:
         await update.message.reply_text(
             "❌ Bu fayl formati qo'llab-quvvatlanmaydi.\n"
             "Qo'llab-quvvatlanadigan formatlar: PDF, Word, Excel, PowerPoint, CSV, Rasm (JPG, PNG)"
@@ -195,15 +197,20 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await msg.edit_text(text, reply_markup=photo_batch_keyboard(count), parse_mode="HTML")
             return
 
-        if expected_tool == "pdf_to_word" and ext_lower == "pdf":
+        caption = (update.message.caption or "").lower().strip() if update.message else ""
+        has_word_intent = any(k in caption for k in ["doc", "docx", "word", "vord", "wordga", "word qil", "doc qil", "docx qil"])
+        has_pdf_intent = any(k in caption for k in ["pdf", "pdfga", "pdf qil"])
+        has_img_intent = any(k in caption for k in ["rasm", "rasmlar", "ajrat", "rasmini ol", "extract"])
+
+        if (expected_tool == "pdf_to_word" or has_word_intent) and ext_lower == "pdf":
             await msg.edit_text("⏳ PDF ni Word (DOCX) ga aylantirish boshlandi...")
             await _convert_to_docx(msg, update, local_path, file_name)
             return
-        elif expected_tool == "word_to_pdf" and ext_lower in ("docx", "doc"):
+        elif (expected_tool == "word_to_pdf" or has_pdf_intent) and ext_lower in ("docx", "doc"):
             await msg.edit_text("⏳ Word ni PDF ga aylantirish boshlandi...")
             await _convert_to_pdf(msg, update, local_path, file_name)
             return
-        elif expected_tool == "extract_images" and ext_lower == "pdf":
+        elif (expected_tool == "extract_images" or has_img_intent) and ext_lower == "pdf":
             await msg.edit_text("⏳ PDF dagi barcha rasmlar ajratilmoqda...")
             await _extract_images(msg, update, local_path, file_name)
             return

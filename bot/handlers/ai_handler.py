@@ -596,6 +596,29 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
 
     import re
 
+    # 3. Agar foydalanuvchi oxirgi yuborgan faylini konvertatsiya qilishni so'ragan bo'lsa (masalan: "doc qilib ber", "word qil", "pdf qil")
+    last_file = context.user_data.get("last_file")
+    if last_file and os.path.exists(last_file.get("path", "")):
+        f_type = (last_file.get("type") or "").lower()
+        f_path = last_file.get("path")
+        f_name = last_file.get("name")
+        lower_raw = raw_text.lower().strip()
+
+        is_greeting = any(g in lower_raw.split() for g in ["salom", "assalom", "hello", "hi", "qalaysiz"])
+        ask_word = any(k in lower_raw for k in ["doc", "docx", "word", "vord", "wordga", "word qil", "doc qil", "docx qil"])
+        ask_pdf = any(k in lower_raw for k in ["pdf", "pdfga", "pdf qil"])
+
+        if ask_word and not is_greeting and f_type == "pdf":
+            status_msg = await update.message.reply_text("⏳ PDF ni Word (DOCX) ga aylantirish boshlandi...")
+            from bot.handlers.file_handler import _convert_to_docx
+            await _convert_to_docx(status_msg, update, f_path, f_name)
+            return
+        elif ask_pdf and not is_greeting and f_type in ("docx", "doc"):
+            status_msg = await update.message.reply_text("⏳ Word ni PDF ga aylantirish boshlandi...")
+            from bot.handlers.file_handler import _convert_to_pdf
+            await _convert_to_pdf(status_msg, update, f_path, f_name)
+            return
+
     # Clean command prefixes if user typed /ai, /test, /konspekt, etc.
     clean_prompt = raw_text
     if raw_text.startswith("/test") or raw_text.startswith("/quiz"):

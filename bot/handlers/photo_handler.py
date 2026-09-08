@@ -12,7 +12,7 @@ from telegram.ext import ContextTypes
 
 from bot.config import get_settings
 from bot.processors.image_processor import ImageProcessor
-from bot.utils.helpers import format_file_size
+from bot.utils.helpers import format_file_size, clean_ai_markdown_for_telegram
 from bot.utils.animator import TelegramAiLoadingAnimation, VISION_STAGES
 
 logger = logging.getLogger(__name__)
@@ -290,8 +290,9 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                         "tushunarli va professional javob ber."
                     )
                 )
+                formatted_reply = clean_ai_markdown_for_telegram(ai_reply)
                 await animator.finish(
-                    final_text=f"🧠 <b>AI Javobi:</b>\n\n{ai_reply}",
+                    final_text=f"🧠 <b>AI Javobi:</b>\n\n{formatted_reply}",
                     update_message=update.message
                 )
                 return
@@ -398,8 +399,9 @@ async def handle_photo_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 image_paths=paths,
                 prompt=prompt
             )
+            formatted_reply = clean_ai_markdown_for_telegram(reply)
             await animator.finish(
-                final_text=f"🧠 <b>AI Tahlil Natijasi:</b>\n\n{reply}\n\n💬 <i>Ushbu rasm bo'yicha qo'shimcha savollaringiz bo'lsa, chatda bemalol yozavering!</i>",
+                final_text=f"🧠 <b>AI Tahlil Natijasi:</b>\n\n{formatted_reply}\n\n💬 <i>Ushbu rasm bo'yicha qo'shimcha savollaringiz bo'lsa, chatda bemalol yozavering!</i>",
                 update_message=query.message
             )
         except Exception as err:
@@ -508,8 +510,9 @@ async def handle_photo_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     prompt=prompt,
                     system_prompt="Siz rasmli hujjatlar va ta'lim materiallari bo'yicha kuchli AI Vision assistentsiz. Unga o'zbek tilida aniq va professional tushuntirish va matn xulosasini bering."
                 )
+                formatted_reply = clean_ai_markdown_for_telegram(reply)
                 await animator.finish(
-                    final_text=f"📝 <b>AI Tahlili Natijasi:</b>\n\n{reply}",
+                    final_text=f"📝 <b>AI Tahlil Natijasi:</b>\n\n{formatted_reply}",
                     update_message=query.message
                 )
             except Exception as err:

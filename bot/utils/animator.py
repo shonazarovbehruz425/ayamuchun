@@ -186,11 +186,16 @@ class TelegramAiLoadingAnimation:
         """
         Animatsiyani to'xtatib, status xabarini to'g'ridan-to'g'ri yakuniy javobga aylantirish.
         HTML xatoliklarida yoki rate limitda to'xtab qolmasdan ishonchli ravishda foydalanuvchiga yetkazadi.
+        Markdown belgilarini (** va ##) tozalaydi va ortiqcha bo'sh joylarni yo'qotadi.
         """
         await self.stop()
 
         if not final_text:
             final_text = "Kechirasiz, javob matni bo'sh bo'ldi. Iltimos, qayta urinib ko'ring."
+
+        # AI markdown belgilarini (** va ##) va bo'sh oraliqlarni tozalash
+        from bot.utils.helpers import clean_ai_markdown_for_telegram, split_html_message
+        final_text = clean_ai_markdown_for_telegram(final_text)
 
         async def _safe_deliver(text: str, is_first: bool = True, markup=None) -> bool:
             # 1-bosqich: mavjud loading xabarini edit qilish (avval HTML, keyin Plain Text)
@@ -260,10 +265,11 @@ class TelegramAiLoadingAnimation:
         if len(final_text) <= 4000:
             await _safe_deliver(final_text, is_first=True, markup=reply_markup)
         else:
-            chunks = [final_text[i:i + 3800] for i in range(0, len(final_text), 3800)]
+            chunks = split_html_message(final_text, max_len=3800)
             first_done = await _safe_deliver(chunks[0], is_first=True, markup=reply_markup if len(chunks) == 1 else None)
             start_idx = 1 if first_done else 0
             for i in range(start_idx, len(chunks)):
                 chunk = chunks[i]
                 is_last = (i == len(chunks) - 1)
                 await _safe_deliver(chunk, is_first=False, markup=reply_markup if is_last else None)
+

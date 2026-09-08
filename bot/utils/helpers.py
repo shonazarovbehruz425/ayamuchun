@@ -105,3 +105,92 @@ def split_html_message(html_text: str, max_len: int = 3800) -> list[str]:
 
     return chunks
 
+
+def clean_ai_markdown_for_telegram(text: str) -> str:
+    """
+    Safely convert AI raw Markdown into clean Telegram HTML entities.
+    - Removes raw markdown artifacts like **, ##, ***, __, etc.
+    - Cleans up excessive blank lines / whitespace ('bosh joy').
+    - Preserves code blocks as <pre><code>.
+    - Preserves existing valid Telegram HTML tags (<b>, <i>, etc.).
+    - Converts bullet lists cleanly (• and ▫️).
+    - Safely escapes raw angle brackets (<, >) and ampersands (&) to prevent parse errors.
+    """
+    if not text:
+        return ""
+
+    import html as html_lib
+
+    # 1. Normalize line breaks
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+
+    # 2. Extract and protect code blocks
+    code_blocks = []
+    def save_code_block(match):
+        lang = match.group(1) or ""
+        code = match.group(2)
+        idx = len(code_blocks)
+        code_blocks.append(html_lib.escape(code.strip("\n"), quote=False))
+        return f"QQQCODEBLOCK{idx}QQQ"
+
+    text = re.sub(r"```(\w*)\n?(.*?)```", save_code_block, text, flags=re.DOTALL)
+
+    # 2b. Extract and preserve existing valid Telegram HTML tags
+    valid_tags = []
+    def save_valid_tag(match):
+        idx = len(valid_tags)
+        valid_tags.append(match.group(0))
+        return f"QQQVALIDTAG{idx}QQQ"
+
+    tag_pattern = r"</?(?:b|strong|i|em|u|ins|s|strike|del|code|pre|blockquote)(?:\s+[^>]*?)?>|<a\s+href=\"[^\"]+\">|</a>"
+    text = re.sub(tag_pattern, save_valid_tag, text, flags=re.IGNORECASE)
+
+    # 3. HTML escape raw text (<, >, & only; preserve quotes and apostrophes like o'zbek)
+    text = html_lib.escape(text, quote=False)
+
+    # 4. Headings: # Heading, ## Heading, ### Heading -> <b>Heading</b>
+    text = re.sub(r"^[ \t]*#{1,6}[ \t]*(.+?)[ \t]*$", r"<b>\1</b>", text, flags=re.MULTILINE)
+
+    # 5. Bold & Italic: ***text*** -> <b><i>text</i></b>
+    text = re.sub(r"\*\*\*(.+?)\*\*\*", r"<b><i>\1</i></b>", text)
+    text = re.sub(r"___(.+?)___", r"<b><i>\1</i></b>", text)
+
+    # 6. Bold: **text** or __text__ -> <b>text</b>
+    text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
+    text = re.sub(r"(?<!\w)__(.+?)__(?!\w)", r"<b>\1</b>", text)
+
+    # 7. Italic: *text* or _text_ -> <i>text</i>
+    text = re.sub(r"(?<!\w)\*([^*\n]+?)\*(?!\w)", r"<i>\1</i>", text)
+    text = re.sub(r"(?<!\w)_([^_\n]+?)_(?!\w)", r"<i>\1</i>", text)
+
+    # 8. Inline code: `code` -> <code>code</code>
+    text = re.sub(r"`([^`\n]+?)`", r"<code>\1</code>", text)
+
+    # 9. Strikethrough: ~~text~~ -> <s>text</s>
+    text = re.sub(r"~~(.+?)~~", r"<s>\1</s>", text)
+
+    # 10. Horizontal rules: --- or *** or ___ -> ──────────
+    text = re.sub(r"^[ \t]*[\*\-_]{3,}[ \t]*$", "──────────", text, flags=re.MULTILINE)
+
+    # 11. Bullet lists:
+    # Sub-bullets (indented):
+    text = re.sub(r"^[ \t]{2,}[\*\-][ \t]+", "   ▫️ ", text, flags=re.MULTILINE)
+    # Top-level bullets:
+    text = re.sub(r"^[ \t]*[\*\-][ \t]+", "• ", text, flags=re.MULTILINE)
+
+    # 12. Restore code blocks
+    for idx, cb in enumerate(code_blocks):
+        text = text.replace(f"QQQCODEBLOCK{idx}QQQ", f"<pre><code>{cb}</code></pre>")
+
+    # 12b. Restore preserved valid Telegram HTML tags
+    for idx, vt in enumerate(valid_tags):
+        text = text.replace(f"QQQVALIDTAG{idx}QQQ", vt)
+
+    # 13. Clean excessive whitespace and blank lines ("bosh joy bor")
+    lines = [line.rstrip() for line in text.split("\n")]
+    text = "\n".join(lines)
+    # Collapse 3 or more newlines into max 2 (one blank line between blocks)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
+    return text.strip()
+

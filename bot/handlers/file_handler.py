@@ -14,7 +14,7 @@ from bot.keyboards.reply import main_menu_keyboard
 from bot.processors import get_processor
 from bot.processors.converter import FileConverter
 from bot.services.ai_service import AIService
-from bot.utils.helpers import format_file_size, get_file_extension, generate_unique_filename
+from bot.utils.helpers import format_file_size, get_file_extension, generate_unique_filename, clean_ai_markdown_for_telegram, split_html_message
 
 from bot.services.ai_service import get_ai_service
 
@@ -391,14 +391,18 @@ async def _ai_analyze(msg, query, file_path: str) -> None:
     await msg.edit_text("🧠 AI tahlil qilmoqda...")
     result = await ai_service.analyze_document(text)
 
-    full = f"🧠 AI tahlil natijasi:\n\n{result}"
-    if len(full) > 4096:
-        chunks = [full[i:i + 4096] for i in range(0, len(full), 4096)]
+    clean_result = clean_ai_markdown_for_telegram(result)
+    full = f"🧠 <b>AI tahlil natijasi:</b>\n\n{clean_result}"
+    chunks = split_html_message(full, max_len=3800)
+    try:
+        await msg.edit_text(chunks[0], parse_mode="HTML")
+    except Exception:
         await msg.edit_text(chunks[0])
-        for chunk in chunks[1:]:
+    for chunk in chunks[1:]:
+        try:
+            await query.message.reply_text(chunk, parse_mode="HTML")
+        except Exception:
             await query.message.reply_text(chunk)
-    else:
-        await msg.edit_text(full)
 
 
 async def _convert_to_docx(msg, query_or_update, file_path: str, file_name: str) -> None:

@@ -12,7 +12,7 @@ from bot.keyboards.reply import ai_menu_keyboard, back_keyboard, main_menu_keybo
 from bot.services.ai_service import AIService
 from bot.processors.word_processor import WordProcessor
 from bot.utils.validators import is_prompt_injection
-from bot.utils.helpers import parse_lesson_subject_topic, split_html_message
+from bot.utils.helpers import parse_lesson_subject_topic, split_html_message, clean_ai_markdown_for_telegram
 from bot.database.engine import get_session
 from bot.database import crud
 
@@ -318,7 +318,8 @@ async def process_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except Exception as log_err:
             logger.warning(f"Could not log AI usage to DB: {log_err}")
 
-        full_response = f"{header}\n\n{result}"
+        clean_result = clean_ai_markdown_for_telegram(result)
+        full_response = f"{header}\n\n{clean_result}"
 
         # If result is large, generate a Word docx as well so teacher can directly download it!
         doc_path = None
@@ -378,30 +379,7 @@ async def process_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 def format_ai_response_for_telegram(text: str) -> str:
     """Safely convert AI markdown into clean Telegram HTML entities."""
-    import html as html_lib
-    import re
-    
-    # 1. HTML escape everything first
-    safe_text = html_lib.escape(text)
-    
-    # 2. Bold: **text** or __text__ -> <b>text</b>
-    safe_text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', safe_text)
-    safe_text = re.sub(r'__(.+?)__', r'<b>\1</b>', safe_text)
-    
-    # 3. Italic: *text* or _text_ -> <i>text</i>
-    safe_text = re.sub(r'(?<!\w)\*([^\*\n]+?)\*(?!\w)', r'<i>\1</i>', safe_text)
-    safe_text = re.sub(r'(?<!\w)_([^\_\n]+?)_(?!\w)', r'<i>\1</i>', safe_text)
-    
-    # 4. Inline code: `code` -> <code>code</code>
-    safe_text = re.sub(r'`([^`\n]+?)`', r'<code>\1</code>', safe_text)
-    
-    # 5. Headings: ### Header -> <b>Header</b>
-    safe_text = re.sub(r'^#{1,6}\s*(.+)$', r'<b>\1</b>', safe_text, flags=re.MULTILINE)
-    
-    # 6. Bullet lists: * item or - item -> • item
-    safe_text = re.sub(r'^[\*\-]\s+', '• ', safe_text, flags=re.MULTILINE)
-    
-    return safe_text
+    return clean_ai_markdown_for_telegram(text)
 
 
 def build_ai_suggestions_keyboard(topic: str = "") -> InlineKeyboardMarkup:
@@ -870,8 +848,9 @@ async def handle_chat_ai_callback(update: Update, context: ContextTypes.DEFAULT_
             context.user_data["last_ai_response"] = summary
             keyboard = build_ai_suggestions_keyboard(topic=f"{last_topic} - Xulosa")
             await wait_msg.delete()
+            clean_summary = clean_ai_markdown_for_telegram(summary)
             await query.message.reply_text(
-                f"📋 <b>Qisqacha Xulosa:</b>\n\n{summary}",
+                f"📋 <b>Qisqacha Xulosa:</b>\n\n{clean_summary}",
                 reply_markup=keyboard,
                 parse_mode="HTML"
             )
@@ -893,9 +872,11 @@ async def handle_chat_ai_callback(update: Update, context: ContextTypes.DEFAULT_
             context.user_data["last_ai_response"] = translated
             keyboard = build_ai_suggestions_keyboard(topic=f"{last_topic} - Tarjima")
             await wait_msg.delete()
+            clean_translated = clean_ai_markdown_for_telegram(translated)
             await query.message.reply_text(
-                f"🔄 <b>Tarjima (Rus va Ingliz tillarida):</b>\n\n{translated}",
-                reply_markup=keyboard
+                f"🔄 <b>Tarjima (Rus va Ingliz tillarida):</b>\n\n{clean_translated}",
+                reply_markup=keyboard,
+                parse_mode="HTML"
             )
         except Exception as err:
             logger.error(f"Translate callback error: {err}", exc_info=True)

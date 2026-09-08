@@ -157,23 +157,24 @@ const TelegramApp = {
     downloadFile(url, fileName = "") {
         this.hapticFeedback('medium');
 
-        // Inside Telegram Mini App: NEVER trigger a.click()!
-        // a.click() opens external Chrome/Safari and forces user onto website.
-        // The file is already sent to the user's Telegram chat.
-        if (tg && (tg.initData || window.Telegram?.WebApp)) {
-            this.showAlert(
-                "📬 Fayl to'g'ridan-to'g'ri Telegram botingiz chatiga yuborildi!\n\n" +
-                "Saytga kirmasdan, bot chatidan original sifatda yuklab oling."
-            );
-            setTimeout(() => {
-                this.closeApp();
-            }, 600);
-            return;
+        const fullUrl = url.startsWith('http') ? url : (window.location.origin + url);
+
+        // Modern Telegram WebApp 8.0+ downloadFile API
+        if (tg && typeof tg.downloadFile === 'function') {
+            try {
+                tg.downloadFile({ url: fullUrl, file_name: fileName || "document" }, (accepted) => {
+                    if (accepted) {
+                        this.showAlert("Yuklab olish boshlandi!");
+                    }
+                });
+                return;
+            } catch (tgDlErr) {
+                console.warn("tg.downloadFile error:", tgDlErr);
+            }
         }
 
-        // Only for desktop web browser outside Telegram:
+        // WebApp or Browser download triggering
         try {
-            const fullUrl = url.startsWith('http') ? url : (window.location.origin + url);
             const a = document.createElement('a');
             a.href = fullUrl;
             if (fileName) a.download = fileName;
@@ -185,6 +186,11 @@ const TelegramApp = {
             }, 500);
         } catch (e) {
             console.warn("Direct download fallback error:", e);
+            if (tg && tg.openLink) {
+                tg.openLink(fullUrl);
+            } else {
+                window.open(fullUrl, '_blank');
+            }
         }
     }
 };

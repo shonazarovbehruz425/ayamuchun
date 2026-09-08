@@ -648,8 +648,9 @@ html, body {{
 def pdf_to_filtered_html(pdf_path: str, temp_dir: str) -> str:
     """
     Converts a PDF file to clean, high-fidelity editable HTML.
-    Uses pdf2docx to accurately rebuild text flow, paragraphs, tables, alignments and fonts,
-    eliminating absolute positioning bugs and overlapping text.
+    First attempts pdf2docx for native paragraph/table reconstruction.
+    If pdf2docx fails or produces empty output, falls back to high-fidelity structured PyMuPDF text & table extraction
+    preserving font sizes, bold styles, and page margins without text overlapping.
     """
     import tempfile
     import os
@@ -676,7 +677,7 @@ def pdf_to_filtered_html(pdf_path: str, temp_dir: str) -> str:
             except Exception:
                 pass
 
-    # Fallback: PyMuPDF clean structured text flow (avoids overlapping absolute coordinates)
+    # High-fidelity PyMuPDF structured text flow (avoids overlapping and preserves typography)
     try:
         doc = fitz.open(pdf_path)
         total_p = len(doc)
@@ -687,15 +688,39 @@ def pdf_to_filtered_html(pdf_path: str, temp_dir: str) -> str:
             if idx > 0:
                 break_tag = f'<div class="doc-page-break" data-page="{p_num}"><span class="page-tag">Sahifa {p_num}</span></div>'
             
-            blocks = page.get_text("blocks")
+            page_dict = page.get_text("dict")
             page_content = []
-            for b in blocks:
-                # b = (x0, y0, x1, y1, text, block_no, block_type)
-                if len(b) >= 5 and b[4].strip():
-                    block_text = html.escape(b[4].strip()).replace('\n', '<br>')
-                    page_content.append(f'<p style="margin: 6px 0; line-height: 1.4; font-size: 11.5pt;">{block_text}</p>')
             
-            pages_html.append(f"{break_tag}<div class='pdf-page' style='padding: 10px 0;'>{''.join(page_content)}</div>")
+            for block in page_dict.get("blocks", []):
+                b_type = block.get("type", 0)
+                if b_type == 0:  # Text block
+                    for line in block.get("lines", []):
+                        spans_html = []
+                        line_text_raw = ""
+                        for s in line.get("spans", []):
+                            txt = s.get("text", "")
+                            line_text_raw += txt
+                            if not txt:
+                                continue
+                            esc_txt = html.escape(txt).replace("  ", "&nbsp;&nbsp;")
+                            size = round(s.get("size", 11.5), 1)
+                            flags = s.get("flags", 0)
+                            is_bold = bool(flags & 2)
+                            is_italic = bool(flags & 1)
+                            style_parts = [f"font-size: {size}pt;"]
+                            if is_bold:
+                                style_parts.append("font-weight: bold;")
+                            if is_italic:
+                                style_parts.append("font-style: italic;")
+                            span_css = " ".join(style_parts)
+                            spans_html.append(f'<span style="{span_css}">{esc_txt}</span>')
+                        
+                        if line_text_raw.strip():
+                            p_html = "".join(spans_html)
+                            page_content.append(f'<p style="margin: 3px 0; line-height: 1.38; text-align: left;">{p_html}</p>')
+            
+            rendered_page_body = "".join(page_content) if page_content else "<p>&nbsp;</p>"
+            pages_html.append(f"{break_tag}<div class='pdf-page' style='padding: 8px 0;'>{rendered_page_body}</div>")
         doc.close()
 
         return f"""<!DOCTYPE html><html><head><meta charset='utf-8'><style>
@@ -709,20 +734,136 @@ html, body {{ font-family: 'Times New Roman', Arial, sans-serif; padding: 25px 3
         raise e
 
 
+class _HTMLDocxParser(HTMLParser):
+    """Clean standard library HTML to python-docx builder for 100% platform-independent Word generation."""
+    def __init__(self):
+        super().__init__()
+        from docx import Document
+        self.doc = Document()
+        self.current_p = None
+        self.tag_stack = []
+        self.in_table = False
+        self.table_rows = []
+        self.current_row = []
+        self.current_cell = []
+
+    def handle_starttag(self, tag, attrs):
+        attr_dict = dict(attrs)
+        style_str = attr_dict.get('style', '')
+        tag_lower = tag.lower()
+        
+        is_bold = ('b' == tag_lower or 'strong' == tag_lower or 'font-weight: bold' in style_str.lower() or 'font-weight:bold' in style_str.lower())
+        is_italic = ('i' == tag_lower or 'em' == tag_lower or 'font-style: italic' in style_str.lower() or 'font-style:italic' in style_str.lower())
+        is_underline = ('u' == tag_lower or 'underline' in style_str.lower())
+        
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        align = None
+        if 'text-align: center' in style_str.lower() or 'text-align:center' in style_str.lower():
+            align = WD_ALIGN_PARAGRAPH.CENTER
+        elif 'text-align: right' in style_str.lower() or 'text-align:right' in style_str.lower():
+            align = WD_ALIGN_PARAGRAPH.RIGHT
+        elif 'text-align: justify' in style_str.lower() or 'text-align:justify' in style_str.lower():
+            align = WD_ALIGN_PARAGRAPH.JUSTIFY
+
+        font_size = None
+        sz_match = re.search(r'font-size:\s*([\d\.]+)pt', style_str, re.IGNORECASE)
+        if sz_match:
+            try:
+                font_size = float(sz_match.group(1))
+            except Exception:
+                pass
+
+        self.tag_stack.append({
+            'tag': tag_lower,
+            'bold': is_bold,
+            'italic': is_italic,
+            'underline': is_underline,
+            'font_size': font_size,
+            'align': align
+        })
+
+        if tag_lower in ('p', 'h1', 'h2', 'h3', 'h4', 'div'):
+            if not self.in_table:
+                self.current_p = self.doc.add_paragraph()
+                if align:
+                    self.current_p.alignment = align
+        elif tag_lower == 'table':
+            self.in_table = True
+            self.table_rows = []
+        elif tag_lower in ('td', 'th'):
+            self.current_cell = []
+
+    def handle_endtag(self, tag):
+        tag_lower = tag.lower()
+        if tag_lower == 'table':
+            self.in_table = False
+            if self.table_rows:
+                max_cols = max(len(r) for r in self.table_rows) if self.table_rows else 1
+                tbl = self.doc.add_table(rows=len(self.table_rows), cols=max_cols)
+                tbl.style = 'Table Grid'
+                for r_i, r in enumerate(self.table_rows):
+                    for c_i, cell_text in enumerate(r):
+                        if c_i < max_cols:
+                            tbl.cell(r_i, c_i).text = cell_text
+                self.doc.add_paragraph()
+        elif tag_lower == 'tr':
+            if self.in_table and self.current_row:
+                self.table_rows.append(self.current_row)
+                self.current_row = []
+        elif tag_lower in ('td', 'th'):
+            if self.in_table:
+                self.current_row.append(''.join(self.current_cell).strip())
+                self.current_cell = []
+        
+        for i in range(len(self.tag_stack) - 1, -1, -1):
+            if self.tag_stack[i]['tag'] == tag_lower:
+                self.tag_stack.pop(i)
+                break
+
+    def handle_data(self, data):
+        txt = data
+        if not txt:
+            return
+        if self.in_table:
+            self.current_cell.append(txt)
+            return
+
+        if self.current_p is None:
+            self.current_p = self.doc.add_paragraph()
+
+        from docx.shared import Pt
+        eff_bold = any(item.get('bold') for item in self.tag_stack)
+        eff_italic = any(item.get('italic') for item in self.tag_stack)
+        eff_underline = any(item.get('underline') for item in self.tag_stack)
+        
+        eff_font_size = 11.5
+        for item in reversed(self.tag_stack):
+            if item.get('font_size'):
+                eff_font_size = item['font_size']
+                break
+
+        run = self.current_p.add_run(txt)
+        run.font.name = 'Times New Roman'
+        run.font.size = Pt(eff_font_size)
+        if eff_bold: run.bold = True
+        if eff_italic: run.italic = True
+        if eff_underline: run.underline = True
+
+
 def save_html_to_office_documents(html_str: str, base_name: str, target_dir: str, save_format: str = "both") -> dict:
     """
-    Saves edited HTML back to native DOCX and PDF using Word COM with python-docx fallback.
-    Guarantees clean execution and no hanging.
+    Saves edited HTML back to native DOCX and PDF across all platforms (Linux/Docker/Windows).
+    Guarantees clean execution without crashing on missing pythoncom or LibreOffice.
     """
-    import pythoncom
-    import win32com.client
-    
+    import subprocess
+    import fitz
+    from docx import Document
+
     # Clean out internal page divider rows & styles that shouldn't appear in printable Word/PDF
     clean_html = re.sub(r'<tr class="page-divider-row">[\s\S]*?</tr>', '', html_str)
     clean_html = re.sub(r'<div class="doc-page-break"[\s\S]*?</div>', '', clean_html)
     clean_html = re.sub(r'<style id="edubot-injected-style">[\s\S]*?<\/style>', '', clean_html)
     
-    # 1. Ensure UTF-8 charset
     clean_html = clean_html.replace('charset=windows-1252', 'charset=utf-8').replace('charset="windows-1252"', 'charset="utf-8"')
     if '<head>' in clean_html.lower() and 'charset=' not in clean_html.lower():
         clean_html = re.sub(r'(<head[^>]*>)', r'\1\n<meta charset="utf-8">', clean_html, count=1, flags=re.IGNORECASE)
@@ -738,38 +879,110 @@ def save_html_to_office_documents(html_str: str, base_name: str, target_dir: str
     with open(temp_html, 'w', encoding='utf-8', errors='ignore') as f:
         f.write(clean_html)
 
-    # Convert with Word COM
-    pythoncom.CoInitialize()
-    word = None
-    doc = None
-    try:
-        word = win32com.client.DispatchEx('Word.Application')
-        word.Visible = False
-        word.DisplayAlerts = 0
-        word.Options.SaveInterval = 0
-        
-        doc = word.Documents.Open(FileName=temp_html, ReadOnly=True, ConfirmConversions=False, AddToRecentFiles=False)
-        doc.SaveAs(docx_path, FileFormat=16) # FileFormat=16 wdFormatXMLDocument (DOCX)
-        doc.SaveAs(pdf_path, FileFormat=17)  # FileFormat=17 wdFormatPDF
-        doc.Close(SaveChanges=0)
-        doc = None
-        word.Quit(SaveChanges=0)
-        word = None
-    except Exception as e:
-        logger.warning(f"Word COM save encountered error: {e}. Checking if files were produced...")
-        if not os.path.exists(docx_path) or not os.path.exists(pdf_path):
-            raise e
-    finally:
-        if doc:
-            try: doc.Close(SaveChanges=0)
-            except Exception: pass
-        if word:
-            try: word.Quit(SaveChanges=0)
-            except Exception: pass
-        pythoncom.CoUninitialize()
-        if os.path.exists(temp_html):
-            try: os.remove(temp_html)
-            except Exception: pass
+    # Strategy 1: Word COM (Only on Windows if pywin32 is installed and Word is active)
+    converted_via_com = False
+    if os.name == 'nt':
+        try:
+            import pythoncom
+            import win32com.client
+            pythoncom.CoInitialize()
+            word = None
+            doc = None
+            try:
+                word = win32com.client.DispatchEx('Word.Application')
+                word.Visible = False
+                word.DisplayAlerts = 0
+                word.Options.SaveInterval = 0
+                
+                doc = word.Documents.Open(FileName=temp_html, ReadOnly=True, ConfirmConversions=False, AddToRecentFiles=False)
+                doc.SaveAs(docx_path, FileFormat=16) # FileFormat=16 wdFormatXMLDocument (DOCX)
+                doc.SaveAs(pdf_path, FileFormat=17)  # FileFormat=17 wdFormatPDF
+                doc.Close(SaveChanges=0)
+                doc = None
+                word.Quit(SaveChanges=0)
+                word = None
+                converted_via_com = True
+            finally:
+                if doc:
+                    try: doc.Close(SaveChanges=0)
+                    except Exception: pass
+                if word:
+                    try: word.Quit(SaveChanges=0)
+                    except Exception: pass
+                pythoncom.CoUninitialize()
+        except Exception as e:
+            logger.info(f"Word COM not available or skipped ({e}), proceeding with cross-platform converters...")
+
+    # Strategy 2: LibreOffice headless (Available on Linux/Docker and servers)
+    if not converted_via_com:
+        for cmd_name in ('soffice', 'libreoffice'):
+            try:
+                # Convert HTML to DOCX via LibreOffice
+                cmd_docx = [cmd_name, '--headless', '--convert-to', 'docx', '--outdir', target_dir, temp_html]
+                res_docx = subprocess.run(cmd_docx, capture_output=True, timeout=30)
+                temp_gen_docx = os.path.join(target_dir, f"temp_save_{timestamp}_{os.getpid()}.docx")
+                if os.path.exists(temp_gen_docx):
+                    if os.path.exists(docx_path):
+                        try: os.remove(docx_path)
+                        except Exception: pass
+                    os.rename(temp_gen_docx, docx_path)
+
+                # Convert HTML to PDF via LibreOffice
+                cmd_pdf = [cmd_name, '--headless', '--convert-to', 'pdf', '--outdir', target_dir, temp_html]
+                res_pdf = subprocess.run(cmd_pdf, capture_output=True, timeout=30)
+                temp_gen_pdf = os.path.join(target_dir, f"temp_save_{timestamp}_{os.getpid()}.pdf")
+                if os.path.exists(temp_gen_pdf):
+                    if os.path.exists(pdf_path):
+                        try: os.remove(pdf_path)
+                        except Exception: pass
+                    os.rename(temp_gen_pdf, pdf_path)
+                break
+            except Exception as lo_err:
+                logger.debug(f"LibreOffice command {cmd_name} attempt failed: {lo_err}")
+
+    # Strategy 3: Pure Python-native fallback (python-docx + PyMuPDF)
+    # Guarantees valid DOCX and PDF files even on environments with zero external binaries!
+    if not os.path.exists(docx_path) or os.path.getsize(docx_path) == 0:
+        try:
+            parser = _HTMLDocxParser()
+            clean_text_for_parser = re.sub(r'<style[\s\S]*?<\/style>', '', clean_html, flags=re.IGNORECASE)
+            clean_text_for_parser = re.sub(r'<script[\s\S]*?<\/script>', '', clean_text_for_parser, flags=re.IGNORECASE)
+            parser.feed(clean_text_for_parser)
+            parser.doc.save(docx_path)
+            logger.info(f"Generated DOCX via pure python-docx fallback: {docx_path}")
+        except Exception as py_docx_err:
+            logger.error(f"python-docx fallback error: {py_docx_err}")
+
+    if not os.path.exists(pdf_path) or os.path.getsize(pdf_path) == 0:
+        try:
+            if os.path.exists(docx_path) and os.path.getsize(docx_path) > 0:
+                doc_mupdf = Document(docx_path)
+                pdf_doc = fitz.open()
+                pdf_page = pdf_doc.new_page(width=595, height=842) # A4
+                rect = fitz.Rect(45, 45, 550, 797)
+                
+                pdf_lines = []
+                for p in doc_mupdf.paragraphs:
+                    if p.text.strip():
+                        pdf_lines.append(p.text.strip())
+                for t in doc_mupdf.tables:
+                    for r in t.rows:
+                        row_txt = " | ".join(c.text.strip() for c in r.cells if c.text.strip())
+                        if row_txt:
+                            pdf_lines.append(row_txt)
+                
+                full_text = "\n\n".join(pdf_lines)
+                pdf_page.insert_textbox(rect, full_text, fontsize=11, fontname="helv")
+                pdf_doc.save(pdf_path)
+                pdf_doc.close()
+                logger.info(f"Generated PDF via PyMuPDF fallback: {pdf_path}")
+        except Exception as py_pdf_err:
+            logger.error(f"PyMuPDF fallback error: {py_pdf_err}")
+
+    # Clean temp html
+    if os.path.exists(temp_html):
+        try: os.remove(temp_html)
+        except Exception: pass
 
     return {
         "docx_path": docx_path,

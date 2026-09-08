@@ -50,8 +50,11 @@ class FileConverter:
         # 1. Windows da Microsoft Word COM orqali 100% asl sifatda konvertatsiya
         if os.name == 'nt':
             def _convert_with_word_com():
-                import pythoncom
-                import win32com.client
+                try:
+                    import pythoncom
+                    import win32com.client
+                except ImportError:
+                    return None
                 pythoncom.CoInitialize()
                 word = None
                 doc = None

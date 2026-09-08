@@ -36,6 +36,8 @@ class DatabaseSyncService:
                     "telegram_id": u.telegram_id,
                     "full_name": u.full_name,
                     "username": u.username,
+                    "phone_number": getattr(u, "phone_number", None),
+                    "photo_url": getattr(u, "photo_url", None),
                     "language": u.language,
                     "created_at": u.created_at.isoformat() if u.created_at else None,
                     "last_active": u.last_active.isoformat() if u.last_active else None,
@@ -54,6 +56,7 @@ class DatabaseSyncService:
                     "telegram_file_id": f.telegram_file_id,
                     "local_path": f.local_path,
                     "file_size": f.file_size,
+                    "channel_message_id": getattr(f, "channel_message_id", None),
                     "uploaded_at": f.uploaded_at.isoformat() if f.uploaded_at else None,
                 }
                 for f in files_res.scalars().all()
@@ -211,11 +214,18 @@ class DatabaseSyncService:
                         telegram_id=u["telegram_id"],
                         full_name=u["full_name"],
                         username=u.get("username"),
+                        phone_number=u.get("phone_number"),
+                        photo_url=u.get("photo_url"),
                         language=u.get("language", "uz"),
                         created_at=datetime.fromisoformat(u["created_at"]) if u.get("created_at") else datetime.utcnow(),
                         last_active=datetime.fromisoformat(u["last_active"]) if u.get("last_active") else datetime.utcnow(),
                     )
                     session.add(new_u)
+                else:
+                    if u.get("phone_number") and not existing.phone_number:
+                        existing.phone_number = u["phone_number"]
+                    if u.get("photo_url") and not existing.photo_url:
+                        existing.photo_url = u["photo_url"]
 
             await session.commit()
 
@@ -250,6 +260,7 @@ class DatabaseSyncService:
                         telegram_file_id=f.get("telegram_file_id", ""),
                         local_path=f["local_path"],
                         file_size=f["file_size"],
+                        channel_message_id=f.get("channel_message_id"),
                         uploaded_at=datetime.fromisoformat(f["uploaded_at"]) if f.get("uploaded_at") else datetime.utcnow(),
                     )
                     session.add(new_f)

@@ -20,8 +20,11 @@ class Settings(BaseSettings):
     # Telegram Cloud Storage Channel for user documents, photos (3x4), PDFs, DOCXs
     STORAGE_CHANNEL_ID: int = int(os.getenv("STORAGE_CHANNEL_ID", "-1003745209875"))
     # Separate channel for DB dumps (if configured; None by default so user storage channel is never polluted)
-    BACKUP_CHANNEL_ID: Optional[int] = None
-    CHANNEL_DB_ID: Optional[int] = None
+    BACKUP_CHANNEL_ID: Optional[int] = int(os.getenv("BACKUP_CHANNEL_ID")) if os.getenv("BACKUP_CHANNEL_ID") else None
+    CHANNEL_DB_ID: Optional[int] = int(os.getenv("CHANNEL_DB_ID")) if os.getenv("CHANNEL_DB_ID") else None
+
+    # Persistent Database URL (e.g. Postgres / Supabase / Neon / Render Postgres)
+    DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL", None)
 
     # Web App & Host
     WEBAPP_URL: str = os.getenv("WEBAPP_URL", "https://ayamuchun.onrender.com")

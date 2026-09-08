@@ -3,12 +3,26 @@ from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 
-# Internal runtime SQLite engine (acts as in-memory/local cache synchronized with Telegram Channel)
-_STORAGE_DIR = os.getenv("STORAGE_PATH", "./storage")
-os.makedirs(_STORAGE_DIR, exist_ok=True)
-_LOCAL_DB_FILE = os.path.join(_STORAGE_DIR, "edubot_cache.db")
+from bot.config import get_settings
 
-async_engine = create_async_engine(f"sqlite+aiosqlite:///{_LOCAL_DB_FILE}", echo=False)
+_settings = get_settings()
+_CUSTOM_DB_URL = getattr(_settings, "DATABASE_URL", None) or os.getenv("DATABASE_URL")
+
+if _CUSTOM_DB_URL:
+    # Convert standard postgres:// or postgresql:// to postgresql+asyncpg:// if needed
+    db_url = _CUSTOM_DB_URL
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif db_url.startswith("postgresql://") and not db_url.startswith("postgresql+asyncpg://"):
+        db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    async_engine = create_async_engine(db_url, echo=False)
+else:
+    # Internal runtime SQLite engine (acts as local cache synchronized with Telegram Channel)
+    _STORAGE_DIR = getattr(_settings, "STORAGE_PATH", "./storage") or "./storage"
+    os.makedirs(_STORAGE_DIR, exist_ok=True)
+    _LOCAL_DB_FILE = os.path.join(_STORAGE_DIR, "edubot_cache.db")
+    async_engine = create_async_engine(f"sqlite+aiosqlite:///{_LOCAL_DB_FILE}", echo=False)
+
 AsyncSessionLocal = async_sessionmaker(async_engine, expire_on_commit=False, class_=AsyncSession)
 
 Base = declarative_base()

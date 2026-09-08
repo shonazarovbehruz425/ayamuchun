@@ -414,6 +414,18 @@ async def main() -> None:
     # Initialize bot
     await application.initialize()
 
+    # Auto-restore database from backup channel on server reboot / cold start
+    backup_chan = config.BACKUP_CHANNEL_ID or config.CHANNEL_DB_ID
+    if backup_chan and backup_chan != config.STORAGE_CHANNEL_ID:
+        try:
+            from bot.services.backup_service import DatabaseSyncService
+            db_sync = DatabaseSyncService(application.bot, backup_chan)
+            restored = await db_sync.restore_from_channel()
+            if restored:
+                logger.info("Auto-restored database from Telegram backup channel successfully!")
+        except Exception as r_err:
+            logger.warning(f"Could not auto-restore database from channel at startup: {r_err}")
+
     # Start bot
     if config.WEBHOOK_URL:
         logger.info(f"Starting webhook on {config.WEBHOOK_URL}")
@@ -453,6 +465,15 @@ async def main() -> None:
         await server.serve()
     finally:
         logger.info("Shutting down bot and server...")
+        backup_chan = config.BACKUP_CHANNEL_ID or config.CHANNEL_DB_ID
+        if backup_chan and backup_chan != config.STORAGE_CHANNEL_ID:
+            try:
+                from bot.services.backup_service import DatabaseSyncService
+                db_sync = DatabaseSyncService(application.bot, backup_chan)
+                await db_sync.sync_to_channel("Shutdown Auto-Sync")
+            except Exception as s_err:
+                logger.warning(f"Could not sync database on shutdown: {s_err}")
+
         if not config.WEBHOOK_URL:
             await application.updater.stop()
         await application.stop()

@@ -86,6 +86,10 @@ async def get_user_files(session: AsyncSession, user_id: int, file_type: Optiona
     result = await session.execute(query)
     return list(result.scalars().all())
 
+async def get_file_by_id(session: AsyncSession, file_id: int) -> Optional[File]:
+    result = await session.execute(select(File).where(File.id == file_id))
+    return result.scalar_one_or_none()
+
 async def delete_file_record(session: AsyncSession, file_id: int):
     result = await session.execute(select(File).where(File.id == file_id))
     file_record = result.scalar_one_or_none()

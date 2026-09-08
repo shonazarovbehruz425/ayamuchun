@@ -1471,15 +1471,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
 
-                <div class="flex items-center gap-2 shrink-0">
+                <div class="flex items-center gap-1.5 sm:gap-2 shrink-0 overflow-x-auto no-scrollbar py-0.5">
                     <!-- Dynamic Page Counter Badge -->
-                    <div id="doc-page-counter-badge" class="flex items-center gap-1 px-2.5 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-700 dark:text-slate-200 select-none">
+                    <div id="doc-page-counter-badge" class="flex items-center gap-1 px-2.5 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-700 dark:text-slate-200 select-none shrink-0">
                         <i data-lucide="book-open" class="w-3.5 h-3.5 text-indigo-500"></i>
                         <span>Sahifa <b id="doc-active-page" class="text-indigo-600 dark:text-indigo-400">1</b> / <span id="doc-total-pages">1</span></span>
                     </div>
 
                     <!-- Zoom control -->
-                    <div class="hidden sm:flex items-center gap-0.5 px-1 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs select-none">
+                    <div class="hidden sm:flex items-center gap-0.5 px-1 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs select-none shrink-0">
                         <button id="btn-zoom-out" title="Kichraytirish" class="p-1 hover:bg-white dark:hover:bg-slate-700 rounded text-slate-600 dark:text-slate-300">
                             <i data-lucide="minus" class="w-3 h-3"></i>
                         </button>
@@ -1492,16 +1492,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         </button>
                     </div>
 
-                    <!-- Save DOCX button -->
-                    <button id="btn-save-doc" class="h-8 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-blue-500/25 transition-all flex items-center gap-1.5 cursor-pointer">
-                        <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
-                        <span>Word</span>
+                    <!-- Word shaklida yuklab olish button -->
+                    <button id="btn-save-doc" title="Word (.docx) shaklida yuklab olish" class="h-8 px-3 sm:px-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-blue-500/25 transition-all flex items-center gap-1.5 cursor-pointer shrink-0">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        <span class="whitespace-nowrap">Word shaklida yuklab olish</span>
                     </button>
 
-                    <!-- Save PDF button -->
-                    <button id="btn-save-pdf" class="h-8 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-rose-500/25 transition-all flex items-center gap-1.5 cursor-pointer">
-                        <i data-lucide="file-check" class="w-3.5 h-3.5"></i>
-                        <span>PDF</span>
+                    <!-- PDF shaklida yuklab olish button -->
+                    <button id="btn-save-pdf" title="PDF shaklida yuklab olish" class="h-8 px-3 sm:px-3.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-rose-500/25 transition-all flex items-center gap-1.5 cursor-pointer shrink-0">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        <span class="whitespace-nowrap">PDF shaklida yuklab olish</span>
                     </button>
                 </div>
             </header>
@@ -1839,18 +1839,22 @@ document.addEventListener('DOMContentLoaded', () => {
             `);
             refreshIcons();
 
+            const isDocx = formatToSave === 'docx';
+            const progressTitle = isDocx ? "Word (.docx) shaklida tayyorlanmoqda..." : "PDF shaklida tayyorlanmoqda...";
+            const progressDesc = isDocx ? "Microsoft Word formati shakllantirilmoqda va yuklab olinmoqda" : "A4 PDF formati shakllantirilmoqda va yuklab olinmoqda";
+
             window.showPercentageLoader('doc-save-loading', {
-                color: 'indigo',
-                icon: 'check-check',
-                title: 'Hujjat saqlanmoqda...',
-                desc: 'Microsoft Word (DOCX) va PDF formatlari yaratilmoqda'
+                color: isDocx ? 'indigo' : 'rose',
+                icon: 'download',
+                title: progressTitle,
+                desc: progressDesc
             });
 
             const stopSaveSim = window.simulatePercentageProgress('doc-save-loading', {
                 start: 15,
                 target: 95,
                 duration: 2500,
-                title: 'Hujjat saqlanmoqda...',
+                title: progressTitle,
                 desc: 'Jadvallar va matnlar sinxronizatsiya qilinmoqda'
             });
 
@@ -1859,56 +1863,66 @@ document.addEventListener('DOMContentLoaded', () => {
                 stopSaveSim();
                 window.updatePercentageLoader('doc-save-loading', 100, {
                     title: 'Tayyor!',
-                    desc: 'Hujjat muvaffaqiyatli saqlandi'
+                    desc: 'Fayl muvaffaqiyatli shakllantirildi'
                 });
                 isDocDirty = false;
                 TelegramApp.hapticFeedback('heavy');
 
-                const isDocx = formatToSave === 'docx';
-                const mainFileName = isDocx ? (saveRes.docx_file_name || saveRes.new_file_name) : (saveRes.pdf_file_name || saveRes.new_file_name);
+                const targetFileId = isDocx ? (saveRes.docx_file_id || saveRes.new_file_id) : (saveRes.pdf_file_id || saveRes.new_file_id);
+                const targetFileName = isDocx ? (saveRes.docx_file_name || saveRes.new_file_name || 'document.docx') : (saveRes.pdf_file_name || saveRes.new_file_name || 'document.pdf');
+
+                // Avtomatik ravishda qurilmaga yuklab olishni boshlash
+                if (targetFileId) {
+                    TelegramApp.downloadFile(`/api/files/${targetFileId}/download`, targetFileName);
+                }
 
                 openModal(`
                     <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md animate-fade-in">
                         <div class="liquid-glass-card max-w-md w-full p-6 text-center space-y-4 bg-white/95 dark:bg-slate-900/95 border border-white/80 shadow-2xl">
-                            <div class="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                                <i data-lucide="check-check" class="w-6 h-6"></i>
+                            <div class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr ${isDocx ? 'from-blue-600 to-indigo-600' : 'from-rose-600 to-red-600'} text-white flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                                <i data-lucide="download-cloud" class="w-7 h-7"></i>
                             </div>
                             <div>
-                                <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">${mainFileName}</h3>
+                                <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">${targetFileName}</h3>
                                 <div class="mt-2.5 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-left space-y-1">
                                     <div class="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
-                                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
-                                        <span>Tahrirlangan hujjat Telegram chatiga yuborildi!</span>
+                                        <i data-lucide="check-circle-2" class="w-4 h-4 shrink-0"></i>
+                                        <span>Faylni yuklab olish boshlandi!</span>
                                     </div>
                                     <p class="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
-                                        Barcha o'zgartirishlar, jadvallar va shriftlar saqlangan holda bot chatida tayyor turibdi.
+                                        Hujjat ${isDocx ? 'Word (.docx)' : 'PDF (.pdf)'} formatida qurilmangizga yuklanmoqda va nusxasi bot chatiga ham yuborildi.
                                     </p>
                                 </div>
                             </div>
 
                             <div class="space-y-2 pt-1">
-                                <button onclick="TelegramApp.openChat(); closeModal();" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-brand-600 to-blue-600 text-white text-xs font-bold shadow-md shadow-brand-500/25 flex items-center justify-center gap-2">
-                                    <i data-lucide="send" class="w-4 h-4"></i> Telegram chatida ochish ✓
+                                <button onclick="TelegramApp.downloadFile('/api/files/${targetFileId}/download', '${targetFileName}')" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r ${isDocx ? 'from-blue-600 to-indigo-600' : 'from-rose-600 to-red-600'} text-white text-xs font-bold shadow-md flex items-center justify-center gap-2 cursor-pointer hover:opacity-95">
+                                    <i data-lucide="download" class="w-4 h-4"></i> ${isDocx ? 'Word (.docx) qayta yuklab olish' : 'PDF (.pdf) qayta yuklab olish'}
                                 </button>
-                                ${saveRes.docx_file_id ? `
-                                    <button onclick="TelegramApp.downloadFile('/api/files/${saveRes.docx_file_id}/download')" class="w-full py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-white">
-                                        <i data-lucide="download" class="w-3.5 h-3.5"></i> Shu yerdan Word (.docx) yuklab olish
+
+                                ${isDocx && saveRes.pdf_file_id ? `
+                                    <button onclick="TelegramApp.downloadFile('/api/files/${saveRes.pdf_file_id}/download', '${saveRes.pdf_file_name || 'document.pdf'}')" class="w-full py-2 px-3 rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50/70 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 text-xs font-bold flex items-center justify-center gap-2 hover:bg-rose-100 cursor-pointer">
+                                        <i data-lucide="file-check" class="w-3.5 h-3.5"></i> PDF (.pdf) shaklida ham yuklab olish
                                     </button>
                                 ` : ''}
 
-                                ${saveRes.pdf_file_id ? `
-                                    <button onclick="TelegramApp.downloadFile('/api/files/${saveRes.pdf_file_id}/download')" class="w-full py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-white">
-                                        <i data-lucide="file-check" class="w-3.5 h-3.5"></i> Shu yerdan PDF (.pdf) yuklab olish
+                                ${!isDocx && saveRes.docx_file_id ? `
+                                    <button onclick="TelegramApp.downloadFile('/api/files/${saveRes.docx_file_id}/download', '${saveRes.docx_file_name || 'document.docx'}')" class="w-full py-2 px-3 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 text-xs font-bold flex items-center justify-center gap-2 hover:bg-blue-100 cursor-pointer">
+                                        <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Word (.docx) shaklida ham yuklab olish
                                     </button>
                                 ` : ''}
+
+                                <button onclick="TelegramApp.openChat(); closeModal();" class="w-full py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-white cursor-pointer">
+                                    <i data-lucide="send" class="w-3.5 h-3.5"></i> Telegram bot chatiga o'tish
+                                </button>
                             </div>
 
                             <div class="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
-                                <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">
+                                <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
                                     Tahrirlashda davom etish
                                 </button>
-                                <button onclick="closeModal(); closeDocumentEditor();" class="px-4 py-2 rounded-xl text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40">
-                                    Bosh sahifaga qaytish
+                                <button onclick="closeModal(); closeDocumentEditor();" class="px-4 py-2 rounded-xl text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 cursor-pointer">
+                                    Chiqish
                                 </button>
                             </div>
                         </div>

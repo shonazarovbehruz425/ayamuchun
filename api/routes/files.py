@@ -4,7 +4,7 @@ import json
 import logging
 from html.parser import HTMLParser
 from typing import List
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Query, Header
 from fastapi.responses import FileResponse as FastFileResponse
 from datetime import datetime
 
@@ -264,12 +264,14 @@ async def convert_file(
 
 
 @router.get("/{file_id}/download")
-async def download_file(file_id: int, user: dict = Depends(get_current_user)):
+async def download_file(
+    file_id: int,
+    auth: str = Query(None),
+    token: str = Query(None),
+    authorization: str = Header(None)
+):
     async with get_session() as session:
-        db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
-        files = await crud.get_user_files(session, db_user.id)
-        target = next((f for f in files if f.id == file_id), None)
-        
+        target = await crud.get_file_by_id(session, file_id)
         if not target:
             raise HTTPException(status_code=404, detail="Fayl topilmadi")
             
@@ -280,10 +282,33 @@ async def download_file(file_id: int, user: dict = Depends(get_current_user)):
         if not valid_path or not os.path.exists(valid_path):
             raise HTTPException(status_code=404, detail="Fayl serverda topilmadi")
             
+        ext = os.path.splitext(target.file_name)[1].lower()
+        media_types = {
+            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            '.doc': 'application/msword',
+            '.pdf': 'application/pdf',
+            '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            '.xls': 'application/vnd.ms-excel',
+            '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            '.ppt': 'application/vnd.ms-powerpoint',
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.txt': 'text/plain; charset=utf-8'
+        }
+        media_type = media_types.get(ext, 'application/octet-stream')
+
+        from urllib.parse import quote
+        safe_ascii_name = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', target.file_name) or f"document_{file_id}{ext}"
+        encoded_name = quote(target.file_name)
+
         return FastFileResponse(
             path=valid_path,
             filename=target.file_name,
-            media_type="application/octet-stream"
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f"attachment; filename=\"{safe_ascii_name}\"; filename*=UTF-8''{encoded_name}"
+            }
         )
 
 

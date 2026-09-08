@@ -231,14 +231,22 @@ const TelegramApp = {
     downloadFile(url, fileName = "") {
         this.hapticFeedback('medium');
 
-        const fullUrl = url.startsWith('http') ? url : (window.location.origin + url);
+        let fullUrl = url.startsWith('http') ? url : (window.location.origin + url);
+        const initData = this.getInitData();
+        if (initData && !fullUrl.includes('auth=') && !fullUrl.includes('token=')) {
+            fullUrl += (fullUrl.includes('?') ? '&' : '?') + 'auth=' + encodeURIComponent(initData);
+        }
 
-        // Modern Telegram WebApp 8.0+ downloadFile API
+        const safeFileName = fileName || "document";
+
+        // 1. Modern Telegram WebApp 8.0+ downloadFile API
         if (tg && typeof tg.downloadFile === 'function') {
             try {
-                tg.downloadFile({ url: fullUrl, file_name: fileName || "document" }, (accepted) => {
+                tg.downloadFile({ url: fullUrl, file_name: safeFileName }, (accepted) => {
                     if (accepted) {
                         this.showAlert("Yuklab olish boshlandi!");
+                    } else {
+                        this._triggerBrowserDownload(fullUrl, safeFileName);
                     }
                 });
                 return;
@@ -247,12 +255,43 @@ const TelegramApp = {
             }
         }
 
-        // WebApp or Browser download triggering
+        // 2. Direct browser & WebApp download
+        this._triggerBrowserDownload(fullUrl, safeFileName);
+    },
+
+    async _triggerBrowserDownload(fullUrl, fileName = "") {
+        try {
+            // First attempt: fetch as blob with auth header (most reliable for all webviews & safari)
+            const initData = this.getInitData();
+            const res = await fetch(fullUrl, {
+                headers: initData ? { 'Authorization': `Bearer ${initData}` } : {}
+            });
+            if (res.ok) {
+                const blob = await res.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                if (fileName) a.download = fileName;
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(blobUrl);
+                    if (document.body.contains(a)) document.body.removeChild(a);
+                }, 2000);
+                return;
+            }
+        } catch (fetchErr) {
+            console.warn("Blob download fallback failed:", fetchErr);
+        }
+
+        // Fallback standard anchor
         try {
             const a = document.createElement('a');
             a.href = fullUrl;
             if (fileName) a.download = fileName;
             a.target = '_blank';
+            a.style.display = 'none';
             document.body.appendChild(a);
             a.click();
             setTimeout(() => {

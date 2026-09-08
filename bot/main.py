@@ -62,6 +62,9 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
+from bot.utils.log_buffer import setup_global_logger
+setup_global_logger()
+
 logger = logging.getLogger(__name__)
 
 config = get_settings()

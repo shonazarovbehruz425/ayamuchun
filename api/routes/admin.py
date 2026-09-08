@@ -7,10 +7,12 @@ from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Depends
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from bot.config import get_settings
 from bot.database.engine import get_session
 from bot.database import crud
+from bot.services.ai_service import get_ai_service
+from bot.utils.log_buffer import log_buffer
 from api.routes.auth import get_admin_user
 
 logger = logging.getLogger(__name__)
@@ -25,6 +27,14 @@ class BroadcastRequest(BaseModel):
 class DirectMessageRequest(BaseModel):
     telegram_id: int
     message: str
+
+class AITestRequest(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=10000)
+    system_instruction: Optional[str] = None
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
 
 def format_bytes(size: int) -> str:
     if size < 1024:
@@ -222,3 +232,115 @@ async def download_db_backup():
         filename=filename,
         media_type="application/x-sqlite3"
     )
+
+# ── AI Testing & Diagnostic Endpoints ─────────────────────────────────────
+
+@router.post("/ai-test")
+async def test_ai_query(req: AITestRequest):
+    """
+    Send a test query to the configured AI engine or a custom provider override.
+    Returns the response, duration in ms, token usage, and active provider info.
+    """
+    start_time = time.time()
+    
+    # Custom provider override if provided in request
+    if req.api_key or req.provider or req.base_url or req.model:
+        from bot.services.ai_service import AIService
+        service_to_use = AIService(
+            api_key=req.api_key,
+            provider=req.provider,
+            base_url=req.base_url,
+            model=req.model,
+            display_name=settings.AI_DISPLAY_NAME
+        )
+    else:
+        service_to_use = get_ai_service()
+
+    if not service_to_use.is_configured:
+        raise HTTPException(
+            status_code=400,
+            detail="AI API kaliti sozlanmagan! Serverda AI_API_KEY yoki GEMINI_API_KEY mavjud emas."
+        )
+
+    logger.info(f"[Admin AI Test] Provider: {service_to_use.provider} | Model: {service_to_use.model_name} | Prompt: {req.prompt[:60]}...")
+
+    messages = [{"role": "user", "content": req.prompt.strip()}]
+    try:
+        reply_text = await service_to_use.generate_response(
+            messages=messages,
+            system_instruction=req.system_instruction or "Siz ta'lim va pedagogika bo'yicha kuchli, yordamchi AI konsultantsiz. O'zbek tilida aniq, ravon va to'liq javob bering."
+        )
+        elapsed_ms = int((time.time() - start_time) * 1000)
+
+        token_usage = getattr(service_to_use, "last_token_usage", {}) or {}
+
+        return {
+            "status": "ok",
+            "reply": reply_text,
+            "provider": service_to_use.provider,
+            "model": service_to_use.model_name,
+            "base_url": service_to_use.base_url or "Standart",
+            "elapsed_ms": elapsed_ms,
+            "tokens": token_usage,
+            "timestamp": datetime.utcnow().strftime("%H:%M:%S")
+        }
+    except Exception as e:
+        elapsed_ms = int((time.time() - start_time) * 1000)
+        logger.error(f"[Admin AI Test Error]: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"AI so'rovida xatolik yuz berdi: {str(e)}"
+        )
+
+
+@router.get("/ai-models")
+async def get_ai_models():
+    """Get active AI provider configurations and recommended free/pro models."""
+    ai = get_ai_service()
+    return {
+        "status": "ok",
+        "current": {
+            "provider": ai.provider,
+            "model": ai.model_name,
+            "base_url": ai.base_url,
+            "is_configured": ai.is_configured,
+            "display_name": ai.display_name
+        },
+        "presets": [
+            {"name": "NVIDIA Nemotron 3.5 (OpenRouter Free)", "provider": "openrouter", "model": "nvidia/nemotron-3.5-lightning:free", "base_url": "https://openrouter.ai/api/v1"},
+            {"name": "DeepSeek V3 (OpenRouter Free)", "provider": "openrouter", "model": "deepseek/deepseek-chat:free", "base_url": "https://openrouter.ai/api/v1"},
+            {"name": "Google Gemini 2.0 Flash (Rasmiy)", "provider": "gemini", "model": "gemini-2.0-flash", "base_url": ""},
+            {"name": "Google Gemini 1.5 Flash", "provider": "gemini", "model": "gemini-1.5-flash", "base_url": ""},
+            {"name": "OpenAI GPT-4o Mini", "provider": "openai", "model": "gpt-4o-mini", "base_url": "https://api.openai.com/v1"}
+        ]
+    }
+
+
+# ── Real-time System Logs Endpoints ───────────────────────────────────────
+
+@router.get("/logs")
+async def get_system_logs(
+    since_id: int = Query(0, ge=0, description="Return logs with ID greater than since_id"),
+    limit: int = Query(150, ge=1, le=500),
+    level: Optional[str] = Query(None, description="Filter by level: INFO, WARNING, ERROR, DEBUG")
+):
+    """
+    Get live system logs from the in-memory ring buffer.
+    Supports incremental polling via since_id.
+    """
+    logs = log_buffer.get_logs(since_id=since_id, limit=limit, level=level)
+    return {
+        "status": "ok",
+        "logs": logs,
+        "count": len(logs),
+        "latest_id": logs[-1]["id"] if logs else since_id
+    }
+
+
+@router.post("/logs/clear")
+async def clear_system_logs():
+    """Clear memory log buffer."""
+    log_buffer.clear()
+    logger.info("[Admin] Tizim loglari xotiradan tozalandi.")
+    return {"status": "ok", "message": "Loglar xotirasi tozalandi."}
+

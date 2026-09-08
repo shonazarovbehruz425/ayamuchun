@@ -7,6 +7,18 @@ const AdminApp = {
     currentTab: 'dashboard',
     cachedUsers: [],
     selectedUserId: null,
+    
+    // AI Test State
+    currentAiReply: '',
+    aiPresets: {},
+
+    // Real-time Logs State
+    logPollingInterval: null,
+    latestLogId: 0,
+    logLevelFilter: '',
+    logAutoScroll: true,
+    isLogStreaming: false,
+    allLogs: [],
 
     getAuthToken() {
         // Priority 1: Telegram WebApp initData if inside Telegram
@@ -118,7 +130,7 @@ const AdminApp = {
         if (activeBtn) activeBtn.classList.add('active');
 
         // Toggle sections
-        ['dashboard', 'users', 'files', 'broadcast', 'system'].forEach(name => {
+        ['dashboard', 'users', 'files', 'broadcast', 'aitest', 'logs', 'system'].forEach(name => {
             const el = document.getElementById(`tab-content-${name}`);
             if (el) {
                 if (name === tabName) {
@@ -135,6 +147,15 @@ const AdminApp = {
             this.loadFiles();
         } else if (tabName === 'dashboard') {
             this.loadStats();
+        } else if (tabName === 'aitest') {
+            this.loadAiInfo();
+        } else if (tabName === 'logs') {
+            this.startLogStream();
+        }
+
+        // Stop polling if we left logs tab
+        if (tabName !== 'logs') {
+            this.pauseLogStream();
         }
         
         this.initLucide();
@@ -445,6 +466,437 @@ const AdminApp = {
         toast.innerText = msg;
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 3500);
+    },
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // AI TESTING LABORATORY METHODS
+    // ═════════════════════════════════════════════════════════════════════════
+
+    async loadAiInfo() {
+        const badge = document.getElementById('ai-active-provider-badge');
+        const charCounter = document.getElementById('ai-char-counter');
+        const promptInput = document.getElementById('ai-test-prompt');
+
+        if (promptInput && !promptInput._boundCount) {
+            promptInput._boundCount = true;
+            promptInput.addEventListener('input', () => {
+                if (charCounter) charCounter.innerText = `${promptInput.value.length} / 10000`;
+            });
+        }
+
+        try {
+            const res = await this.apiFetch('/api/admin/ai-models');
+            if (res.ok) {
+                const data = await res.json();
+                const cur = data.current || {};
+                if (badge) {
+                    badge.innerText = `${(cur.provider || 'gemini').toUpperCase()} (${cur.model || 'standart'})`;
+                }
+                this.aiPresets = {
+                    'nemotron': { provider: 'openrouter', model: 'nvidia/nemotron-3.5-lightning:free' },
+                    'deepseek': { provider: 'openrouter', model: 'deepseek/deepseek-chat:free' },
+                    'gemini-2': { provider: 'gemini', model: 'gemini-2.0-flash' },
+                    'gpt4o': { provider: 'openai', model: 'gpt-4o-mini' }
+                };
+            }
+        } catch (e) {
+            if (badge) badge.innerText = "Xato";
+        }
+    },
+
+    applyAiPreset(presetKey) {
+        const provInput = document.getElementById('ai-override-provider');
+        const modelInput = document.getElementById('ai-override-model');
+        if (presetKey === 'default') {
+            if (provInput) provInput.value = '';
+            if (modelInput) modelInput.value = '';
+            return;
+        }
+        const preset = this.aiPresets[presetKey];
+        if (preset) {
+            if (provInput) provInput.value = preset.provider;
+            if (modelInput) modelInput.value = preset.model;
+        }
+    },
+
+    setAiPrompt(text) {
+        const promptInput = document.getElementById('ai-test-prompt');
+        const charCounter = document.getElementById('ai-char-counter');
+        if (promptInput) {
+            promptInput.value = text;
+            promptInput.focus();
+            if (charCounter) charCounter.innerText = `${text.length} / 10000`;
+        }
+    },
+
+    resetAiSystemPrompt() {
+        const sys = document.getElementById('ai-test-system');
+        if (sys) sys.value = "Siz ta'lim va pedagogika bo'yicha kuchli, yordamchi AI konsultantsiz. O'zbek tilida aniq, ravon va to'liq javob bering.";
+    },
+
+    clearAiTest() {
+        const p = document.getElementById('ai-test-prompt');
+        const r = document.getElementById('ai-response-container');
+        const tb = document.getElementById('ai-telemetry-box');
+        if (p) p.value = '';
+        if (r) r.innerHTML = `
+            <div class="h-[280px] flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 text-center space-y-2">
+                <i data-lucide="bot" class="w-10 h-10 stroke-[1.5] text-slate-300 dark:text-slate-600"></i>
+                <p class="text-xs">Maydon tozalandi. Yangi prompt yozing va jo'nating.</p>
+            </div>
+        `;
+        if (tb) tb.classList.add('hidden');
+        this.currentAiReply = '';
+        this.initLucide(r);
+    },
+
+    async sendAiTestQuery() {
+        const promptInput = document.getElementById('ai-test-prompt');
+        const systemInput = document.getElementById('ai-test-system');
+        const provInput = document.getElementById('ai-override-provider');
+        const modelInput = document.getElementById('ai-override-model');
+        const keyInput = document.getElementById('ai-override-key');
+        const sendBtn = document.getElementById('ai-test-send-btn');
+        const responseBox = document.getElementById('ai-response-container');
+        const telemetryBox = document.getElementById('ai-telemetry-box');
+        const noteEl = document.getElementById('ai-status-note');
+
+        const prompt = promptInput?.value?.trim();
+        if (!prompt) {
+            alert("Iltimos, AI uchun prompt yoki savol matnini kiriting!");
+            promptInput?.focus();
+            return;
+        }
+
+        // Loading UI state
+        if (sendBtn) {
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = `
+                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>AI o'ylamoqda...</span>
+            `;
+        }
+
+        if (responseBox) {
+            responseBox.innerHTML = `
+                <div class="h-[280px] flex flex-col items-center justify-center text-slate-500 space-y-3">
+                    <div class="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin"></div>
+                    <span class="text-xs font-semibold animate-pulse">Sun'iy intellekt javob tayyorlamoqda...</span>
+                </div>
+            `;
+        }
+        if (noteEl) noteEl.innerText = "So'rov yuborildi...";
+
+        const payload = {
+            prompt: prompt,
+            system_instruction: systemInput?.value?.trim() || null,
+            provider: provInput?.value?.trim() || null,
+            model: modelInput?.value?.trim() || null,
+            api_key: keyInput?.value?.trim() || null
+        };
+
+        try {
+            const res = await this.apiFetch('/api/admin/ai-test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (res.ok && data.status === 'ok') {
+                this.currentAiReply = data.reply || '';
+                
+                // Render nicely formatted text
+                if (responseBox) {
+                    responseBox.innerText = this.currentAiReply;
+                }
+
+                // Show telemetry badge
+                if (telemetryBox) {
+                    telemetryBox.classList.remove('hidden');
+                    const speedTag = document.getElementById('ai-speed-tag');
+                    const tokTag = document.getElementById('ai-tokens-tag');
+                    const modelTag = document.getElementById('ai-model-tag');
+
+                    if (speedTag) speedTag.innerText = `⚡ ${data.elapsed_ms}ms`;
+                    const totalTok = data.tokens?.total_tokens || 0;
+                    if (tokTag) tokTag.innerText = `🎯 ${totalTok} tok`;
+                    if (modelTag) modelTag.innerText = `🤖 ${data.model || data.provider}`;
+                }
+
+                if (noteEl) noteEl.innerText = `Muvaffaqiyatli bajarildi: ${data.timestamp}`;
+                this.showToast("✓ AI javobi qabul qilindi!");
+            } else {
+                const errMsg = data.detail || 'Noma\'lum xatolik yuz berdi';
+                if (responseBox) {
+                    responseBox.innerHTML = `
+                        <div class="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs">
+                            <b class="font-bold">❌ AI Xatoligi:</b>
+                            <p class="mt-1 font-mono">${errMsg}</p>
+                        </div>
+                    `;
+                }
+                if (noteEl) noteEl.innerText = "Xatolik yuz berdi";
+            }
+        } catch (err) {
+            if (responseBox) {
+                responseBox.innerHTML = `
+                    <div class="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs">
+                        <b class="font-bold">❌ Tarmoq / Server Xatoligi:</b>
+                        <p class="mt-1 font-mono">${err.message}</p>
+                    </div>
+                `;
+            }
+            if (noteEl) noteEl.innerText = "Tarmoq xatosi";
+        } finally {
+            if (sendBtn) {
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = `
+                    <i data-lucide="sparkles" class="w-4 h-4"></i>
+                    <span>AI ga So'rov Yuborish</span>
+                `;
+                this.initLucide(sendBtn);
+            }
+        }
+    },
+
+    copyAiResponse() {
+        if (!this.currentAiReply) {
+            alert("Nusxa olish uchun hali javob mavjud emas!");
+            return;
+        }
+        navigator.clipboard.writeText(this.currentAiReply).then(() => {
+            this.showToast("📋 AI javobi clipboardga nusxalandi!");
+        }).catch(() => {
+            alert("Nusxalab bo'lmadi, brauzer ruxsat bermadi.");
+        });
+    },
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // REAL-TIME SYSTEM LOGS METHODS
+    // ═════════════════════════════════════════════════════════════════════════
+
+    startLogStream() {
+        this.isLogStreaming = true;
+        this.updateLogPauseUI();
+        
+        // Initial fetch
+        this.fetchLogs();
+
+        // Start repeating poll every 2 seconds
+        if (this.logPollingInterval) clearInterval(this.logPollingInterval);
+        this.logPollingInterval = setInterval(() => {
+            if (this.isLogStreaming && this.currentTab === 'logs') {
+                this.fetchLogs();
+            }
+        }, 2000);
+    },
+
+    pauseLogStream() {
+        this.isLogStreaming = false;
+        if (this.logPollingInterval) {
+            clearInterval(this.logPollingInterval);
+            this.logPollingInterval = null;
+        }
+        this.updateLogPauseUI();
+    },
+
+    toggleLogStream() {
+        if (this.isLogStreaming) {
+            this.pauseLogStream();
+            this.showToast("⏸ Jonli log oqimi to'xtatildi");
+        } else {
+            this.startLogStream();
+            this.showToast("▶ Jonli log oqimi davom ettirilmoqda");
+        }
+    },
+
+    updateLogPauseUI() {
+        const btnText = document.getElementById('log-pause-text');
+        const btnIcon = document.getElementById('log-pause-icon');
+        const indicator = document.getElementById('log-connection-indicator');
+        const badge = document.getElementById('live-log-badge');
+
+        if (this.isLogStreaming) {
+            if (btnText) btnText.innerText = "Pauza";
+            if (btnIcon) btnIcon.setAttribute('data-lucide', 'pause');
+            if (indicator) {
+                indicator.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span><span>Jonli efir (Har 2 soniya)</span>';
+                indicator.className = "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20";
+            }
+            if (badge) badge.classList.add('animate-ping');
+        } else {
+            if (btnText) btnText.innerText = "Davom etish";
+            if (btnIcon) btnIcon.setAttribute('data-lucide', 'play');
+            if (indicator) {
+                indicator.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span><span>To\'xtatilgan</span>';
+                indicator.className = "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20";
+            }
+            if (badge) badge.classList.remove('animate-ping');
+        }
+        this.initLucide();
+    },
+
+    changeLogLevelFilter(level) {
+        this.logLevelFilter = level;
+        this.renderAllLogs();
+    },
+
+    toggleLogAutoScroll() {
+        this.logAutoScroll = !this.logAutoScroll;
+        const btn = document.getElementById('log-autoscroll-toggle');
+        if (btn) {
+            if (this.logAutoScroll) {
+                btn.className = "p-1.5 px-3 rounded-xl border border-brand-500/30 bg-brand-500/10 text-brand-600 dark:text-brand-400 text-xs font-bold flex items-center gap-1.5 transition-all";
+                btn.innerHTML = '<i data-lucide="arrow-down-circle" class="w-3.5 h-3.5"></i><span>Avto-surish: YOQILGAN</span>';
+                this.scrollToTerminalBottom();
+            } else {
+                btn.className = "p-1.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 text-xs font-bold flex items-center gap-1.5 transition-all";
+                btn.innerHTML = '<i data-lucide="circle-slash" class="w-3.5 h-3.5"></i><span>Avto-surish: O\'CHIK</span>';
+            }
+            this.initLucide(btn);
+        }
+    },
+
+    scrollToTerminalBottom() {
+        const terminal = document.getElementById('terminal-window');
+        const jumpBtn = document.getElementById('terminal-scroll-bottom-btn');
+        if (terminal) {
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+        if (jumpBtn) jumpBtn.classList.add('hidden');
+    },
+
+    async fetchLogs() {
+        try {
+            const url = `/api/admin/logs?since_id=${this.latestLogId}&limit=200`;
+            const res = await this.apiFetch(url);
+            if (!res.ok) return;
+
+            const data = await res.json();
+            const newLogs = data.logs || [];
+            
+            if (newLogs.length > 0) {
+                this.allLogs = this.allLogs.concat(newLogs);
+                // Keep max 1000 logs in frontend memory
+                if (this.allLogs.length > 1000) {
+                    this.allLogs = this.allLogs.slice(this.allLogs.length - 1000);
+                }
+                this.latestLogId = data.latest_id || this.allLogs[this.allLogs.length - 1].id;
+                this.appendLogsToTerminal(newLogs);
+            }
+
+            const countDisplay = document.getElementById('log-count-display');
+            const syncDisplay = document.getElementById('log-last-sync-time');
+            if (countDisplay) countDisplay.innerText = this.allLogs.length;
+            if (syncDisplay) {
+                const now = new Date();
+                syncDisplay.innerText = now.toTimeString().split(' ')[0];
+            }
+        } catch (e) {
+            // Silently handle polling glitch
+        }
+    },
+
+    appendLogsToTerminal(logs) {
+        const container = document.getElementById('log-lines-container');
+        const terminal = document.getElementById('terminal-window');
+        if (!container) return;
+
+        // If it was initial loading message, clear it
+        if (container.firstElementChild && container.firstElementChild.innerText.includes('Tizim loglari yuklanmoqda')) {
+            container.innerHTML = '';
+        }
+
+        const fragment = document.createDocumentFragment();
+        logs.forEach(log => {
+            if (this.logLevelFilter && log.level !== this.logLevelFilter) {
+                return;
+            }
+            const div = this.createLogElement(log);
+            fragment.appendChild(div);
+        });
+
+        container.appendChild(fragment);
+
+        if (this.logAutoScroll && terminal) {
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+    },
+
+    renderAllLogs() {
+        const container = document.getElementById('log-lines-container');
+        const terminal = document.getElementById('terminal-window');
+        if (!container) return;
+
+        container.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+        this.allLogs.forEach(log => {
+            if (this.logLevelFilter && log.level !== this.logLevelFilter) {
+                return;
+            }
+            const div = this.createLogElement(log);
+            fragment.appendChild(div);
+        });
+        container.appendChild(fragment);
+
+        if (this.logAutoScroll && terminal) {
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+    },
+
+    createLogElement(log) {
+        const div = document.createElement('div');
+        div.className = 'flex items-start gap-2 py-0.5 hover:bg-white/5 px-1.5 rounded transition-colors group font-mono text-[11px]';
+
+        let levelBadge = '';
+        if (log.level === 'ERROR' || log.level === 'CRITICAL') {
+            levelBadge = '<span class="px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 font-bold border border-rose-500/30 text-[10px]">ERROR</span>';
+        } else if (log.level === 'WARNING') {
+            levelBadge = '<span class="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30 text-[10px]">WARN</span>';
+        } else if (log.level === 'DEBUG') {
+            levelBadge = '<span class="px-1.5 py-0.2 rounded bg-slate-700/50 text-slate-400 text-[10px]">DEBUG</span>';
+        } else {
+            levelBadge = '<span class="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">INFO</span>';
+        }
+
+        div.innerHTML = `
+            <span class="text-slate-500 shrink-0 text-[10px] select-none">${log.time || ''}</span>
+            <div class="shrink-0">${levelBadge}</div>
+            <span class="text-slate-400 font-semibold shrink-0 select-none">[${log.logger || 'app'}]</span>
+            <span class="text-slate-200 break-all select-text">${this.escapeHtml(log.message)}</span>
+        `;
+        return div;
+    },
+
+    escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    },
+
+    async clearServerLogs() {
+        if (!confirm("Barcha saqlangan tizim loglarini xotiradan tozalashni tasdiqlaysizmi?")) return;
+        try {
+            await this.apiFetch('/api/admin/logs/clear', { method: 'POST' });
+            this.allLogs = [];
+            this.latestLogId = 0;
+            const container = document.getElementById('log-lines-container');
+            if (container) {
+                container.innerHTML = '<div class="text-slate-500 italic py-2">Loglar tozalandi. Yangi yozuvlar kutilmoqda...</div>';
+            }
+            const countDisplay = document.getElementById('log-count-display');
+            if (countDisplay) countDisplay.innerText = "0";
+            this.showToast("✓ Tizim loglari tozalandi");
+        } catch (e) {
+            alert("Loglarni tozalashda xatolik: " + e.message);
+        }
     }
 };
 

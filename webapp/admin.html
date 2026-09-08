@@ -104,6 +104,15 @@
                 <i data-lucide="send" class="w-4 h-4"></i>
                 <span>Ommaviy Xabar</span>
             </button>
+            <button onclick="AdminApp.switchTab('aitest')" id="tab-btn-aitest" class="admin-tab-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 transition-all shrink-0">
+                <i data-lucide="bot" class="w-4 h-4 text-purple-500"></i>
+                <span>AI Sinov Laboratoriyasi</span>
+            </button>
+            <button onclick="AdminApp.switchTab('logs')" id="tab-btn-logs" class="admin-tab-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 transition-all shrink-0">
+                <i data-lucide="terminal" class="w-4 h-4 text-emerald-500"></i>
+                <span>Real-Time Loglar</span>
+                <span id="live-log-badge" class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+            </button>
             <button onclick="AdminApp.switchTab('system')" id="tab-btn-system" class="admin-tab-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 transition-all shrink-0">
                 <i data-lucide="hard-drive" class="w-4 h-4"></i>
                 <span>Tizim & Zaxira</span>
@@ -416,6 +425,224 @@
             </div>
         </section>
 
+        <!-- TAB 6: AI TEST LABORATORY -->
+        <section id="tab-content-aitest" class="space-y-4 hidden animate-fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                <!-- Left Column: Input & Controls (5 cols) -->
+                <div class="lg:col-span-5 space-y-4">
+                    <div class="liquid-glass-card p-5 space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-200/50 dark:border-white/10 pb-3">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center">
+                                    <i data-lucide="bot" class="w-4 h-4"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-bold text-slate-900 dark:text-white leading-none">AI So'rov Sinovi</h3>
+                                    <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Tezkor prompt yuborish va tekshirish</p>
+                                </div>
+                            </div>
+                            <span id="ai-active-provider-badge" class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 font-mono">
+                                Tekshirilmoqda...
+                            </span>
+                        </div>
+
+                        <!-- Prompt input -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="text-xs font-bold text-slate-700 dark:text-slate-300">Prompt (Savol / Matn):</label>
+                                <span class="text-[10px] text-slate-400 font-mono" id="ai-char-counter">0 / 10000</span>
+                            </div>
+                            <textarea id="ai-test-prompt" rows="5" placeholder="Masalan: 7-sinf Fizika fanidan bosim mavzusiga 5 ta qiziqarli test savoli tuzib ber..." 
+                                class="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/80 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"></textarea>
+                        </div>
+
+                        <!-- System instruction (Optional) -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="text-xs font-bold text-slate-700 dark:text-slate-300">Tizim Ko'rsatmasi (System Instruction):</label>
+                                <button onclick="AdminApp.resetAiSystemPrompt()" class="text-[10px] text-brand-600 hover:underline">Standartga qaytarish</button>
+                            </div>
+                            <textarea id="ai-test-system" rows="2" 
+                                class="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/80 text-xs font-mono text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500/50">Siz ta'lim va pedagogika bo'yicha kuchli, yordamchi AI konsultantsiz. O'zbek tilida aniq, ravon va to'liq javob bering.</textarea>
+                        </div>
+
+                        <!-- Advanced overrides accordion -->
+                        <details class="group rounded-xl border border-slate-200/70 dark:border-white/10 bg-slate-50/50 dark:bg-white/5 p-3 text-xs">
+                            <summary class="font-bold text-slate-700 dark:text-slate-300 cursor-pointer flex items-center justify-between select-none">
+                                <span>Kengaytirilgan Sozlamalar (Model / Provider o'zgartirish)</span>
+                                <i data-lucide="chevron-down" class="w-4 h-4 transition-transform group-open:rotate-180"></i>
+                            </summary>
+                            <div class="space-y-3 mt-3 pt-3 border-t border-slate-200/50 dark:border-white/10">
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-500 mb-1">Model / Provider Tezkor Tanlov:</label>
+                                    <select id="ai-model-preset-select" onchange="AdminApp.applyAiPreset(this.value)" class="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 focus:outline-none">
+                                        <option value="default">Joriy Server Sozlamasi (.env)</option>
+                                        <option value="nemotron">NVIDIA Nemotron 3.5 (OpenRouter Free)</option>
+                                        <option value="deepseek">DeepSeek V3 (OpenRouter Free)</option>
+                                        <option value="gemini-2">Google Gemini 2.0 Flash</option>
+                                        <option value="gpt4o">OpenAI GPT-4o Mini</option>
+                                    </select>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-slate-500 mb-1">Provider:</label>
+                                        <input type="text" id="ai-override-provider" placeholder="openrouter / gemini" class="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-slate-500 mb-1">Model Nomi:</label>
+                                        <input type="text" id="ai-override-model" placeholder="masalan: nvidia/nemotron-3.5-lightning:free" class="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-500 mb-1">Maxsus API Kalit (Ixtiyoriy):</label>
+                                    <input type="password" id="ai-override-key" placeholder="Server kalitini chetlab o'tish uchun..." class="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs">
+                                </div>
+                            </div>
+                        </details>
+
+                        <!-- Action Buttons -->
+                        <div class="flex gap-2 pt-1">
+                            <button onclick="AdminApp.sendAiTestQuery()" id="ai-test-send-btn" class="flex-1 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs sm:text-sm shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2 transition-all active:scale-98 cursor-pointer">
+                                <i data-lucide="sparkles" class="w-4 h-4"></i>
+                                <span>AI ga So'rov Yuborish</span>
+                            </button>
+                            <button onclick="AdminApp.clearAiTest()" class="px-3.5 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 text-xs font-semibold" title="Tozalash">
+                                <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Sample Prompts -->
+                    <div class="liquid-glass-card p-4 space-y-2">
+                        <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Namuna savollar:</span>
+                        <div class="flex flex-wrap gap-1.5">
+                            <button onclick="AdminApp.setAiPrompt('Pedagog xodimlar uchun dars rejasining asosiy bosqichlarini qisqacha sanab ber.')" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-purple-100 dark:hover:bg-purple-950/40 text-[11px] text-slate-700 dark:text-slate-300 transition-colors">📋 Dars rejasi bosqichlari</button>
+                            <button onclick="AdminApp.setAiPrompt('8-sinf Kimyo: Kimyoviy bog\'lanishlar mavzusidan 3 ta A/B/C/D test savoli tuz.')" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-purple-100 dark:hover:bg-purple-950/40 text-[11px] text-slate-700 dark:text-slate-300 transition-colors">📝 Kimyo test</button>
+                            <button onclick="AdminApp.setAiPrompt('Assalomu alaykum, o\'zingizni tanishtiring va qanday imkoniyatlaringiz borligini ayting.')" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-purple-100 dark:hover:bg-purple-950/40 text-[11px] text-slate-700 dark:text-slate-300 transition-colors">👋 AI bilan tanishuv</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Response & Diagnostics (7 cols) -->
+                <div class="lg:col-span-7 space-y-4">
+                    <div class="liquid-glass-card p-5 space-y-4 min-h-[460px] flex flex-col justify-between">
+                        <div>
+                            <!-- Header Bar with telemetry stats -->
+                            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/50 dark:border-white/10 pb-3">
+                                <div class="flex items-center gap-2">
+                                    <i data-lucide="message-square-code" class="w-4 h-4 text-purple-600"></i>
+                                    <span class="text-xs font-bold text-slate-900 dark:text-white">AI Javobi</span>
+                                </div>
+                                <div id="ai-telemetry-box" class="hidden flex items-center gap-2 text-[11px] font-mono">
+                                    <span class="px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 font-semibold" id="ai-speed-tag">⚡ 0ms</span>
+                                    <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-semibold" id="ai-tokens-tag">🎯 0 tok</span>
+                                    <span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-600 font-semibold" id="ai-model-tag">🤖 ...</span>
+                                </div>
+                            </div>
+
+                            <!-- Response Area -->
+                            <div id="ai-response-container" class="mt-4 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 min-h-[300px] text-xs sm:text-sm leading-relaxed text-slate-800 dark:text-slate-200 whitespace-pre-wrap font-sans select-text">
+                                <div class="h-[280px] flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 text-center space-y-2">
+                                    <i data-lucide="bot" class="w-10 h-10 stroke-[1.5] text-slate-300 dark:text-slate-600"></i>
+                                    <p class="text-xs">Chap tomondan prompt yozing va "AI ga So'rov Yuborish" tugmasini bosing.</p>
+                                    <p class="text-[11px] text-slate-400">Javob matni, tezligi (ms) va token sarfi shu yerda ko'rinadi.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Footer copy & actions -->
+                        <div class="pt-3 border-t border-slate-200/50 dark:border-white/10 flex items-center justify-between text-xs">
+                            <span class="text-slate-400 text-[11px]" id="ai-status-note">Tayyor</span>
+                            <div class="flex gap-2">
+                                <button onclick="AdminApp.copyAiResponse()" id="ai-copy-btn" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 font-semibold text-xs flex items-center gap-1.5 transition-all">
+                                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                                    <span>Nusxa Olish</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 7: REAL-TIME LOGS -->
+        <section id="tab-content-logs" class="space-y-4 hidden animate-fade-in">
+            <div class="liquid-glass-card p-4 sm:p-5 space-y-4">
+                <!-- Controls bar -->
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/50 dark:border-white/10 pb-3.5">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                            <i data-lucide="terminal" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h3 class="text-sm font-bold text-slate-900 dark:text-white leading-none">Jonli Tizim Loglari (Console Live Stream)</h3>
+                                <span id="log-connection-indicator" class="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    <span>Jonli efir (Har 2 soniya)</span>
+                                </span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Foydalanuvchilar harakatlari, xatolar, AI so'rovlari va bot jarayonlari</p>
+                        </div>
+                    </div>
+
+                    <!-- Filter & Action Controls -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <!-- Level filter -->
+                        <select id="log-level-filter" onchange="AdminApp.changeLogLevelFilter(this.value)" class="p-1.5 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/80 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none">
+                            <option value="">Barcha Darajalar</option>
+                            <option value="INFO">Faqat INFO</option>
+                            <option value="WARNING">Faqat WARNING</option>
+                            <option value="ERROR">Faqat ERROR</option>
+                        </select>
+
+                        <!-- Auto-scroll toggle -->
+                        <button id="log-autoscroll-toggle" onclick="AdminApp.toggleLogAutoScroll()" class="p-1.5 px-3 rounded-xl border border-brand-500/30 bg-brand-500/10 text-brand-600 dark:text-brand-400 text-xs font-bold flex items-center gap-1.5 transition-all">
+                            <i data-lucide="arrow-down-circle" class="w-3.5 h-3.5"></i>
+                            <span>Avto-surish: YOQILGAN</span>
+                        </button>
+
+                        <!-- Pause / Resume -->
+                        <button id="log-pause-btn" onclick="AdminApp.toggleLogStream()" class="p-1.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 text-xs font-bold flex items-center gap-1.5 transition-all">
+                            <i id="log-pause-icon" data-lucide="pause" class="w-3.5 h-3.5"></i>
+                            <span id="log-pause-text">Pauza</span>
+                        </button>
+
+                        <!-- Clear memory -->
+                        <button onclick="AdminApp.clearServerLogs()" class="p-1.5 px-3 rounded-xl border border-rose-200 dark:border-rose-900/40 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-xs font-bold flex items-center gap-1.5 transition-all" title="Loglarni tozalash">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            <span>Tozalash</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live Log Terminal Window -->
+                <div class="relative">
+                    <div id="terminal-window" class="w-full h-[520px] rounded-2xl bg-slate-950 text-slate-200 p-4 font-mono text-[11px] sm:text-xs overflow-y-auto leading-relaxed border border-slate-800 shadow-inner select-text">
+                        <div id="log-lines-container" class="space-y-1">
+                            <div class="text-slate-500 italic py-2">Tizim loglari yuklanmoqda...</div>
+                        </div>
+                    </div>
+                    <!-- Quick jump to bottom button (appears when user scrolls up) -->
+                    <button id="terminal-scroll-bottom-btn" onclick="AdminApp.scrollToTerminalBottom()" class="hidden absolute bottom-4 right-6 px-3 py-1.5 rounded-xl bg-brand-600 text-white shadow-xl text-xs font-bold flex items-center gap-1.5 animate-bounce">
+                        <i data-lucide="arrow-down" class="w-3.5 h-3.5"></i>
+                        <span>Pastga tushish</span>
+                    </button>
+                </div>
+
+                <!-- Log metrics footer -->
+                <div class="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-1 font-mono">
+                    <div class="flex items-center gap-3">
+                        <span>Ko'rsatilmoqda: <b id="log-count-display" class="text-slate-800 dark:text-slate-200">0</b> ta yozuv</span>
+                        <span>Oxirgi yangilanish: <b id="log-last-sync-time" class="text-slate-800 dark:text-slate-200">--:--:--</b></span>
+                    </div>
+                    <div>
+                        <span>Bufer: <b>1000 ta yozuv</b> (Avtomatik aylanma)</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
     </main>
 
     <!-- Modal for sending individual user message -->
@@ -455,6 +682,6 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="js/telegram.js?v=2.0"></script>
     <!-- Admin JS -->
-    <script src="js/admin.js?v=2.1"></script>
+    <script src="js/admin.js?v=2.5"></script>
 </body>
 </html>

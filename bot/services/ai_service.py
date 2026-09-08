@@ -220,6 +220,32 @@ class AIService:
             return await self.generate_chat([{"role": "user", "content": prompt[:15000]}], system_prompt=sys, image_paths=image_paths)
         return await self.generate_chat([{"role": "user", "content": "Salom"}], system_prompt=sys, image_paths=image_paths)
 
+    @staticmethod
+    def _optimize_image_for_vision(img_path: str, max_dimension: int = 1280, quality: int = 85) -> bytes:
+        """
+        Smartfon fotosuratlarini Vision AI uchun eng maqbul hajmga keltiradi (max 1280px, sifatli JPEG).
+        Hajmni 5-15MB dan 120-200KB gacha kamaytiradi va Vision AI tahlil tezligini 5-10 barobarga oshiradi.
+        """
+        try:
+            from PIL import Image
+            import io
+            with Image.open(img_path) as im:
+                if im.mode in ("RGBA", "P", "LA") or (im.mode == "RGB" and "transparency" in im.info):
+                    im = im.convert("RGB")
+                w, h = im.size
+                if max(w, h) > max_dimension:
+                    scale = max_dimension / max(w, h)
+                    new_w = max(1, int(w * scale))
+                    new_h = max(1, int(h * scale))
+                    im = im.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                buf = io.BytesIO()
+                im.save(buf, format="JPEG", quality=quality, optimize=True)
+                return buf.getvalue()
+        except Exception as e:
+            logger.warning(f"Could not optimize image {img_path} with PIL: {e}")
+            with open(img_path, "rb") as f:
+                return f.read()
+
     async def generate_chat(
         self,
         messages: List[Dict[str, str]],
@@ -285,15 +311,15 @@ class AIService:
             if not raw_turns:
                 raw_turns = [{"role": "user", "parts": ["Ushbu tasvirni ko'rib chiqib, tahlil qilib bering."] if valid_image_paths else ["Assalomu alaykum"]}]
 
-            # Multimodal: append PIL images to the last user turn parts
+            # Multimodal: append optimized PIL images to the last user turn parts
             if valid_image_paths:
                 try:
                     from PIL import Image
+                    import io
                     for img_p in valid_image_paths:
                         try:
-                            im = Image.open(img_p)
-                            if im.mode in ("RGBA", "P"):
-                                im = im.convert("RGB")
+                            opt_bytes = self._optimize_image_for_vision(img_p)
+                            im = Image.open(io.BytesIO(opt_bytes))
                             # Find last user turn
                             last_user_turn = None
                             for turn in reversed(raw_turns):
@@ -408,15 +434,12 @@ class AIService:
             for img_p in image_paths:
                 if img_p and os.path.exists(img_p):
                     try:
-                        mime_type, _ = mimetypes.guess_type(img_p)
-                        if not mime_type or not mime_type.startswith("image/"):
-                            mime_type = "image/jpeg"
-                        with open(img_p, "rb") as f_img:
-                            b64_data = base64.b64encode(f_img.read()).decode("utf-8")
+                        opt_bytes = self._optimize_image_for_vision(img_p)
+                        b64_data = base64.b64encode(opt_bytes).decode("utf-8")
                         image_content_items.append({
                             "type": "image_url",
                             "image_url": {
-                                "url": f"data:{mime_type};base64,{b64_data}"
+                                "url": f"data:image/jpeg;base64,{b64_data}"
                             }
                         })
                     except Exception as b64_err:
@@ -441,8 +464,25 @@ class AIService:
             parts.extend(image_content_items)
             chat_messages.append({"role": "user", "content": parts})
 
+        active_model = self.model_name
+        # Agar so'rovda rasm bo'lsa va faqat matnli model tanlangan bo'lsa, avtomatik Vision modelga o'tish
+        TEXT_ONLY_MODELS = {
+            "nvidia/nemotron-3.5-lightning:free",
+            "deepseek/deepseek-chat:free",
+            "deepseek-chat",
+            "deepseek-reasoner",
+            "gpt-3.5-turbo"
+        }
+        if image_content_items and any(t_model in active_model.lower() for t_model in TEXT_ONLY_MODELS):
+            if "openrouter" in (self.base_url or "").lower() or "openrouter" in url.lower():
+                logger.info(f"Model {active_model} does not support vision. Switching to meta-llama/llama-3.2-11b-vision-instruct:free...")
+                active_model = "meta-llama/llama-3.2-11b-vision-instruct:free"
+            else:
+                logger.info(f"Model {active_model} does not support vision. Switching to gpt-4o-mini...")
+                active_model = "gpt-4o-mini"
+
         payload = {
-            "model": self.model_name,
+            "model": active_model,
             "messages": chat_messages,
             "temperature": 0.7,
             "max_tokens": 4096
@@ -485,9 +525,21 @@ class AIService:
                                 return choice["text"].strip()
                         return ""
                     elif res.status_code in (400, 404):
-                        # 1. OpenRouter model unavailability check
+                        err_text_low = res.text.lower()
+                        # 1. Vision/Multimodal model fallback on OpenRouter
+                        if image_content_items and ("openrouter" in (self.base_url or "").lower() or "openrouter" in url.lower()):
+                            if any(k in err_text_low for k in ["multimodal", "image_url", "not supported", "unavailable", "does not exist", "not found"]):
+                                if payload["model"] != "meta-llama/llama-3.2-11b-vision-instruct:free":
+                                    logger.warning(f"Vision model {payload['model']} unsupported/unavailable. Falling back to meta-llama/llama-3.2-11b-vision-instruct:free...")
+                                    payload["model"] = "meta-llama/llama-3.2-11b-vision-instruct:free"
+                                    continue
+                                elif payload["model"] != "google/gemini-2.0-flash-exp:free":
+                                    logger.warning("Falling back to google/gemini-2.0-flash-exp:free...")
+                                    payload["model"] = "google/gemini-2.0-flash-exp:free"
+                                    continue
+
+                        # 2. Text-only OpenRouter model unavailability check
                         if "openrouter" in (self.base_url or "").lower() or "openrouter" in url.lower():
-                            err_text_low = res.text.lower()
                             if ("unavailable for free" in err_text_low or "not found" in err_text_low or "does not exist" in err_text_low) and payload["model"] != "nvidia/nemotron-3.5-lightning:free":
                                 logger.warning(f"OpenRouter model {payload['model']} is unavailable. Falling back to nvidia/nemotron-3.5-lightning:free...")
                                 payload["model"] = "nvidia/nemotron-3.5-lightning:free"

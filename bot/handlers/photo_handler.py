@@ -406,9 +406,12 @@ async def handle_photo_callback(update: Update, context: ContextTypes.DEFAULT_TY
             logger.error(f"Error in photo_ai_ask callback: {err}")
             await animator.stop()
             try:
-                await animator.message.edit_text(f"❌ AI tahlilida xatolik yuz berdi: {err}")
+                await animator.message.edit_text(f"❌ AI tahlilida xatolik yuz berdi: {err}", parse_mode=None)
             except Exception:
-                await query.message.reply_text(f"❌ AI tahlilida xatolik: {err}")
+                try:
+                    await query.message.reply_text(f"❌ AI tahlilida xatolik yuz berdi: {err}", parse_mode=None)
+                except Exception:
+                    pass
         return
 
     elif data == "photo_manual_options":

@@ -169,29 +169,31 @@ const TelegramApp = {
         const tgUrl = `https://t.me/${cleanUsername}`;
 
         if (tg) {
+            // Mini App yopilmasdan (sessiya va holat saqlangan holda) bot chatiga o'tish
             try {
-                if (typeof tg.disableClosingConfirmation === 'function') {
-                    tg.disableClosingConfirmation();
+                if (typeof tg.exitFullscreen === 'function' && tg.isFullscreen) {
+                    tg.exitFullscreen();
+                }
+                if (typeof tg.enableVerticalSwipes === 'function') {
+                    tg.enableVerticalSwipes();
                 }
             } catch (e) {}
 
             try {
                 if (typeof tg.openTelegramLink === 'function') {
-                    tg.openTelegramLink(tgUrl);
+                    tg.openTelegramLink(tgUrl, { force_request: true });
+                    return true;
                 }
             } catch (e) {
                 console.warn("tg.openTelegramLink error:", e);
             }
 
-            // In Telegram WebApp, closing the app returns user directly to the bot chat where their file is!
             try {
-                if (typeof tg.close === 'function') {
-                    tg.close();
+                if (typeof tg.openLink === 'function') {
+                    tg.openLink(tgUrl);
                     return true;
                 }
-            } catch (e) {
-                console.warn("tg.close error:", e);
-            }
+            } catch (e) {}
         }
 
         // Fallback for regular web browsers

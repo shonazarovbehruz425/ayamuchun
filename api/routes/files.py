@@ -649,28 +649,83 @@ html, body {{
 def pdf_to_filtered_html(pdf_path: str, temp_dir: str) -> str:
     """
     Converts a PDF file to clean, high-fidelity editable HTML.
-    First attempts pdf2docx for native paragraph/table reconstruction.
-    If pdf2docx fails or produces empty output, falls back to high-fidelity structured PyMuPDF text & table extraction
-    preserving font sizes, bold styles, and page margins without text overlapping.
+    Uses the project's FileConverter engine (which has lattice table parsing,
+    stream table protection, and geometric layout alignment) to produce
+    a structured DOCX, then maps it to responsive, editable HTML tables and paragraphs.
+    If any error occurs, falls back to structured PyMuPDF text & table extraction.
     """
     import tempfile
     import os
     import fitz
+    from bot.processors.converter import FileConverter
     
     timestamp = int(datetime.now().timestamp())
     temp_docx = os.path.join(temp_dir, f"temp_pdf_render_{timestamp}_{os.getpid()}.docx")
+    converter = FileConverter()
     
     try:
-        from pdf2docx import Converter
-        cv = Converter(pdf_path)
-        cv.convert(temp_docx, start=0, end=None)
-        cv.close()
+        # Use our robust converter with parse_stream_table=False, connected_border_tolerance,
+        # and geometric layout fallback to guarantee tables and text alignment
+        import asyncio
+        loop = None
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            pass
+
+        if loop and loop.is_running():
+            # Synchronous execution inside worker thread
+            def _run_sync_conv():
+                # Direct call to _convert internal logic
+                return asyncio.run(converter.pdf_to_word(pdf_path, temp_docx))
+            try:
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    executor.submit(_run_sync_conv).result(timeout=60)
+            except Exception:
+                # Direct converter invocation
+                cv = Converter(pdf_path)
+                cv.convert(
+                    temp_docx,
+                    start=0,
+                    end=None,
+                    parse_lattice_table=True,
+                    parse_stream_table=False,
+                    connected_border_tolerance=2.5,
+                    max_line_spacing_ratio=1.5,
+                    line_separate_threshold=3.5,
+                    delete_end_line_hyphen=True,
+                    ignore_page_error=True
+                )
+                cv.close()
+        else:
+            cv = Converter(pdf_path)
+            cv.convert(
+                temp_docx,
+                start=0,
+                end=None,
+                parse_lattice_table=True,
+                parse_stream_table=False,
+                connected_border_tolerance=2.5,
+                max_line_spacing_ratio=1.5,
+                line_separate_threshold=3.5,
+                delete_end_line_hyphen=True,
+                ignore_page_error=True
+            )
+            cv.close()
 
         if os.path.exists(temp_docx) and os.path.getsize(temp_docx) > 0:
             html = docx_to_filtered_html(temp_docx, temp_dir)
             return html
     except Exception as conv_err:
-        logger.warning(f"pdf2docx parsing encountered error: {conv_err}. Falling back to structured PyMuPDF text flow...")
+        logger.warning(f"Structured PDF converter encountered error: {conv_err}. Falling back to layout engine / PyMuPDF...")
+        try:
+            converter._convert_with_layout_engine(pdf_path, temp_docx)
+            if os.path.exists(temp_docx) and os.path.getsize(temp_docx) > 0:
+                html = docx_to_filtered_html(temp_docx, temp_dir)
+                return html
+        except Exception as le_err:
+            logger.warning(f"Layout engine fallback error: {le_err}")
     finally:
         if os.path.exists(temp_docx):
             try:

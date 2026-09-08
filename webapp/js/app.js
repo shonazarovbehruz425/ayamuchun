@@ -87,6 +87,89 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // ── Universal Real Percentage Loader Helper ──
+    window.showPercentageLoader = function(containerId, {
+        color = 'indigo',
+        icon = 'sparkles',
+        title = 'Ishlanmoqda...',
+        desc = 'Fayl qayta ishlanmoqda'
+    } = {}) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        const colorMap = {
+            rose: { text: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-500/10' },
+            blue: { text: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/10' },
+            cyan: { text: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-500/10' },
+            amber: { text: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10' },
+            fuchsia: { text: 'text-fuchsia-600 dark:text-fuchsia-400', bg: 'bg-fuchsia-500/10' },
+            purple: { text: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-500/10' },
+            emerald: { text: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10' },
+            red: { text: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10' },
+            indigo: { text: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-500/10' }
+        };
+        const c = colorMap[color] || colorMap.indigo;
+
+        container.innerHTML = `
+            <div class="progress-percentage-container p-5 rounded-2xl bg-white/70 dark:bg-slate-900/70 border border-slate-200/60 dark:border-slate-800 space-y-3.5 shadow-sm max-w-sm mx-auto">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div class="w-8 h-8 rounded-xl ${c.bg} ${c.text} flex items-center justify-center shrink-0">
+                            <i data-lucide="${icon}" class="w-4 h-4"></i>
+                        </div>
+                        <div class="min-w-0 text-left">
+                            <h4 id="${containerId}-step-title" class="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">${title}</h4>
+                            <p id="${containerId}-step-desc" class="text-[10px] text-slate-500 dark:text-slate-400 truncate">${desc}</p>
+                        </div>
+                    </div>
+                    <span id="${containerId}-badge" class="progress-percentage-badge text-xs ${c.text} ml-2 shrink-0 font-mono">0%</span>
+                </div>
+                <div class="progress-percentage-track w-full">
+                    <div id="${containerId}-bar" class="progress-percentage-fill ${color}" style="width: 0%;"></div>
+                </div>
+            </div>
+        `;
+        container.classList.remove('hidden');
+        refreshIcons(container);
+    };
+
+    window.updatePercentageLoader = function(containerId, percent, { title, desc } = {}) {
+        const bar = document.getElementById(`${containerId}-bar`);
+        const badge = document.getElementById(`${containerId}-badge`);
+        const titleEl = document.getElementById(`${containerId}-step-title`);
+        const descEl = document.getElementById(`${containerId}-step-desc`);
+
+        const p = Math.min(Math.max(Math.round(percent), 0), 100);
+        if (bar) bar.style.width = `${p}%`;
+        if (badge) badge.innerText = `${p}%`;
+        if (title && titleEl) titleEl.innerText = title;
+        if (desc && descEl) descEl.innerText = desc;
+    };
+
+    window.simulatePercentageProgress = function(containerId, {
+        start = 0,
+        target = 90,
+        duration = 3000,
+        title,
+        desc
+    } = {}) {
+        let current = start;
+        const stepTime = 60;
+        const totalSteps = Math.max(1, Math.floor(duration / stepTime));
+        const increment = (target - start) / totalSteps;
+
+        const timer = setInterval(() => {
+            current += increment;
+            if (current >= target) {
+                current = target;
+                clearInterval(timer);
+            }
+            window.updatePercentageLoader(containerId, current, { title, desc });
+        }, stepTime);
+
+        return () => clearInterval(timer);
+    };
+
     // ── Day / Night Theme Controller ──
     const themeToggleBtn = document.getElementById('theme-toggle-btn');
     const themeIconMoon = document.getElementById('theme-icon-moon');
@@ -753,11 +836,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
 
                         <!-- Processing indicator -->
-                        <div id="p2w-loading" class="hidden py-8 text-center space-y-3">
-                            <i data-lucide="loader-2" class="w-9 h-9 mx-auto text-rose-600 animate-spin"></i>
-                            <p class="text-xs font-bold text-slate-800">Word (DOCX) ga aylantirilmoqda...</p>
-                            <p class="text-[11px] text-slate-500">Jadvallar, matn va shriftlar saqlanmoqda</p>
-                        </div>
+                        <div id="p2w-loading" class="hidden py-6 text-center"></div>
 
                         <!-- Result Box -->
                         <div id="p2w-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-3.5">
@@ -804,27 +883,56 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!input.files.length) return;
             const file = input.files[0];
             uploadBox.classList.add('hidden');
-            loadingBox.classList.remove('hidden');
-            refreshIcons();
+            window.showPercentageLoader('p2w-loading', {
+                color: 'rose',
+                icon: 'file-text',
+                title: 'PDF yuklanmoqda...',
+                desc: 'Serverga uzatilmoqda'
+            });
 
             try {
                 const fd = new FormData();
                 fd.append('file', file);
-                const uploaded = await api.uploadFile(fd);
+                const uploaded = await api.uploadFile(fd, (pct) => {
+                    const mapped = Math.round(pct * 0.6);
+                    window.updatePercentageLoader('p2w-loading', mapped, {
+                        title: 'PDF yuklanmoqda...',
+                        desc: `${pct}% yuklandi`
+                    });
+                });
+
+                window.updatePercentageLoader('p2w-loading', 65, {
+                    title: 'Word (DOCX) ga aylantirilmoqda...',
+                    desc: 'Jadvallar va matnlar tekshirilmoqda'
+                });
+                const stopSim = window.simulatePercentageProgress('p2w-loading', {
+                    start: 65,
+                    target: 95,
+                    duration: 3500,
+                    title: 'Word (DOCX) ga aylantirilmoqda...',
+                    desc: 'Format va shriftlar saqlanmoqda'
+                });
 
                 const converted = await api.convertFile(uploaded.file_id, 'docx');
+                stopSim();
+                window.updatePercentageLoader('p2w-loading', 100, {
+                    title: 'Tayyor!',
+                    desc: 'Word hujjati muvaffaqiyatli yaratildi'
+                });
                 TelegramApp.hapticFeedback('medium');
 
-                loadingBox.classList.add('hidden');
-                resultBox.classList.remove('hidden');
-                outName.innerText = converted.new_file_name;
-                if (dlBtn) {
-                    dlBtn.onclick = () => {
-                        TelegramApp.downloadFile(`/api/files/${converted.new_file_id}/download`);
-                    };
-                }
-                refreshIcons();
-                loadRecentFiles();
+                setTimeout(() => {
+                    loadingBox.classList.add('hidden');
+                    resultBox.classList.remove('hidden');
+                    outName.innerText = converted.new_file_name;
+                    if (dlBtn) {
+                        dlBtn.onclick = () => {
+                            TelegramApp.downloadFile(`/api/files/${converted.new_file_id}/download`);
+                        };
+                    }
+                    refreshIcons();
+                    loadRecentFiles();
+                }, 300);
             } catch (err) {
                 loadingBox.classList.add('hidden');
                 uploadBox.classList.remove('hidden');
@@ -839,14 +947,14 @@ document.addEventListener('DOMContentLoaded', () => {
     window.openWordToPdfModal = () => {
         TelegramApp.hapticFeedback();
         openModal(`
-            <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-md animate-fade-in">
-                <div class="liquid-glass-card max-w-md w-full flex flex-col overflow-hidden bg-white/95 dark:bg-slate-900/95 border border-white/80 dark:border-slate-700/80 shadow-2xl">
-                    <div class="p-4 border-b border-white/60 dark:border-slate-800 flex items-center justify-between">
+            <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+                <div class="liquid-glass-card max-w-sm w-full p-0 overflow-hidden bg-white/95 dark:bg-slate-900/95 border border-white/80 shadow-2xl">
+                    <div class="p-4 border-b border-white/60 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/40">
                         <div class="flex items-center gap-2">
                             <div class="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center">
-                                <i data-lucide="file-text" class="w-4 h-4"></i>
+                                <i data-lucide="file-check" class="w-4 h-4"></i>
                             </div>
-                            <h3 class="text-sm font-bold text-slate-900">Word ni PDF ga aylantirish</h3>
+                            <h3 class="text-sm font-bold text-slate-900">Word ➔ PDF</h3>
                         </div>
                         <button onclick="closeModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600">
                             <i data-lucide="x" class="w-4 h-4"></i>
@@ -862,11 +970,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
 
                         <!-- Processing indicator -->
-                        <div id="w2p-loading" class="hidden py-8 text-center space-y-3">
-                            <i data-lucide="loader-2" class="w-9 h-9 mx-auto text-blue-600 animate-spin"></i>
-                            <p class="text-xs font-bold text-slate-800">PDF ga aylantirilmoqda...</p>
-                            <p class="text-[11px] text-slate-500">Asl format va shriftlar saqlanmoqda</p>
-                        </div>
+                        <div id="w2p-loading" class="hidden py-6 text-center"></div>
 
                         <!-- Result Box -->
                         <div id="w2p-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-3.5">
@@ -913,27 +1017,56 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!input.files.length) return;
             const file = input.files[0];
             uploadBox.classList.add('hidden');
-            loadingBox.classList.remove('hidden');
-            refreshIcons();
+            window.showPercentageLoader('w2p-loading', {
+                color: 'blue',
+                icon: 'file-check',
+                title: 'Word yuklanmoqda...',
+                desc: 'Serverga uzatilmoqda'
+            });
 
             try {
                 const fd = new FormData();
                 fd.append('file', file);
-                const uploaded = await api.uploadFile(fd);
+                const uploaded = await api.uploadFile(fd, (pct) => {
+                    const mapped = Math.round(pct * 0.6);
+                    window.updatePercentageLoader('w2p-loading', mapped, {
+                        title: 'Word yuklanmoqda...',
+                        desc: `${pct}% yuklandi`
+                    });
+                });
+
+                window.updatePercentageLoader('w2p-loading', 65, {
+                    title: 'PDF ga aylantirilmoqda...',
+                    desc: 'Format va shriftlar saqlanmoqda'
+                });
+                const stopSim = window.simulatePercentageProgress('w2p-loading', {
+                    start: 65,
+                    target: 95,
+                    duration: 3500,
+                    title: 'PDF ga aylantirilmoqda...',
+                    desc: 'Asl format va shriftlar saqlanmoqda'
+                });
 
                 const converted = await api.convertFile(uploaded.file_id, 'pdf');
+                stopSim();
+                window.updatePercentageLoader('w2p-loading', 100, {
+                    title: 'Tayyor!',
+                    desc: 'PDF hujjati muvaffaqiyatli yaratildi'
+                });
                 TelegramApp.hapticFeedback('medium');
 
-                loadingBox.classList.add('hidden');
-                resultBox.classList.remove('hidden');
-                outName.innerText = converted.new_file_name;
-                if (dlBtn) {
-                    dlBtn.onclick = () => {
-                        TelegramApp.downloadFile(`/api/files/${converted.new_file_id}/download`);
-                    };
-                }
-                refreshIcons();
-                loadRecentFiles();
+                setTimeout(() => {
+                    loadingBox.classList.add('hidden');
+                    resultBox.classList.remove('hidden');
+                    outName.innerText = converted.new_file_name;
+                    if (dlBtn) {
+                        dlBtn.onclick = () => {
+                            TelegramApp.downloadFile(`/api/files/${converted.new_file_id}/download`);
+                        };
+                    }
+                    refreshIcons();
+                    loadRecentFiles();
+                }, 300);
             } catch (err) {
                 loadingBox.classList.add('hidden');
                 uploadBox.classList.remove('hidden');
@@ -1274,30 +1407,51 @@ document.addEventListener('DOMContentLoaded', () => {
         // Show loading state while fetching document HTML
         editorContainer.innerHTML = `
             <div class="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-4 bg-slate-900 text-white">
-                <div class="relative">
-                    <div class="w-16 h-16 rounded-3xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-xl shadow-indigo-500/30 animate-pulse">
-                        <i data-lucide="file-text" class="w-8 h-8 text-white"></i>
-                    </div>
-                    <i data-lucide="loader-2" class="w-6 h-6 text-indigo-400 absolute -bottom-2 -right-2 animate-spin"></i>
+                <div class="w-16 h-16 rounded-3xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-xl shadow-indigo-500/30">
+                    <i data-lucide="file-text" class="w-8 h-8 text-white"></i>
                 </div>
-                <div>
-                    <h3 class="text-base font-bold tracking-tight">${fileName}</h3>
-                    <p class="text-xs text-slate-400 mt-1">Hujjatning asl formati, sahifalari va jadvallari yuklanmoqda...</p>
-                </div>
+                <div id="doc-open-loading" class="w-full max-w-sm"></div>
             </div>
         `;
         refreshIcons();
+
+        window.showPercentageLoader('doc-open-loading', {
+            color: 'indigo',
+            icon: 'file-text',
+            title: fileName,
+            desc: "Format, shriftlar va jadvallar ochilmoqda..."
+        });
+
+        const stopEditorSim = window.simulatePercentageProgress('doc-open-loading', {
+            start: 10,
+            target: 92,
+            duration: 2500,
+            title: fileName,
+            desc: "Sahifalar va jadvallar tahrirlash uchun tayyorlanmoqda..."
+        });
 
         let docHtml = initialHtml;
         if (!docHtml) {
             try {
                 const res = await api.getFileHtml(fileId);
                 docHtml = res.html || '';
+                stopEditorSim();
+                window.updatePercentageLoader('doc-open-loading', 100, {
+                    title: fileName,
+                    desc: "Hujjat tayyor!"
+                });
             } catch (err) {
+                stopEditorSim();
                 TelegramApp.showAlert(`Hujjatni ochishda xatolik: ${err.message}`);
                 closeDocumentEditor();
                 return;
             }
+        } else {
+            stopEditorSim();
+            window.updatePercentageLoader('doc-open-loading', 100, {
+                title: fileName,
+                desc: "Hujjat tayyor!"
+            });
         }
 
         // Render full modern document workspace with liquid glass buttons & page counter
@@ -1678,21 +1832,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
             openModal(`
                 <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md animate-fade-in">
-                    <div class="liquid-glass-card max-w-sm w-full p-6 text-center space-y-4 bg-white/95 dark:bg-slate-900/95 border border-white/80 shadow-2xl">
-                        <div class="w-12 h-12 mx-auto rounded-2xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
-                            <i data-lucide="loader-2" class="w-7 h-7 animate-spin"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Hujjat saqlanmoqda...</h3>
-                            <p class="text-xs text-slate-500 mt-1">Microsoft Word (DOCX) va PDF formatlari yaratilmoqda</p>
-                        </div>
+                    <div class="liquid-glass-card max-w-sm w-full p-5 text-center bg-white/95 dark:bg-slate-900/95 border border-white/80 shadow-2xl">
+                        <div id="doc-save-loading" class="w-full"></div>
                     </div>
                 </div>
             `);
             refreshIcons();
 
+            window.showPercentageLoader('doc-save-loading', {
+                color: 'indigo',
+                icon: 'check-check',
+                title: 'Hujjat saqlanmoqda...',
+                desc: 'Microsoft Word (DOCX) va PDF formatlari yaratilmoqda'
+            });
+
+            const stopSaveSim = window.simulatePercentageProgress('doc-save-loading', {
+                start: 15,
+                target: 95,
+                duration: 2500,
+                title: 'Hujjat saqlanmoqda...',
+                desc: 'Jadvallar va matnlar sinxronizatsiya qilinmoqda'
+            });
+
             try {
                 const saveRes = await api.saveFileHtml(fileId, outputHtml, formatToSave);
+                stopSaveSim();
+                window.updatePercentageLoader('doc-save-loading', 100, {
+                    title: 'Tayyor!',
+                    desc: 'Hujjat muvaffaqiyatli saqlandi'
+                });
                 isDocDirty = false;
                 TelegramApp.hapticFeedback('heavy');
 
@@ -1804,11 +1972,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
 
                         <!-- Processing State -->
-                        <div id="doc-picker-loading" class="hidden py-8 text-center space-y-3">
-                            <i data-lucide="loader-2" class="w-8 h-8 mx-auto ${colorClass.split(' ')[0]} animate-spin"></i>
-                            <p class="text-xs font-bold text-slate-800 dark:text-slate-200">Hujjat tayyorlanmoqda...</p>
-                            <p class="text-[11px] text-slate-500">Asl format, jadvallar va shriftlar yuklanmoqda</p>
-                        </div>
+                        <div id="doc-picker-loading" class="hidden py-6 text-center"></div>
                     </div>
 
                     <div class="p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40">
@@ -1829,16 +1993,33 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!input.files.length) return;
             const file = input.files[0];
             pickerBox.classList.add('hidden');
-            loadingBox.classList.remove('hidden');
-            refreshIcons();
+            window.showPercentageLoader('doc-picker-loading', {
+                color: isWord ? 'indigo' : 'rose',
+                icon: 'file-text',
+                title: 'Fayl yuklanmoqda...',
+                desc: 'Tahrirlash muhitiga uzatilmoqda'
+            });
 
             try {
                 const fd = new FormData();
                 fd.append('file', file);
-                const uploaded = await api.uploadFile(fd);
+                const uploaded = await api.uploadFile(fd, (pct) => {
+                    const mapped = Math.round(pct * 0.85);
+                    window.updatePercentageLoader('doc-picker-loading', mapped, {
+                        title: 'Fayl yuklanmoqda...',
+                        desc: `${pct}% yuklandi`
+                    });
+                });
 
-                closeModal();
-                openDocumentEditorPage(uploaded.file_id, uploaded.file_name, targetType);
+                window.updatePercentageLoader('doc-picker-loading', 100, {
+                    title: 'Ochilyapti...',
+                    desc: 'Muharrir sahifasi ochilmoqda'
+                });
+
+                setTimeout(() => {
+                    closeModal();
+                    openDocumentEditorPage(uploaded.file_id, uploaded.file_name, targetType);
+                }, 250);
             } catch (err) {
                 loadingBox.classList.add('hidden');
                 pickerBox.classList.remove('hidden');
@@ -2063,11 +2244,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
 
                         <!-- Processing State -->
-                        <div id="img2pdf-loading" class="hidden py-8 text-center space-y-3">
-                            <i data-lucide="loader-2" class="w-9 h-9 mx-auto text-emerald-600 animate-spin"></i>
-                            <p class="text-xs font-bold text-slate-800 dark:text-white">Yuqori sifatli PDF tayyorlanmoqda...</p>
-                            <p class="text-[11px] text-slate-500 dark:text-slate-400">Rasmlar tartiblanib, sahifalarga joylashtirilmoqda</p>
-                        </div>
+                        <div id="img2pdf-loading" class="hidden py-6 text-center"></div>
 
                         <!-- Success Result Box -->
                         <div id="img2pdf-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-3.5">
@@ -2180,13 +2357,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             box.classList.add('hidden');
             previewArea.classList.remove('hidden');
-            generateBtn.disabled = false;
             countBadge.innerText = `${selectedFiles.length} ta`;
+            generateBtn.disabled = false;
 
             thumbsList.innerHTML = selectedFiles.map((file, idx) => {
                 const tempUrl = URL.createObjectURL(file);
                 return `
-                    <div class="relative group rounded-lg overflow-hidden border border-slate-200/80 dark:border-slate-700/80 aspect-square bg-slate-100 dark:bg-slate-800 shadow-sm flex items-center justify-center">
+                    <div class="group relative rounded-xl overflow-hidden aspect-[3/4] bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs">
                         <img src="${tempUrl}" class="w-full h-full object-cover">
                         <span class="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white font-mono text-[9px] font-bold">#${idx + 1}</span>
                         <!-- Actions overlay -->
@@ -2248,8 +2425,12 @@ document.addEventListener('DOMContentLoaded', () => {
             previewArea.classList.add('hidden');
             box.classList.add('hidden');
             generateBtn.classList.add('hidden');
-            loading.classList.remove('hidden');
-            refreshIcons();
+            window.showPercentageLoader('img2pdf-loading', {
+                color: 'emerald',
+                icon: 'images',
+                title: 'Rasmlar yuklanmoqda...',
+                desc: `${selectedFiles.length} ta rasm uzatilmoqda`
+            });
 
             const fd = new FormData();
             selectedFiles.forEach(file => {
@@ -2269,30 +2450,58 @@ document.addEventListener('DOMContentLoaded', () => {
             if (title.trim()) fd.append('title', title.trim());
 
             try {
-                const res = await api.imagesToPdf(fd);
+                let stopSim = null;
+                const res = await api.imagesToPdf(fd, (pct) => {
+                    const mapped = Math.round(pct * 0.7);
+                    window.updatePercentageLoader('img2pdf-loading', mapped, {
+                        title: 'Rasmlar yuklanmoqda...',
+                        desc: `${pct}% yuklandi`
+                    });
+                    if (pct >= 100 && !stopSim) {
+                        window.updatePercentageLoader('img2pdf-loading', 72, {
+                            title: 'PDF sahifalari shakllantirilmoqda...',
+                            desc: 'A4 formatda sifatli birlashtirilmoqda'
+                        });
+                        stopSim = window.simulatePercentageProgress('img2pdf-loading', {
+                            start: 72,
+                            target: 96,
+                            duration: 3000,
+                            title: 'PDF sahifalari shakllantirilmoqda...',
+                            desc: 'Tasvirlar joylashtirilmoqda'
+                        });
+                    }
+                });
+
+                if (stopSim) stopSim();
+                window.updatePercentageLoader('img2pdf-loading', 100, {
+                    title: 'Tayyor!',
+                    desc: 'PDF muvaffaqiyatli yaratildi'
+                });
                 TelegramApp.hapticFeedback('heavy');
 
-                loading.classList.add('hidden');
-                box.classList.add('hidden');
-                previewArea.classList.add('hidden');
-                result.classList.remove('hidden');
-                outName.innerText = res.new_file_name;
-                const footer = document.getElementById('img2pdf-footer');
-                if (footer) {
-                    footer.innerHTML = `
-                        <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 ml-auto">
-                            Yopish
-                        </button>
-                    `;
-                    footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
-                }
-                if (dlBtn) {
-                    dlBtn.onclick = () => {
-                        TelegramApp.downloadFile(`/api/files/${res.new_file_id}/download`);
-                    };
-                }
-                refreshIcons();
-                loadRecentFiles();
+                setTimeout(() => {
+                    loading.classList.add('hidden');
+                    box.classList.add('hidden');
+                    previewArea.classList.add('hidden');
+                    result.classList.remove('hidden');
+                    outName.innerText = res.new_file_name;
+                    const footer = document.getElementById('img2pdf-footer');
+                    if (footer) {
+                        footer.innerHTML = `
+                            <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 ml-auto">
+                                Yopish
+                            </button>
+                        `;
+                        footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
+                    }
+                    if (dlBtn) {
+                        dlBtn.onclick = () => {
+                            TelegramApp.downloadFile(`/api/files/${res.new_file_id}/download`);
+                        };
+                    }
+                    refreshIcons();
+                    loadRecentFiles();
+                }, 300);
             } catch (err) {
                 loading.classList.add('hidden');
                 result.classList.add('hidden');
@@ -2333,11 +2542,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
 
                         <!-- Processing -->
-                        <div id="ext-loading" class="hidden py-8 text-center space-y-3">
-                            <i data-lucide="loader-2" class="w-9 h-9 mx-auto text-cyan-600 animate-spin"></i>
-                            <p class="text-xs font-bold text-slate-800">Rasmlar ajratilmoqda...</p>
-                            <p class="text-[11px] text-slate-500">Asl sifatdagi fotosuratlar saqlanmoqda</p>
-                        </div>
+                        <div id="ext-loading" class="hidden py-6 text-center"></div>
 
                         <!-- Result -->
                         <div id="ext-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-3.5">
@@ -2383,27 +2588,56 @@ document.addEventListener('DOMContentLoaded', () => {
         input.onchange = async () => {
             if (!input.files.length) return;
             box.classList.add('hidden');
-            loading.classList.remove('hidden');
-            refreshIcons();
+            window.showPercentageLoader('ext-loading', {
+                color: 'cyan',
+                icon: 'file-archive',
+                title: 'PDF yuklanmoqda...',
+                desc: 'Rasmlarni qidirish uchun uzatilmoqda'
+            });
 
             try {
                 const fd = new FormData();
                 fd.append('file', input.files[0]);
-                const uploaded = await api.uploadFile(fd);
+                const uploaded = await api.uploadFile(fd, (pct) => {
+                    const mapped = Math.round(pct * 0.6);
+                    window.updatePercentageLoader('ext-loading', mapped, {
+                        title: 'PDF yuklanmoqda...',
+                        desc: `${pct}% yuklandi`
+                    });
+                });
+
+                window.updatePercentageLoader('ext-loading', 65, {
+                    title: 'Rasmlar ajratilmoqda...',
+                    desc: 'Sahifalardagi fotosuratlar qidirilmoqda'
+                });
+                const stopSim = window.simulatePercentageProgress('ext-loading', {
+                    start: 65,
+                    target: 95,
+                    duration: 3000,
+                    title: 'Rasmlar arxivlanmoqda...',
+                    desc: 'ZIP fayl shakllantirilmoqda'
+                });
 
                 const extracted = await api.extractImages(uploaded.file_id);
+                stopSim();
+                window.updatePercentageLoader('ext-loading', 100, {
+                    title: 'Tayyor!',
+                    desc: `${extracted.images_count} ta rasm ajratildi`
+                });
                 TelegramApp.hapticFeedback('medium');
 
-                loading.classList.add('hidden');
-                result.classList.remove('hidden');
-                outMsg.innerText = `${extracted.images_count} ta rasm ZIP arxivga yig'ildi!`;
-                if (dlBtn) {
-                    dlBtn.onclick = () => {
-                        TelegramApp.downloadFile(`/api/files/${extracted.new_file_id}/download`);
-                    };
-                }
-                refreshIcons();
-                loadRecentFiles();
+                setTimeout(() => {
+                    loading.classList.add('hidden');
+                    result.classList.remove('hidden');
+                    outMsg.innerText = `${extracted.images_count} ta rasm ZIP arxivga yig'ildi!`;
+                    if (dlBtn) {
+                        dlBtn.onclick = () => {
+                            TelegramApp.downloadFile(`/api/files/${extracted.new_file_id}/download`);
+                        };
+                    }
+                    refreshIcons();
+                    loadRecentFiles();
+                }, 300);
             } catch (err) {
                 loading.classList.add('hidden');
                 box.classList.remove('hidden');
@@ -2470,11 +2704,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
 
-                        <div id="pmerge-loading" class="hidden py-8 text-center space-y-3">
-                            <i data-lucide="loader-2" class="w-9 h-9 mx-auto text-red-600 animate-spin"></i>
-                            <p class="text-xs font-bold text-slate-800 dark:text-white">PDF lar birlashtirilmoqda...</p>
-                            <p class="text-[11px] text-slate-500">Sahifalar sifatli tarzda ulanmoqda</p>
-                        </div>
+                        <div id="pmerge-loading" class="hidden py-6 text-center"></div>
 
                         <div id="pmerge-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-3.5">
                             <div class="w-11 h-11 mx-auto rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30">
@@ -2580,8 +2810,12 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('pmerge-upload-box').classList.add('hidden');
             previewArea.classList.add('hidden');
             actionBtn.classList.add('hidden');
-            document.getElementById('pmerge-loading').classList.remove('hidden');
-            refreshIcons();
+            window.showPercentageLoader('pmerge-loading', {
+                color: 'red',
+                icon: 'file-plus',
+                title: 'PDF lar yuklanmoqda...',
+                desc: `${mergeFiles.length} ta hujjat serverga uzatilmoqda`
+            });
 
             const fd = new FormData();
             mergeFiles.forEach(f => fd.append('files', f));
@@ -2589,15 +2823,42 @@ document.addEventListener('DOMContentLoaded', () => {
             if (title && title.trim()) fd.append('title', title.trim());
 
             try {
-                const res = await api.mergePdfs(fd);
+                let stopSim = null;
+                const res = await api.mergePdfs(fd, (pct) => {
+                    const mapped = Math.round(pct * 0.7);
+                    window.updatePercentageLoader('pmerge-loading', mapped, {
+                        title: 'PDF lar yuklanmoqda...',
+                        desc: `${pct}% yuklandi`
+                    });
+                    if (pct >= 100 && !stopSim) {
+                        window.updatePercentageLoader('pmerge-loading', 72, {
+                            title: 'Sahifalar ulanmoqda...',
+                            desc: 'PDF kataloglari va varaqlar tartiblanmoqda'
+                        });
+                        stopSim = window.simulatePercentageProgress('pmerge-loading', {
+                            start: 72,
+                            target: 95,
+                            duration: 3000,
+                            title: 'PDF lar birlashtirilmoqda...',
+                            desc: 'Hujjat to\'liq shakllantirilmoqda'
+                        });
+                    }
+                });
+
+                if (stopSim) stopSim();
+                window.updatePercentageLoader('pmerge-loading', 100, {
+                    title: 'Tayyor!',
+                    desc: 'Birlashtirilgan PDF muvaffaqiyatli tayyorlandi'
+                });
                 TelegramApp.hapticFeedback('heavy');
 
-                document.getElementById('pmerge-loading').classList.add('hidden');
-                document.getElementById('pmerge-upload-box').classList.add('hidden');
-                previewArea.classList.add('hidden');
-                document.getElementById('pmerge-result').classList.remove('hidden');
-                document.getElementById('pmerge-out-name').innerText = res.file_name;
-                const footer = document.getElementById('pmerge-footer');
+                setTimeout(() => {
+                    document.getElementById('pmerge-loading').classList.add('hidden');
+                    document.getElementById('pmerge-upload-box').classList.add('hidden');
+                    previewArea.classList.add('hidden');
+                    document.getElementById('pmerge-result').classList.remove('hidden');
+                    document.getElementById('pmerge-out-name').innerText = res.file_name;
+                    const footer = document.getElementById('pmerge-footer');
                 if (footer) {
                     footer.innerHTML = `
                         <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 ml-auto">
@@ -2676,11 +2937,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
 
-                        <div id="psplit-loading" class="hidden py-8 text-center space-y-3">
-                            <i data-lucide="loader-2" class="w-9 h-9 mx-auto text-amber-600 animate-spin"></i>
-                            <p class="text-xs font-bold text-slate-800 dark:text-white">PDF sahifalari ajratilmoqda...</p>
-                            <p class="text-[11px] text-slate-500">Hujjat tayyorlanmoqda</p>
-                        </div>
+                        <div id="psplit-loading" class="hidden py-6 text-center"></div>
 
                         <div id="psplit-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-3.5">
                             <div class="w-11 h-11 mx-auto rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-600 text-white flex items-center justify-center shadow-lg shadow-amber-500/30">
@@ -2759,8 +3016,12 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('psplit-upload-box').classList.add('hidden');
             document.getElementById('psplit-options').classList.add('hidden');
             document.getElementById('psplit-action-btn').classList.add('hidden');
-            document.getElementById('psplit-loading').classList.remove('hidden');
-            refreshIcons();
+            window.showPercentageLoader('psplit-loading', {
+                color: 'amber',
+                icon: 'columns-2',
+                title: 'PDF yuklanmoqda...',
+                desc: 'Sahifalarga bo\'lish uchun uzatilmoqda'
+            });
 
             const fd = new FormData();
             fd.append('file', chosenFile);
@@ -2771,31 +3032,59 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                const res = await api.splitPdf(fd);
+                let stopSim = null;
+                const res = await api.splitPdf(fd, (pct) => {
+                    const mapped = Math.round(pct * 0.7);
+                    window.updatePercentageLoader('psplit-loading', mapped, {
+                        title: 'PDF yuklanmoqda...',
+                        desc: `${pct}% yuklandi`
+                    });
+                    if (pct >= 100 && !stopSim) {
+                        window.updatePercentageLoader('psplit-loading', 75, {
+                            title: 'Sahifalar ajratilmoqda...',
+                            desc: 'Kerakli varaqlar kesib olinmoqda'
+                        });
+                        stopSim = window.simulatePercentageProgress('psplit-loading', {
+                            start: 75,
+                            target: 95,
+                            duration: 2500,
+                            title: 'Sahifalar ajratilmoqda...',
+                            desc: 'Hujjat tayyorlanmoqda'
+                        });
+                    }
+                });
+
+                if (stopSim) stopSim();
+                window.updatePercentageLoader('psplit-loading', 100, {
+                    title: 'Tayyor!',
+                    desc: 'Sahifalar muvaffaqiyatli ajratildi'
+                });
                 TelegramApp.hapticFeedback('heavy');
 
-                document.getElementById('psplit-loading').classList.add('hidden');
-                document.getElementById('psplit-upload-box').classList.add('hidden');
-                document.getElementById('psplit-options').classList.add('hidden');
-                document.getElementById('psplit-result').classList.remove('hidden');
-                document.getElementById('psplit-out-name').innerText = res.file_name;
-                const footer = document.getElementById('psplit-footer');
-                if (footer) {
-                    footer.innerHTML = `
-                        <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 ml-auto">
-                            Yopish
-                        </button>
-                    `;
-                    footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
-                }
-                const splitDlBtn = document.getElementById('psplit-dl-btn');
-                if (splitDlBtn) {
-                    splitDlBtn.onclick = () => {
-                        TelegramApp.downloadFile(res.download_url);
-                    };
-                }
-                refreshIcons();
-                loadRecentFiles();
+                setTimeout(() => {
+                    document.getElementById('psplit-loading').classList.add('hidden');
+                    document.getElementById('psplit-upload-box').classList.add('hidden');
+                    document.getElementById('psplit-options').classList.add('hidden');
+                    document.getElementById('psplit-result').classList.remove('hidden');
+                    document.getElementById('psplit-out-name').innerText = res.file_name;
+                    const footer = document.getElementById('psplit-footer');
+                    if (footer) {
+                        footer.innerHTML = `
+                            <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 ml-auto">
+                                Yopish
+                            </button>
+                        `;
+                        footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
+                    }
+                    const splitDlBtn = document.getElementById('psplit-dl-btn');
+                    if (splitDlBtn) {
+                        splitDlBtn.onclick = () => {
+                            TelegramApp.downloadFile(res.download_url);
+                        };
+                    }
+                    refreshIcons();
+                    loadRecentFiles();
+                }, 300);
             } catch (err) {
                 document.getElementById('psplit-loading').classList.add('hidden');
                 document.getElementById('psplit-result').classList.add('hidden');
@@ -2857,11 +3146,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
 
-                        <div id="pcomp-loading" class="hidden py-8 text-center space-y-3">
-                            <i data-lucide="loader-2" class="w-9 h-9 mx-auto text-fuchsia-600 animate-spin"></i>
-                            <p class="text-xs font-bold text-slate-800 dark:text-white">PDF siqilmoqda...</p>
-                            <p class="text-[11px] text-slate-500">Tasvirlar qayta optimallashtirilmoqda</p>
-                        </div>
+                        <div id="pcomp-loading" class="hidden py-6 text-center"></div>
 
                         <div id="pcomp-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-3.5">
                             <div class="w-11 h-11 mx-auto rounded-2xl bg-gradient-to-tr from-fuchsia-500 to-pink-600 text-white flex items-center justify-center shadow-lg shadow-fuchsia-500/30">
@@ -2938,45 +3223,77 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('pcomp-upload-box').classList.add('hidden');
             document.getElementById('pcomp-options').classList.add('hidden');
             document.getElementById('pcomp-action-btn').classList.add('hidden');
-            document.getElementById('pcomp-loading').classList.remove('hidden');
-            refreshIcons();
+            window.showPercentageLoader('pcomp-loading', {
+                color: 'fuchsia',
+                icon: 'file-down',
+                title: 'PDF yuklanmoqda...',
+                desc: 'Hajmni kamaytirish uchun serverga uzatilmoqda'
+            });
 
             const fd = new FormData();
             fd.append('file', chosenFile);
             fd.append('quality_level', compressLevel);
 
             try {
-                const res = await api.compressPdf(fd);
+                let stopSim = null;
+                const res = await api.compressPdf(fd, (pct) => {
+                    const mapped = Math.round(pct * 0.7);
+                    window.updatePercentageLoader('pcomp-loading', mapped, {
+                        title: 'PDF yuklanmoqda...',
+                        desc: `${pct}% yuklandi`
+                    });
+                    if (pct >= 100 && !stopSim) {
+                        window.updatePercentageLoader('pcomp-loading', 75, {
+                            title: 'PDF siqilmoqda...',
+                            desc: 'Tasvirlar qayta optimallashtirilmoqda'
+                        });
+                        stopSim = window.simulatePercentageProgress('pcomp-loading', {
+                            start: 75,
+                            target: 95,
+                            duration: 3000,
+                            title: 'PDF siqilmoqda...',
+                            desc: 'Hajm yengillashtirilmoqda'
+                        });
+                    }
+                });
+
+                if (stopSim) stopSim();
+                window.updatePercentageLoader('pcomp-loading', 100, {
+                    title: 'Tayyor!',
+                    desc: 'PDF muvaffaqiyatli siqildi'
+                });
                 TelegramApp.hapticFeedback('heavy');
 
-                document.getElementById('pcomp-loading').classList.add('hidden');
-                document.getElementById('pcomp-upload-box').classList.add('hidden');
-                document.getElementById('pcomp-options').classList.add('hidden');
-                document.getElementById('pcomp-result').classList.remove('hidden');
-                document.getElementById('pcomp-out-name').innerText = res.file_name;
-                
-                const initMb = (res.initial_size / (1024 * 1024)).toFixed(2);
-                const finMb = (res.final_size / (1024 * 1024)).toFixed(2);
-                document.getElementById('pcomp-stats').innerHTML = `📉 ${initMb} MB ➔ <b>${finMb} MB</b> (${res.saved_percent}% tejandi)`;
+                setTimeout(() => {
+                    document.getElementById('pcomp-loading').classList.add('hidden');
+                    document.getElementById('pcomp-upload-box').classList.add('hidden');
+                    document.getElementById('pcomp-options').classList.add('hidden');
+                    document.getElementById('pcomp-result').classList.remove('hidden');
+                    document.getElementById('pcomp-out-name').innerText = res.file_name;
+                    
+                    const initMb = (res.initial_size / (1024 * 1024)).toFixed(2);
+                    const finMb = (res.final_size / (1024 * 1024)).toFixed(2);
+                    document.getElementById('pcomp-stats').innerHTML = `📉 ${initMb} MB ➔ <b>${finMb} MB</b> (${res.saved_percent}% tejandi)`;
 
-                const footer = document.getElementById('pcomp-footer');
-                if (footer) {
-                    footer.innerHTML = `
-                        <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 ml-auto">
-                            Yopish
-                        </button>
-                    `;
-                    footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
-                }
+                    const footer = document.getElementById('pcomp-footer');
+                    if (footer) {
+                        footer.innerHTML = `
+                            <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 ml-auto">
+                                Yopish
+                            </button>
+                        `;
+                        footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
+                    }
 
-                const compDlBtn = document.getElementById('pcomp-dl-btn');
-                if (compDlBtn) {
-                    compDlBtn.onclick = () => {
-                        TelegramApp.downloadFile(res.download_url);
-                    };
-                }
-                refreshIcons();
-                loadRecentFiles();
+                    const compDlBtn = document.getElementById('pcomp-dl-btn');
+                    if (compDlBtn) {
+                        compDlBtn.onclick = () => {
+                            TelegramApp.downloadFile(res.download_url);
+                        };
+                    }
+                    refreshIcons();
+                    loadRecentFiles();
+                }, 300);
             } catch (err) {
                 document.getElementById('pcomp-loading').classList.add('hidden');
                 document.getElementById('pcomp-result').classList.add('hidden');
@@ -3071,11 +3388,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
 
-                        <div id="pwm-loading" class="hidden py-8 text-center space-y-3">
-                            <i data-lucide="loader-2" class="w-9 h-9 mx-auto text-indigo-600 animate-spin"></i>
-                            <p class="text-xs font-bold text-slate-800 dark:text-white">Suv belgisi qo'yilmoqda...</p>
-                            <p class="text-[11px] text-slate-500">Barcha sahifalar himoyalanmoqda</p>
-                        </div>
+                        <div id="pwm-loading" class="hidden py-6 text-center"></div>
 
                         <div id="pwm-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-3.5">
                             <div class="w-11 h-11 mx-auto rounded-2xl bg-gradient-to-tr from-indigo-500 to-blue-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30">
@@ -3172,8 +3485,12 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('pwm-upload-box').classList.add('hidden');
             document.getElementById('pwm-options').classList.add('hidden');
             document.getElementById('pwm-action-btn').classList.add('hidden');
-            document.getElementById('pwm-loading').classList.remove('hidden');
-            refreshIcons();
+            window.showPercentageLoader('pwm-loading', {
+                color: 'indigo',
+                icon: 'stamp',
+                title: 'PDF yuklanmoqda...',
+                desc: 'Suv belgisi qo\'yish uchun uzatilmoqda'
+            });
 
             const fd = new FormData();
             fd.append('file', chosenFile);
@@ -3196,33 +3513,61 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                const res = await api.watermarkPdf(fd);
+                let stopSim = null;
+                const res = await api.watermarkPdf(fd, (pct) => {
+                    const mapped = Math.round(pct * 0.7);
+                    window.updatePercentageLoader('pwm-loading', mapped, {
+                        title: 'PDF yuklanmoqda...',
+                        desc: `${pct}% yuklandi`
+                    });
+                    if (pct >= 100 && !stopSim) {
+                        window.updatePercentageLoader('pwm-loading', 75, {
+                            title: 'Suv belgisi qo\'yilmoqda...',
+                            desc: 'Barcha sahifalar himoyalanmoqda'
+                        });
+                        stopSim = window.simulatePercentageProgress('pwm-loading', {
+                            start: 75,
+                            target: 95,
+                            duration: 2500,
+                            title: 'Suv belgisi qo\'yilmoqda...',
+                            desc: 'Sahifalar saqlanmoqda'
+                        });
+                    }
+                });
+
+                if (stopSim) stopSim();
+                window.updatePercentageLoader('pwm-loading', 100, {
+                    title: 'Tayyor!',
+                    desc: 'Suv belgisi muvaffaqiyatli qo\'yildi'
+                });
                 TelegramApp.hapticFeedback('heavy');
 
-                document.getElementById('pwm-loading').classList.add('hidden');
-                document.getElementById('pwm-upload-box').classList.add('hidden');
-                document.getElementById('pwm-options').classList.add('hidden');
-                document.getElementById('pwm-result').classList.remove('hidden');
-                document.getElementById('pwm-out-name').innerText = res.file_name;
+                setTimeout(() => {
+                    document.getElementById('pwm-loading').classList.add('hidden');
+                    document.getElementById('pwm-upload-box').classList.add('hidden');
+                    document.getElementById('pwm-options').classList.add('hidden');
+                    document.getElementById('pwm-result').classList.remove('hidden');
+                    document.getElementById('pwm-out-name').innerText = res.file_name;
 
-                const footer = document.getElementById('pwm-footer');
-                if (footer) {
-                    footer.innerHTML = `
-                        <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 ml-auto">
-                            Yopish
-                        </button>
-                    `;
-                    footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
-                }
+                    const footer = document.getElementById('pwm-footer');
+                    if (footer) {
+                        footer.innerHTML = `
+                            <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 ml-auto">
+                                Yopish
+                            </button>
+                        `;
+                        footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
+                    }
 
-                const wmDlBtn = document.getElementById('pwm-dl-btn');
-                if (wmDlBtn) {
-                    wmDlBtn.onclick = () => {
-                        TelegramApp.downloadFile(res.download_url);
-                    };
-                }
-                refreshIcons();
-                loadRecentFiles();
+                    const wmDlBtn = document.getElementById('pwm-dl-btn');
+                    if (wmDlBtn) {
+                        wmDlBtn.onclick = () => {
+                            TelegramApp.downloadFile(res.download_url);
+                        };
+                    }
+                    refreshIcons();
+                    loadRecentFiles();
+                }, 300);
             } catch (err) {
                 document.getElementById('pwm-loading').classList.add('hidden');
                 document.getElementById('pwm-result').classList.add('hidden');
@@ -3340,11 +3685,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
 
                         <!-- Loading State -->
-                        <div id="p34-loading" class="hidden py-8 text-center space-y-3">
-                            <i data-lucide="loader-2" class="w-9 h-9 mx-auto text-purple-600 animate-spin"></i>
-                            <p class="text-xs font-bold text-slate-800 dark:text-white">3×4 Hujjat fotosi tayyorlanmoqda...</p>
-                            <p class="text-[11px] text-slate-500">Yuz mutanosibligi va 10×15 sm varaq shakllantirilmoqda</p>
-                        </div>
+                        <div id="p34-loading" class="hidden py-6 text-center"></div>
 
                         <!-- Success Result Box -->
                         <div id="p34-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-3.5">
@@ -3440,8 +3781,12 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('p34-upload-box').classList.add('hidden');
             document.getElementById('p34-options-area').classList.add('hidden');
             document.getElementById('p34-action-btn').classList.add('hidden');
-            document.getElementById('p34-loading').classList.remove('hidden');
-            refreshIcons();
+            window.showPercentageLoader('p34-loading', {
+                color: 'purple',
+                icon: 'camera',
+                title: 'Surat yuklanmoqda...',
+                desc: '3×4 format uchun serverga uzatilmoqda'
+            });
 
             const fd = new FormData();
             fd.append('file', chosenFile);
@@ -3457,24 +3802,51 @@ document.addEventListener('DOMContentLoaded', () => {
             fd.append('contrast', contrastVal);
 
             try {
-                const res = await api.generatePhoto3x4(fd);
+                let stopSim = null;
+                const res = await api.generatePhoto3x4(fd, (pct) => {
+                    const mapped = Math.round(pct * 0.7);
+                    window.updatePercentageLoader('p34-loading', mapped, {
+                        title: 'Surat yuklanmoqda...',
+                        desc: `${pct}% yuklandi`
+                    });
+                    if (pct >= 100 && !stopSim) {
+                        window.updatePercentageLoader('p34-loading', 75, {
+                            title: '3×4 Foto tayyorlanmoqda...',
+                            desc: 'Yuz mutanosibligi va 10×15 sm varaq shakllantirilmoqda'
+                        });
+                        stopSim = window.simulatePercentageProgress('p34-loading', {
+                            start: 75,
+                            target: 95,
+                            duration: 3000,
+                            title: '3×4 Foto tayyorlanmoqda...',
+                            desc: 'Orqa fon va kontrast tekshirilmoqda'
+                        });
+                    }
+                });
+
+                if (stopSim) stopSim();
+                window.updatePercentageLoader('p34-loading', 100, {
+                    title: 'Tayyor!',
+                    desc: '3×4 fotosuratlar muvaffaqiyatli tayyorlandi'
+                });
                 TelegramApp.hapticFeedback('heavy');
 
-                document.getElementById('p34-loading').classList.add('hidden');
-                document.getElementById('p34-upload-box').classList.add('hidden');
-                document.getElementById('p34-options-area').classList.add('hidden');
-                document.getElementById('p34-result').classList.remove('hidden');
-                document.getElementById('p34-out-name').innerText = res.single_file_name;
+                setTimeout(() => {
+                    document.getElementById('p34-loading').classList.add('hidden');
+                    document.getElementById('p34-upload-box').classList.add('hidden');
+                    document.getElementById('p34-options-area').classList.add('hidden');
+                    document.getElementById('p34-result').classList.remove('hidden');
+                    document.getElementById('p34-out-name').innerText = res.single_file_name;
 
-                const footer = document.getElementById('p34-footer');
-                if (footer) {
-                    footer.innerHTML = `
-                        <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 ml-auto">
-                            Yopish
-                        </button>
-                    `;
-                    footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
-                }
+                    const footer = document.getElementById('p34-footer');
+                    if (footer) {
+                        footer.innerHTML = `
+                            <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 ml-auto">
+                                Yopish
+                            </button>
+                        `;
+                        footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
+                    }
 
                 const p34DlSingle = document.getElementById('p34-dl-single');
                 if (p34DlSingle) {

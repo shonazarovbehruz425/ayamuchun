@@ -20,10 +20,58 @@ const api = {
         }
         return response.json();
     },
+
+    uploadWithProgress(url, formData, onProgress) {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            const initData = TelegramApp.getInitData() || '';
+
+            xhr.open('POST', `${BASE_URL}${url}`);
+            if (initData) {
+                xhr.setRequestHeader('Authorization', `Bearer ${initData}`);
+            }
+
+            if (xhr.upload && typeof onProgress === 'function') {
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable && e.total > 0) {
+                        const percent = Math.min(Math.round((e.loaded / e.total) * 100), 100);
+                        onProgress(percent, e.loaded, e.total);
+                    }
+                };
+            }
+
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        resolve(data);
+                    } catch (e) {
+                        resolve(xhr.responseText);
+                    }
+                } else {
+                    let errMsg = `Server xatosi: ${xhr.status}`;
+                    try {
+                        const errObj = JSON.parse(xhr.responseText);
+                        if (errObj && errObj.detail) errMsg = errObj.detail;
+                    } catch (e) {}
+                    reject(new Error(errMsg));
+                }
+            };
+
+            xhr.onerror = () => reject(new Error("Tarmoq xatoligi yoki internet bilan aloqa yo'q"));
+            xhr.ontimeout = () => reject(new Error("So'rov vaqti tugadi (timeout)"));
+            xhr.send(formData);
+        });
+    },
     
     // Files & Documents
     getFiles() { return this.fetchWithAuth('/files'); },
-    uploadFile(formData) { return this.fetchWithAuth('/files/upload', { method: 'POST', body: formData }); },
+    uploadFile(formData, onProgress) {
+        if (typeof onProgress === 'function') {
+            return this.uploadWithProgress('/files/upload', formData, onProgress);
+        }
+        return this.fetchWithAuth('/files/upload', { method: 'POST', body: formData });
+    },
     convertFile(fileId, format) { return this.fetchWithAuth(`/files/${fileId}/convert?format=${format}`, { method: 'POST' }); },
     deleteFile(fileId) { return this.fetchWithAuth(`/files/${fileId}`, { method: 'DELETE' }); },
     clearAllFiles() { return this.fetchWithAuth('/files/clear-all', { method: 'DELETE' }); },
@@ -31,13 +79,31 @@ const api = {
     saveFileContent(fileId, content) { return this.fetchWithAuth(`/files/${fileId}/save-content`, { method: 'POST', body: { content } }); },
     getFileHtml(fileId) { return this.fetchWithAuth(`/files/${fileId}/html`); },
     saveFileHtml(fileId, html, format = 'both') { return this.fetchWithAuth(`/files/${fileId}/save-html`, { method: 'POST', body: { html, format } }); },
-    imagesToPdf(formData) { return this.fetchWithAuth('/files/images-to-pdf', { method: 'POST', body: formData }); },
+    imagesToPdf(formData, onProgress) {
+        if (typeof onProgress === 'function') return this.uploadWithProgress('/files/images-to-pdf', formData, onProgress);
+        return this.fetchWithAuth('/files/images-to-pdf', { method: 'POST', body: formData });
+    },
     extractImages(fileId) { return this.fetchWithAuth(`/files/${fileId}/extract-images`, { method: 'POST' }); },
-    mergePdfs(formData) { return this.fetchWithAuth('/files/merge-pdfs', { method: 'POST', body: formData }); },
-    splitPdf(formData) { return this.fetchWithAuth('/files/split-pdf', { method: 'POST', body: formData }); },
-    compressPdf(formData) { return this.fetchWithAuth('/files/compress-pdf', { method: 'POST', body: formData }); },
-    watermarkPdf(formData) { return this.fetchWithAuth('/files/watermark-pdf', { method: 'POST', body: formData }); },
-    generatePhoto3x4(formData) { return this.fetchWithAuth('/files/photo-3x4', { method: 'POST', body: formData }); },
+    mergePdfs(formData, onProgress) {
+        if (typeof onProgress === 'function') return this.uploadWithProgress('/files/merge-pdfs', formData, onProgress);
+        return this.fetchWithAuth('/files/merge-pdfs', { method: 'POST', body: formData });
+    },
+    splitPdf(formData, onProgress) {
+        if (typeof onProgress === 'function') return this.uploadWithProgress('/files/split-pdf', formData, onProgress);
+        return this.fetchWithAuth('/files/split-pdf', { method: 'POST', body: formData });
+    },
+    compressPdf(formData, onProgress) {
+        if (typeof onProgress === 'function') return this.uploadWithProgress('/files/compress-pdf', formData, onProgress);
+        return this.fetchWithAuth('/files/compress-pdf', { method: 'POST', body: formData });
+    },
+    watermarkPdf(formData, onProgress) {
+        if (typeof onProgress === 'function') return this.uploadWithProgress('/files/watermark-pdf', formData, onProgress);
+        return this.fetchWithAuth('/files/watermark-pdf', { method: 'POST', body: formData });
+    },
+    generatePhoto3x4(formData, onProgress) {
+        if (typeof onProgress === 'function') return this.uploadWithProgress('/files/photo-3x4', formData, onProgress);
+        return this.fetchWithAuth('/files/photo-3x4', { method: 'POST', body: formData });
+    },
     sendFileToTelegram(fileId) { return this.fetchWithAuth(`/files/${fileId}/send-to-telegram`, { method: 'POST' }); },
     
     // AI tools

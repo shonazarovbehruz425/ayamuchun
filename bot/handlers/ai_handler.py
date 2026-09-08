@@ -484,33 +484,6 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
         )
         return
 
-    # 3. Check for File Tools intent in user natural language
-    lower_text = raw_text.lower()
-    if any(w in lower_text for w in ("pdf to word", "pdfni word", "pdf dan word", "pdf wordga")):
-        context.user_data["expected_tool"] = "pdf_to_word"
-        await update.message.reply_text(
-            "🔄 <b>PDF ➔ Word (DOCX)</b>\n\n"
-            "Menga <b>PDF fayl</b> yuboring, uni sifatli va tahrirlanadigan Word (.docx) hujjatiga aylantirib beraman.",
-            parse_mode="HTML"
-        )
-        return
-    elif any(w in lower_text for w in ("word to pdf", "wordni pdf", "doc to pdf", "word pdfga")):
-        context.user_data["expected_tool"] = "word_to_pdf"
-        await update.message.reply_text(
-            "🔄 <b>Word ➔ PDF</b>\n\n"
-            "Menga <b>Word (.docx yoki .doc)</b> fayl yuboring, uni sifatli PDF ga aylantirib beraman.",
-            parse_mode="HTML"
-        )
-        return
-    elif any(w in lower_text for w in ("3x4 rasm", "3x4 foto", "hujjat foto", "3*4 rasm")):
-        context.user_data["expected_tool"] = "photo_3x4"
-        await update.message.reply_text(
-            "📸 <b>Hujjat foto (3×4) tayyorlash</b>\n\n"
-            "Menga fotosurat yuboring. Uni 3×4 o'lchamga keltirib, oq yoki ko'k fon bilan tayyorlab beraman.",
-            parse_mode="HTML"
-        )
-        return
-
     import re
 
     # Clean command prefixes if user typed /ai, /test, /konspekt, etc.
@@ -590,10 +563,20 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
 
         # Persist messages to DB asynchronously
         try:
+            tokens = getattr(ai_service, "last_token_usage", {}) or {}
             from bot.database.engine import get_session
             from bot.database import crud
             async with get_session() as session:
                 db_user = await crud.get_or_create_user(session, update.effective_user.id, update.effective_user.full_name or "User")
+                await crud.log_usage(
+                    session,
+                    db_user.id,
+                    "ai_chat",
+                    clean_prompt[:60],
+                    prompt_tokens=tokens.get("prompt_tokens", 0),
+                    completion_tokens=tokens.get("completion_tokens", 0),
+                    total_tokens=tokens.get("total_tokens", 0)
+                )
                 await crud.save_chat_message(session, db_user.id, "user", clean_prompt, session_id="telegram")
                 await crud.save_chat_message(session, db_user.id, "assistant", ai_reply, session_id="telegram")
         except Exception as dbe:

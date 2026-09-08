@@ -1607,14 +1607,22 @@ async def compress_pdf_endpoint(
                 try:
                     init_str = format_file_size_human(stats["initial_size"])
                     fin_str = format_file_size_human(stats["final_size"])
+                    saved = stats.get("saved_percent", 0.0)
+                    if saved > 0:
+                        detail_list = [
+                            f"Oldingi hajm: {init_str}",
+                            f"Yangi hajm: {fin_str}",
+                            f"Tejalgan joy: {saved}%"
+                        ]
+                    else:
+                        detail_list = [
+                            f"Fayl hajmi: {fin_str}",
+                            "Holati: Allaqachon optimal hajmda"
+                        ]
                     c_caption = build_file_caption(
                         file_name=out_name,
                         tool_name="Siqilgan PDF Hujjati",
-                        details=[
-                            f"Oldingi hajm: {init_str}",
-                            f"Yangi hajm: {fin_str}",
-                            f"Tejalgan joy: {stats['saved_percent']}%"
-                        ],
+                        details=detail_list,
                         file_size=stats["final_size"]
                     )
                     await send_file_to_telegram(user["telegram_id"], out_path, caption=c_caption, file_id=record.telegram_file_id)

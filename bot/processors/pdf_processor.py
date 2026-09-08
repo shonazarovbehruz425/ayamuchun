@@ -108,57 +108,105 @@ class PDFProcessor(BaseProcessor):
             logger.error(f"Xato: PDF ni bo'lishda xatolik - {e}")
             raise
 
-    async def compress_pdf(self, file_path: str, output_path: str, quality_level: str = "medium") -> dict:
+    async def compress_pdf(self, file_path: str, output_path: str, quality_level: str = "recommended") -> dict:
         """
-        PDF hajmini siqish (50-80% gacha).
+        PDF hajmini sifatli qisqartirish (Siqish / Compress).
         quality_level:
-          - 'low': maksimal siqish (70-85% gacha kichraytirish)
-          - 'medium': muvozanatli (50-70% gacha kichraytirish, tavsiya etiladi)
-          - 'high': sifatni saqlagan holda yengil siqish
+          - 'extreme' / 'low': maksimal siqish (60-85% gacha kichraytirish)
+          - 'recommended' / 'medium': muvozanatli (optimal hajm va sifat, 40-70% gacha)
+          - 'basic' / 'high': yengil siqish (maksimal sifat, 20-40% gacha)
         """
         def _compress():
             initial_size = os.path.getsize(file_path)
             doc = fitz.open(file_path)
 
-            max_dim = 1000 if quality_level == "low" else (1400 if quality_level == "medium" else 1800)
-            jpeg_quality = 50 if quality_level == "low" else (68 if quality_level == "medium" else 82)
+            ql = str(quality_level).lower().strip()
+            if ql in ("extreme", "kuchli", "low", "high_compression", "max"):
+                dpi_threshold = 96
+                dpi_target = 72
+                quality = 48
+                max_dim = 900
+            elif ql in ("basic", "yengil", "high", "light"):
+                dpi_threshold = 180
+                dpi_target = 140
+                quality = 82
+                max_dim = 1600
+            else:
+                # "recommended", "tavsiya", "medium", default
+                dpi_threshold = 130
+                dpi_target = 100
+                quality = 65
+                max_dim = 1200
 
-            for xref in range(1, doc.xref_length()):
-                if doc.xref_is_image(xref):
-                    try:
-                        base_image = doc.extract_image(xref)
-                        if not base_image:
-                            continue
-                        img_bytes = base_image.get("image")
-                        if not img_bytes:
-                            continue
+            # 1. PyMuPDF rasmlarni qayta optimallashtirish (rewrite_images)
+            try:
+                doc.rewrite_images(
+                    dpi_threshold=dpi_threshold,
+                    dpi_target=dpi_target,
+                    quality=quality,
+                    lossy=True,
+                    lossless=True,
+                    bitonal=True,
+                    color=True,
+                    gray=True
+                )
+            except Exception as rw_err:
+                logger.warning(f"doc.rewrite_images da xatolik, fallback ishlatilmoqda: {rw_err}")
+                try:
+                    for page in doc:
+                        for img_info in page.get_images():
+                            xref = img_info[0]
+                            try:
+                                base_img = doc.extract_image(xref)
+                                if not base_img:
+                                    continue
+                                raw_bytes = base_img.get("image")
+                                if not raw_bytes:
+                                    continue
+                                pil = Image.open(io.BytesIO(raw_bytes))
+                                if pil.mode in ("RGBA", "P"):
+                                    pil = pil.convert("RGB")
+                                if pil.width > max_dim or pil.height > max_dim:
+                                    pil.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+                                buf = io.BytesIO()
+                                pil.save(buf, format="JPEG", quality=quality, optimize=True)
+                                new_b = buf.getvalue()
+                                if len(new_b) < len(raw_bytes):
+                                    page.replace_image(xref, stream=new_b)
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
 
-                        pil_img = Image.open(io.BytesIO(img_bytes))
-                        w, h = pil_img.size
-                        if w > max_dim or h > max_dim:
-                            pil_img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
-
-                        if pil_img.mode in ("RGBA", "P"):
-                            pil_img = pil_img.convert("RGB")
-
-                        buf = io.BytesIO()
-                        pil_img.save(buf, format="JPEG", quality=jpeg_quality, optimize=True)
-                        new_data = buf.getvalue()
-
-                        if len(new_data) < len(img_bytes):
-                            doc.update_stream(xref, new_data)
-                    except Exception:
-                        pass
-
-            doc.save(output_path, garbage=4, deflate=True, clean=True)
+            # 2. Deflate va tozalash orqali saqlash
+            doc.save(
+                output_path,
+                garbage=4,
+                deflate=True,
+                clean=True,
+                deflate_fonts=True,
+                deflate_images=True
+            )
             doc.close()
 
             final_size = os.path.getsize(output_path)
-            saved_percent = round((1 - (final_size / max(initial_size, 1))) * 100, 1)
+
+            # Agar siqilgan fayl hajmi kamaymagan bo'lsa (fayl allaqachon maksimal siqilgan bo'lsa),
+            # fayl kattalashib ketmasligi uchun asl nusxasini saqlaymiz
+            if final_size >= initial_size:
+                import shutil
+                shutil.copy2(file_path, output_path)
+                final_size = initial_size
+                saved_percent = 0.0
+            else:
+                saved_percent = round((1 - (final_size / max(initial_size, 1))) * 100, 1)
+
             return {
                 "initial_size": initial_size,
                 "final_size": final_size,
-                "saved_percent": max(0.0, saved_percent)
+                "saved_percent": max(0.0, saved_percent),
+                "original_size": initial_size,
+                "compressed_size": final_size
             }
 
         try:

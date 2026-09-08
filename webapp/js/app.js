@@ -3166,20 +3166,23 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                             <div>
                                 <h4 class="text-xs font-bold text-slate-900 dark:text-white" id="pcomp-out-name">Fayl</h4>
-                                <div id="pcomp-stats" class="text-xs font-bold text-emerald-600 mt-1"></div>
+                                <div id="pcomp-stats" class="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-1"></div>
                                 <div class="mt-2 p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-left space-y-1">
                                     <div class="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
                                         <i data-lucide="send" class="w-3.5 h-3.5"></i>
-                                        <span>Siqilgan PDF Telegram chatiga yuborildi!</span>
+                                        <span>Siqilgan PDF tayyor bo'ldi!</span>
                                     </div>
                                     <p class="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
-                                        Hajmi yengillashtirilgan faylni bot chatidan to'g'ridan-to'g'ri oling.
+                                        Hajmi yengillashtirilgan faylni to'g'ridan-to'g'ri yuklab oling yoki Telegram botingizdan oling.
                                     </p>
                                 </div>
                             </div>
-                            <div class="pt-1">
-                                <button onclick="TelegramApp.openChat(); closeModal();" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-fuchsia-600 via-pink-600 to-purple-600 text-white text-xs font-extrabold shadow-lg shadow-fuchsia-500/25 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
-                                    <i data-lucide="send" class="w-4 h-4"></i> Telegram Chatiga O'tish (Siqilgan PDF faylni olish) ✓
+                            <div class="space-y-2 pt-1">
+                                <button id="pcomp-dl-btn" class="w-full py-3 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-bold border border-slate-200 dark:border-slate-700 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
+                                    <i data-lucide="download" class="w-4 h-4 text-fuchsia-600"></i> Siqilgan PDF ni yuklab olish
+                                </button>
+                                <button onclick="TelegramApp.openChat(); closeModal();" class="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-fuchsia-600 via-pink-600 to-purple-600 text-white text-xs font-extrabold shadow-lg shadow-fuchsia-500/25 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
+                                    <i data-lucide="send" class="w-4 h-4"></i> Telegram Chatiga O'tish (Botdan olish) ✓
                                 </button>
                             </div>
                         </div>
@@ -3202,6 +3205,20 @@ document.addEventListener('DOMContentLoaded', () => {
         let compressLevel = 'recommended';
         const fileInput = document.getElementById('pcomp-file-input');
         const fileLabel = document.getElementById('pcomp-file-label');
+        const uploadBox = document.getElementById('pcomp-upload-box');
+
+        if (uploadBox) {
+            uploadBox.ondragover = (e) => { e.preventDefault(); uploadBox.classList.add('border-fuchsia-500', 'bg-fuchsia-50/40'); };
+            uploadBox.ondragleave = () => { uploadBox.classList.remove('border-fuchsia-500', 'bg-fuchsia-50/40'); };
+            uploadBox.ondrop = (e) => {
+                e.preventDefault();
+                uploadBox.classList.remove('border-fuchsia-500', 'bg-fuchsia-50/40');
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    chosenFile = e.dataTransfer.files[0];
+                    fileLabel.innerText = `Tanlandi: ${chosenFile.name} (${Math.round(chosenFile.size / 1024)} KB)`;
+                }
+            };
+        }
 
         fileInput.onchange = (e) => {
             if (e.target.files && e.target.files[0]) {
@@ -3285,7 +3302,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     const initMb = (res.initial_size / (1024 * 1024)).toFixed(2);
                     const finMb = (res.final_size / (1024 * 1024)).toFixed(2);
-                    document.getElementById('pcomp-stats').innerHTML = `📉 ${initMb} MB ➔ <b>${finMb} MB</b> (${res.saved_percent}% tejandi)`;
+                    if (res.saved_percent > 0) {
+                        document.getElementById('pcomp-stats').innerHTML = `📉 ${initMb} MB ➔ <b>${finMb} MB</b> (${res.saved_percent}% tejandi)`;
+                    } else {
+                        document.getElementById('pcomp-stats').innerHTML = `ℹ️ Fayl allaqachon maksimal optimal hajmda (${finMb} MB)`;
+                    }
 
                     const footer = document.getElementById('pcomp-footer');
                     if (footer) {
@@ -3298,7 +3319,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     const compDlBtn = document.getElementById('pcomp-dl-btn');
-                    if (compDlBtn) {
+                    if (compDlBtn && res.download_url) {
                         compDlBtn.onclick = () => {
                             TelegramApp.downloadFile(res.download_url);
                         };

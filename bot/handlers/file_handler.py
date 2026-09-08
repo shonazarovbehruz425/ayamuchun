@@ -486,22 +486,37 @@ async def _compress_pdf(msg, query_or_update, file_path: str, file_name: str) ->
     reply_target = query_or_update.message if hasattr(query_or_update, "message") and query_or_update.message else msg
     try:
         proc = PDFProcessor()
-        res = await proc.compress_pdf(file_path, output_path, quality_level="medium")
+        res = await proc.compress_pdf(file_path, output_path, quality_level="recommended")
         saved_pct = res.get("saved_percent", 0)
-        orig_mb = res.get("original_size", 0) / (1024 * 1024)
-        comp_mb = res.get("compressed_size", 0) / (1024 * 1024)
-        await msg.edit_text(f"✅ PDF muvaffaqiyatli siqildi! ({saved_pct}% hajm tejaldi)")
+        orig_sz = res.get("initial_size") or res.get("original_size", 0)
+        comp_sz = res.get("final_size") or res.get("compressed_size", 0)
+        orig_mb = orig_sz / (1024 * 1024)
+        comp_mb = comp_sz / (1024 * 1024)
+
+        if saved_pct > 0:
+            status_text = f"✅ PDF muvaffaqiyatli siqildi! ({saved_pct}% hajm tejaldi)"
+            caption_text = (
+                f"🟪 <b>PDF siqish natijasi:</b>\n\n"
+                f"📦 Asl hajm: <b>{orig_mb:.2f} MB</b>\n"
+                f"✨ Yangi hajm: <b>{comp_mb:.2f} MB</b>\n"
+                f"📉 Tejaldi: <b>{saved_pct}%</b>\n\n"
+                f"⚡ <i>EduBot orqali tayyorlandi</i>"
+            )
+        else:
+            status_text = f"ℹ️ PDF allaqachon maksimal optimal hajmda!"
+            caption_text = (
+                f"🟪 <b>PDF siqish natijasi:</b>\n\n"
+                f"📦 Fayl hajmi: <b>{comp_mb:.2f} MB</b>\n"
+                f"ℹ️ <i>Ushbu PDF allaqachon maksimal darajada siqilgan.</i>\n\n"
+                f"⚡ <i>EduBot orqali tayyorlandi</i>"
+            )
+
+        await msg.edit_text(status_text)
         with open(output_path, "rb") as f:
             await reply_target.reply_document(
                 document=f,
                 filename=os.path.basename(output_path),
-                caption=(
-                    f"🟪 <b>PDF siqish natijasi:</b>\n\n"
-                    f"📦 Asl hajm: <b>{orig_mb:.2f} MB</b>\n"
-                    f"✨ Yangi hajm: <b>{comp_mb:.2f} MB</b>\n"
-                    f"📉 Tejaldi: <b>{saved_pct}%</b>\n\n"
-                    f"⚡ <i>EduBot orqali tayyorlandi</i>"
-                ),
+                caption=caption_text,
                 parse_mode="HTML"
             )
     except Exception as e:

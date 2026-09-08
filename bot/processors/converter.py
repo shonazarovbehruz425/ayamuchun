@@ -131,14 +131,246 @@ class FileConverter:
             os.rename(result_path, output_path)
         return output_path
 
+    def _convert_scanned_pdf(self, input_path: str, output_path: str) -> str:
+        """
+        Matnsiz, faqat rasmlardan iborat skaner qilingan PDF hujjatlarni
+        Word (.docx) formatiga yuqori sifatli rasm sahifalari ko'rinishida o'tkazish.
+        """
+        import io
+        import fitz
+        from docx import Document
+        from docx.shared import Inches, Pt
+
+        doc = fitz.open(input_path)
+        word_doc = Document()
+
+        for sec in word_doc.sections:
+            sec.top_margin = Inches(0.5)
+            sec.bottom_margin = Inches(0.5)
+            sec.left_margin = Inches(0.5)
+            sec.right_margin = Inches(0.5)
+            sec.page_width = Inches(8.27)
+            sec.page_height = Inches(11.69)
+
+        for i, page in enumerate(doc):
+            if i > 0:
+                word_doc.add_page_break()
+
+            pix = page.get_pixmap(dpi=200)
+            img_bytes = pix.tobytes("png")
+            img_stream = io.BytesIO(img_bytes)
+
+            p = word_doc.add_paragraph()
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.space_after = Pt(0)
+            run = p.add_run()
+            run.add_picture(img_stream, width=Inches(7.27))
+
+        doc.close()
+        word_doc.save(output_path)
+        return output_path
+
+    def _convert_with_layout_engine(self, input_path: str, output_path: str) -> str:
+        """
+        PyMuPDF va python-docx asosidagi geometrik joylashuv dvigateli.
+        Jadval va matnlarni koordinatalari bo'yicha tartiblab, tartibi buzilmasdan
+        aniq Word (.docx) fayliga o'tkazadi.
+        """
+        import fitz
+        from docx import Document
+        from docx.shared import Pt, Inches
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.oxml import parse_xml
+        from docx.oxml.ns import nsdecls
+
+        doc = fitz.open(input_path)
+        word_doc = Document()
+
+        for sec in word_doc.sections:
+            sec.top_margin = Inches(0.7)
+            sec.bottom_margin = Inches(0.7)
+            sec.left_margin = Inches(0.7)
+            sec.right_margin = Inches(0.7)
+
+        for pno, page in enumerate(doc):
+            if pno > 0:
+                word_doc.add_page_break()
+
+            page_rect = page.rect
+            page_width = page_rect.width
+
+            table_finder = page.find_tables()
+            tables = table_finder.tables if table_finder else []
+            table_bboxes = [t.bbox for t in tables]
+
+            blocks = page.get_text('blocks')
+
+            def is_inside_table(bbox):
+                bx0, by0, bx1, by1 = bbox[:4]
+                b_mid_x = (bx0 + bx1) / 2
+                b_mid_y = (by0 + by1) / 2
+                for tx0, ty0, tx1, ty1 in table_bboxes:
+                    if (tx0 - 5) <= b_mid_x <= (tx1 + 5) and (ty0 - 5) <= b_mid_y <= (ty1 + 5):
+                        return True
+                return False
+
+            elements = []
+            for b in blocks:
+                if b[6] == 0:  # Matn bloki
+                    text = b[4].strip()
+                    if text and not is_inside_table(b):
+                        elements.append({
+                            'type': 'text',
+                            'y0': b[1],
+                            'x0': b[0],
+                            'x1': b[2],
+                            'text': text,
+                            'block': b
+                        })
+
+            for t in tables:
+                elements.append({
+                    'type': 'table',
+                    'y0': t.bbox[1],
+                    'x0': t.bbox[0],
+                    'table': t
+                })
+
+            # Geometrik y o'qi bo'yicha saralash (yaqin balandliklarni guruhlash uchun 4pt grid)
+            elements.sort(key=lambda e: (round(e['y0'] / 4) * 4, e['x0']))
+
+            for el in elements:
+                if el['type'] == 'text':
+                    txt = el['text']
+                    lines = [l.strip() for l in txt.split('\n') if l.strip()]
+                    for line in lines:
+                        p = word_doc.add_paragraph()
+                        p.paragraph_format.space_after = Pt(2)
+                        p.paragraph_format.space_before = Pt(0)
+                        p.paragraph_format.line_spacing = 1.15
+
+                        mid_x = (el['x0'] + el['x1']) / 2
+                        if abs(mid_x - page_width / 2) < 40 and len(line) < 70:
+                            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        elif el['x0'] > page_width * 0.45:
+                            p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                        else:
+                            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+                        run = p.add_run(line)
+                        run.font.name = 'Times New Roman'
+                        if len(line) < 90 and (line.isupper() or any(k in line.upper() for k in ['VAZIRLIGI', 'REJASI', 'TASDIQLAYMAN', 'MA\'LUMOTNOMA'])):
+                            run.bold = True
+                            run.font.size = Pt(11)
+                        else:
+                            run.font.size = Pt(10.5)
+
+                elif el['type'] == 'table':
+                    t_obj = el['table']
+                    raw_data = t_obj.extract()
+                    if not raw_data or len(raw_data) == 0:
+                        continue
+
+                    num_rows = len(raw_data)
+                    num_cols = max(len(r) for r in raw_data)
+
+                    w_table = word_doc.add_table(rows=num_rows, cols=num_cols)
+                    w_table.style = 'Table Grid'
+                    w_table.autofit = True
+
+                    for r_idx, row in enumerate(raw_data):
+                        for c_idx in range(num_cols):
+                            cell_val = row[c_idx] if c_idx < len(row) and row[c_idx] is not None else ''
+                            cell = w_table.cell(r_idx, c_idx)
+                            cell.text = str(cell_val).strip()
+
+                            for cp in cell.paragraphs:
+                                cp.paragraph_format.space_after = Pt(2)
+                                cp.paragraph_format.space_before = Pt(2)
+                                cp.paragraph_format.line_spacing = 1.05
+                                for crun in cp.runs:
+                                    crun.font.name = 'Times New Roman'
+                                    crun.font.size = Pt(9.5)
+                                    if r_idx == 0:
+                                        crun.bold = True
+
+                            if r_idx == 0:
+                                shading = parse_xml(f'<w:shd {nsdecls("w")} w:fill="F1F5F9"/>')
+                                cell._tc.get_or_add_tcPr().append(shading)
+
+                    p_after = word_doc.add_paragraph()
+                    p_after.paragraph_format.space_before = Pt(2)
+                    p_after.paragraph_format.space_after = Pt(2)
+
+        word_doc.save(output_path)
+        doc.close()
+        return output_path
+
     async def pdf_to_word(self, input_path: str, output_path: str) -> str:
-        """PDF dan Word formatiga o'tkazish."""
+        """
+        PDF dan Word (.docx) formatiga yuqori aniqlikda o'tkazish.
+        Matnlar va jadvallarning asl joylashuvini, tartibini va strukturasini
+        buzilmasdan saqlaydi (stream-table noto'g'ri bo'linishini oldini oladi).
+        """
         def _convert():
-            cv = Converter(input_path)
-            cv.convert(output_path, start=0, end=None)
-            cv.close()
-            return output_path
-            
+            import fitz
+            import docx
+
+            # 1. PDF ni oldindan tahlil qilish: sahifalar, matn hajmi
+            is_scanned = False
+            try:
+                test_doc = fitz.open(input_path)
+                total_text_len = 0
+                has_images = False
+                for p in test_doc:
+                    total_text_len += len(p.get_text().strip())
+                    if len(p.get_images()) > 0:
+                        has_images = True
+                test_doc.close()
+
+                # Agar matn deyarli bo'lmasa va rasm bo'lsa - bu skaner qilingan PDF
+                if total_text_len < 20 and has_images:
+                    is_scanned = True
+            except Exception as e:
+                logger.warning(f"PDF tahlilida ogohlantirish: {e}")
+
+            if is_scanned:
+                logger.info(f"Skaner qilingan PDF aniqlandi ({input_path}). Tasvirlar orqali DOCX ga o'tkazilmoqda.")
+                return self._convert_scanned_pdf(input_path, output_path)
+
+            # 2. Asosiy konvertatsiya: maxsus sozlangan pdf2docx
+            # parse_stream_table=False qilib o'rnatamiz, chunki u oddiy matn bo'shliqlarini jadval deb o'ylab,
+            # qatorlarni 30 martagacha takrorlab matnni aralashtirib yuborardi.
+            try:
+                cv = Converter(input_path)
+                cv.convert(
+                    output_path,
+                    start=0,
+                    end=None,
+                    parse_lattice_table=True,
+                    parse_stream_table=False,
+                    connected_border_tolerance=2.5,
+                    max_line_spacing_ratio=1.5,
+                    line_separate_threshold=3.5,
+                    delete_end_line_hyphen=True,
+                    ignore_page_error=True
+                )
+                cv.close()
+
+                # Natijani tekshirish
+                if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                    docx.Document(output_path)
+                    return output_path
+            except Exception as e:
+                logger.warning(f"Asosiy pdf2docx da xatolik yuz berdi ({e}). Geometrik layout dvigateliga o'tilmoqda...")
+
+            # 3. Zaxira usul: PyMuPDF + python-docx geometrik layout dvigateli
+            try:
+                return self._convert_with_layout_engine(input_path, output_path)
+            except Exception as e2:
+                logger.error(f"Layout dvigatelida ham xatolik: {e2}")
+                raise Exception(f"PDF dan Word ga o'tkazib bo'lmadi: {e2}")
+
         try:
             return await asyncio.to_thread(_convert)
         except Exception as e:

@@ -616,7 +616,17 @@ const AdminApp = {
                 
                 // Render nicely formatted text
                 if (responseBox) {
-                    responseBox.innerText = this.currentAiReply;
+                    if (this.currentAiReply) {
+                        responseBox.innerText = this.currentAiReply;
+                    } else {
+                        const totalTok = data.tokens?.total_tokens || 0;
+                        responseBox.innerHTML = `
+                            <div class="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs">
+                                <b class="font-bold">⚠️ Model javobi bo'sh qaytdi:</b>
+                                <p class="mt-1">Model javob matnini taqdim etmadi (token sarfi: ${totalTok} tok). Model sozlamasini yoki so'rovni tekshiring.</p>
+                            </div>
+                        `;
+                    }
                 }
 
                 // Show telemetry badge

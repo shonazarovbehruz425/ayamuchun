@@ -449,7 +449,7 @@ class AIService:
         }
 
         max_retries = 3
-        timeout_config = httpx.Timeout(60.0, connect=10.0)
+        timeout_config = httpx.Timeout(120.0, connect=15.0)
         logger.info(f"Connecting to OpenAI-compatible endpoint: {url} | Model: {payload['model']}")
 
         for attempt in range(max_retries):
@@ -468,8 +468,21 @@ class AIService:
                             "total_tokens": t_tok
                         }
                         choices = data.get("choices", [])
-                        if choices and "message" in choices[0]:
-                            return choices[0]["message"].get("content", "").strip()
+                        if choices and len(choices) > 0:
+                            choice = choices[0]
+                            if "message" in choice:
+                                msg = choice["message"]
+                                content = (msg.get("content") or "").strip()
+                                reasoning = (msg.get("reasoning_content") or msg.get("reasoning") or "").strip()
+                                
+                                # Agar reasoning model (Qwen-Thinking, DeepSeek R1) bo'lsa
+                                if content:
+                                    return content
+                                elif reasoning:
+                                    # Agar content bo'sh bo'lib, fikrlash/matn reasoning_content da bo'lsa
+                                    return reasoning
+                            elif "text" in choice:
+                                return choice["text"].strip()
                         return ""
                     elif res.status_code in (400, 404):
                         # 1. OpenRouter model unavailability check

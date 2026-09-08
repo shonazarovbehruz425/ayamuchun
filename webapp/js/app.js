@@ -2803,7 +2803,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('psplit-options').classList.remove('hidden');
                 document.getElementById('psplit-action-btn').classList.remove('hidden');
                 TelegramApp.showAlert(`Xatolik: ${err.message}`);
-            }    refreshIcons();
+                refreshIcons();
             }
         };
     };

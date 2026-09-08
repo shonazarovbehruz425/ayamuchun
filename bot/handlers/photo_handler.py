@@ -129,7 +129,7 @@ async def execute_photo_3x4(
         except Exception:
             pass
 
-        # Backup to Channel -1003745209875 & Save to DB
+        # Backup to Storage Channel & Save to DB
         try:
             from bot.services.cloud_storage import get_cloud_storage
             cloud_storage = get_cloud_storage()

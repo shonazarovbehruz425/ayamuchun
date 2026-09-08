@@ -83,7 +83,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             "telegram_file_id": document.file_id,
         }
 
-        # Save record in database and backup to channel -1003745209875
+        # Save record in database and backup to cloud storage channel
         try:
             from bot.database.engine import get_session
             from bot.database import crud

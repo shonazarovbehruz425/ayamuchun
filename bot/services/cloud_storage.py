@@ -1,4 +1,4 @@
-"""Cloud Storage Service — Persistent cloud storage via Telegram Channel (-1003745209875).
+"""Cloud Storage Service — Persistent cloud storage via Telegram Channel.
 Ensures all user files (photos, 3x4, PDFs, Word, etc.) survive server reboots and ephemeral disk wipes,
 auto-restores missing files, and sends files to users with zero channel attribution (hide name)."""
 
@@ -33,9 +33,13 @@ class CloudStorageService:
         tool_name: str = "EduBot Hujjati"
     ) -> Tuple[str, Optional[int]]:
         """
-        Upload file to private backup channel -1003745209875.
+        Upload file to private backup channel configured via env.
         Returns (telegram_file_id, channel_message_id).
         """
+        if not self.channel_id:
+            logger.warning("Storage channel ID not configured in environment (FILES_CHANNEL_ID). Skipping cloud channel backup.")
+            return ("", None)
+
         if not self.bot_token or self.bot_token in ("local_dev_preview_token", "your_bot_token_here"):
             logger.warning("Bot token not configured for cloud storage backup.")
             return ("", None)

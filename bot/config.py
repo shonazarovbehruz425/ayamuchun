@@ -3,17 +3,19 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 import os
 
-def _parse_channel_id(val: Optional[str], default: Optional[int] = None) -> Optional[int]:
-    """Safely parse channel ID from environment variable string."""
+from pydantic import model_validator
+
+def _parse_channel_id(val: Optional[object]) -> Optional[int]:
+    """Safely parse channel ID from environment variable or config value."""
     if val is None:
-        return default
+        return None
     val_str = str(val).strip()
     if not val_str:
-        return default
+        return None
     try:
         return int(val_str)
     except (ValueError, TypeError):
-        return default
+        return None
 
 class Settings(BaseSettings):
     # Telegram Bot
@@ -30,30 +32,46 @@ class Settings(BaseSettings):
     AI_DISPLAY_NAME: str = os.getenv("AI_DISPLAY_NAME", "EduBot AI")  # Public user-facing name (no third-party brand)
 
     # 1. Telegram Channel for User Files (PDF, Word, Excel, PPTX, 3x4 photos)
-    # Reads from FILES_CHANNEL_ID or STORAGE_CHANNEL_ID
-    STORAGE_CHANNEL_ID: int = _parse_channel_id(
-        os.getenv("FILES_CHANNEL_ID") or os.getenv("STORAGE_CHANNEL_ID"),
-        default=-1003745209875
-    )
+    # Strictly resolved from FILES_CHANNEL_ID or STORAGE_CHANNEL_ID env vars
+    FILES_CHANNEL_ID: Optional[int] = None
+    STORAGE_CHANNEL_ID: Optional[int] = None
 
     # 2. Telegram Channel for Database Backup (.js dumps, user sync)
-    # Reads from DATABASE_CHANNEL_ID, CHANNEL_DB_ID, or BACKUP_CHANNEL_ID
-    BACKUP_CHANNEL_ID: Optional[int] = _parse_channel_id(
-        os.getenv("DATABASE_CHANNEL_ID") or os.getenv("CHANNEL_DB_ID") or os.getenv("BACKUP_CHANNEL_ID"),
-        default=None
-    )
-    CHANNEL_DB_ID: Optional[int] = _parse_channel_id(
-        os.getenv("DATABASE_CHANNEL_ID") or os.getenv("CHANNEL_DB_ID") or os.getenv("BACKUP_CHANNEL_ID"),
-        default=None
-    )
+    # Strictly resolved from DATABASE_CHANNEL_ID, CHANNEL_DB_ID, or BACKUP_CHANNEL_ID env vars
+    DATABASE_CHANNEL_ID: Optional[int] = None
+    BACKUP_CHANNEL_ID: Optional[int] = None
+    CHANNEL_DB_ID: Optional[int] = None
 
-    @property
-    def FILES_CHANNEL_ID(self) -> int:
-        return self.STORAGE_CHANNEL_ID
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_channels_from_env(cls, values):
+        if not isinstance(values, dict):
+            return values
 
-    @property
-    def DATABASE_CHANNEL_ID(self) -> Optional[int]:
-        return self.BACKUP_CHANNEL_ID
+        # Resolve User Files Channel (from env or loaded values)
+        files_val = _parse_channel_id(
+            values.get("FILES_CHANNEL_ID")
+            or values.get("STORAGE_CHANNEL_ID")
+            or os.getenv("FILES_CHANNEL_ID")
+            or os.getenv("STORAGE_CHANNEL_ID")
+        )
+        values["FILES_CHANNEL_ID"] = files_val
+        values["STORAGE_CHANNEL_ID"] = files_val
+
+        # Resolve Database Backup Channel (from env or loaded values)
+        db_val = _parse_channel_id(
+            values.get("DATABASE_CHANNEL_ID")
+            or values.get("CHANNEL_DB_ID")
+            or values.get("BACKUP_CHANNEL_ID")
+            or os.getenv("DATABASE_CHANNEL_ID")
+            or os.getenv("CHANNEL_DB_ID")
+            or os.getenv("BACKUP_CHANNEL_ID")
+        )
+        values["DATABASE_CHANNEL_ID"] = db_val
+        values["BACKUP_CHANNEL_ID"] = db_val
+        values["CHANNEL_DB_ID"] = db_val
+
+        return values
 
     # Persistent Database URL (e.g. Postgres / Supabase / Neon / Render Postgres)
     DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL", None)

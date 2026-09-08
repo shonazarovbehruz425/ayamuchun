@@ -119,7 +119,7 @@ async def save_and_backup_user_file(
     file_type: str,
     tool_name: str = "Hujjat"
 ):
-    """Faylni Telegram kanalga (-1003745209875) doimiy zaxiralash va bazaga saqlash."""
+    """Faylni Telegram saqlash kanaliga doimiy zaxiralash va bazaga saqlash."""
     from bot.services.cloud_storage import get_cloud_storage
     cloud_storage = get_cloud_storage()
     tg_id = user_dict.get("telegram_id")
@@ -273,7 +273,7 @@ async def download_file(file_id: int, user: dict = Depends(get_current_user)):
         if not target:
             raise HTTPException(status_code=404, detail="Fayl topilmadi")
             
-        # Ensure local file exists on disk, auto-restoring from Telegram Cloud (-1003745209875) if wiped
+        # Ensure local file exists on disk, auto-restoring from Telegram Cloud storage if wiped
         from bot.services.cloud_storage import get_cloud_storage
         cloud_storage = get_cloud_storage()
         valid_path = await cloud_storage.ensure_local_file(target)
@@ -1721,7 +1721,7 @@ async def create_photo_3x4_endpoint(
                 dpi=300
             )
 
-            # Save and backup both files to channel -1003745209875
+            # Save and backup both files to storage channel
             single_rec = await save_and_backup_user_file(
                 session=session,
                 db_user=db_user,

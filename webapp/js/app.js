@@ -1877,52 +1877,49 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 openModal(`
-                    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md animate-fade-in">
-                        <div class="liquid-glass-card max-w-md w-full p-6 text-center space-y-4 bg-white/95 dark:bg-slate-900/95 border border-white/80 shadow-2xl">
-                            <div class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr ${isDocx ? 'from-blue-600 to-indigo-600' : 'from-rose-600 to-red-600'} text-white flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                                <i data-lucide="download-cloud" class="w-7 h-7"></i>
-                            </div>
-                            <div>
-                                <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">${targetFileName}</h3>
-                                <div class="mt-2.5 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-left space-y-1">
-                                    <div class="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
-                                        <i data-lucide="check-circle-2" class="w-4 h-4 shrink-0"></i>
-                                        <span>Faylni yuklab olish boshlandi!</span>
+                    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-md animate-fade-in">
+                        <div class="liquid-glass-card max-w-sm w-full overflow-hidden rounded-3xl bg-slate-900/95 border border-emerald-500/30 shadow-2xl">
+                            <div class="p-6 text-center space-y-4">
+                                <!-- Green checkmark pill badge -->
+                                <div class="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/40">
+                                    <i data-lucide="check" class="w-6 h-6 stroke-[3]"></i>
+                                </div>
+
+                                <!-- File title -->
+                                <div>
+                                    <h4 class="text-xs sm:text-sm font-bold text-white tracking-wide truncate px-2">${targetFileName}</h4>
+                                </div>
+
+                                <!-- Green message card -->
+                                <div class="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-left space-y-1">
+                                    <div class="flex items-center gap-2 text-emerald-400 font-bold text-xs">
+                                        <i data-lucide="send" class="w-4 h-4 shrink-0"></i>
+                                        <span>${isDocx ? "Word hujjatingiz Telegram chatiga yuborildi!" : "PDF hujjatingiz Telegram chatiga yuborildi!"}</span>
                                     </div>
-                                    <p class="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
-                                        Hujjat ${isDocx ? 'Word (.docx)' : 'PDF (.pdf)'} formatida qurilmangizga yuklanmoqda va nusxasi bot chatiga ham yuborildi.
+                                    <p class="text-[11px] text-slate-300 leading-snug pl-6">
+                                        ${isDocx ? "Barcha tahrirlangan matnlar, jadvallar va formatlash to'liq saqlanib, botingizga yuborildi." : "Barcha sahifalar, jadvallar va dizayn bitta faylga saqlanib, botingizga yuborildi."}
                                     </p>
+                                </div>
+
+                                <!-- Action Buttons -->
+                                <div class="space-y-2 pt-1">
+                                    <button onclick="TelegramApp.openChat(); closeModal();" class="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-green-600 text-white text-xs font-extrabold shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
+                                        <i data-lucide="send" class="w-4 h-4"></i> ${isDocx ? "Telegram Chatiga O'tish (Word faylni olish) ✓" : "Telegram Chatiga O'tish (PDF faylni olish) ✓"}
+                                    </button>
+
+                                    <button onclick="TelegramApp.downloadFile('/api/files/${targetFileId}/download', '${targetFileName}')" class="w-full py-2.5 px-3 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-200 text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer">
+                                        <i data-lucide="download" class="w-3.5 h-3.5"></i> Shu yerdan to'g'ridan-to'g'ri yuklab olish
+                                    </button>
                                 </div>
                             </div>
 
-                            <div class="space-y-2 pt-1">
-                                <button onclick="TelegramApp.downloadFile('/api/files/${targetFileId}/download', '${targetFileName}')" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r ${isDocx ? 'from-blue-600 to-indigo-600' : 'from-rose-600 to-red-600'} text-white text-xs font-bold shadow-md flex items-center justify-center gap-2 cursor-pointer hover:opacity-95">
-                                    <i data-lucide="download" class="w-4 h-4"></i> ${isDocx ? 'Word (.docx) qayta yuklab olish' : 'PDF (.pdf) qayta yuklab olish'}
-                                </button>
-
-                                ${isDocx && saveRes.pdf_file_id ? `
-                                    <button onclick="TelegramApp.downloadFile('/api/files/${saveRes.pdf_file_id}/download', '${saveRes.pdf_file_name || 'document.pdf'}')" class="w-full py-2 px-3 rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50/70 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 text-xs font-bold flex items-center justify-center gap-2 hover:bg-rose-100 cursor-pointer">
-                                        <i data-lucide="file-check" class="w-3.5 h-3.5"></i> PDF (.pdf) shaklida ham yuklab olish
-                                    </button>
-                                ` : ''}
-
-                                ${!isDocx && saveRes.docx_file_id ? `
-                                    <button onclick="TelegramApp.downloadFile('/api/files/${saveRes.docx_file_id}/download', '${saveRes.docx_file_name || 'document.docx'}')" class="w-full py-2 px-3 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 text-xs font-bold flex items-center justify-center gap-2 hover:bg-blue-100 cursor-pointer">
-                                        <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Word (.docx) shaklida ham yuklab olish
-                                    </button>
-                                ` : ''}
-
-                                <button onclick="TelegramApp.openChat(); closeModal();" class="w-full py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-white cursor-pointer">
-                                    <i data-lucide="send" class="w-3.5 h-3.5"></i> Telegram bot chatiga o'tish
-                                </button>
-                            </div>
-
-                            <div class="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
-                                <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
+                            <!-- Footer -->
+                            <div class="px-5 py-3 border-t border-slate-800 flex items-center justify-between bg-slate-950/60">
+                                <button onclick="closeModal()" class="text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer">
                                     Tahrirlashda davom etish
                                 </button>
-                                <button onclick="closeModal(); closeDocumentEditor();" class="px-4 py-2 rounded-xl text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 cursor-pointer">
-                                    Chiqish
+                                <button onclick="closeModal()" class="text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer">
+                                    Yopish
                                 </button>
                             </div>
                         </div>

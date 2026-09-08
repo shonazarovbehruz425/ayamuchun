@@ -167,7 +167,40 @@ const TelegramApp = {
         const username = botUsername || this.botUsername || "AyamUchunBot";
         const cleanUsername = String(username).replace(/^@/, '').trim();
         const tgUrl = `https://t.me/${cleanUsername}`;
-        this.openTelegramLink(tgUrl);
+
+        if (tg) {
+            try {
+                if (typeof tg.disableClosingConfirmation === 'function') {
+                    tg.disableClosingConfirmation();
+                }
+            } catch (e) {}
+
+            try {
+                if (typeof tg.openTelegramLink === 'function') {
+                    tg.openTelegramLink(tgUrl);
+                }
+            } catch (e) {
+                console.warn("tg.openTelegramLink error:", e);
+            }
+
+            // In Telegram WebApp, closing the app returns user directly to the bot chat where their file is!
+            try {
+                if (typeof tg.close === 'function') {
+                    tg.close();
+                    return true;
+                }
+            } catch (e) {
+                console.warn("tg.close error:", e);
+            }
+        }
+
+        // Fallback for regular web browsers
+        try {
+            window.location.href = tgUrl;
+        } catch (e) {
+            window.open(tgUrl, '_blank');
+        }
+        return false;
     },
 
     closeApp() {

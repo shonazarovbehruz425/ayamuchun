@@ -68,18 +68,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }).catch(() => {});
 
+    let _refreshIconsPending = false;
     function refreshIcons(rootNode) {
-        if (window.lucide) {
+        if (!window.lucide) return;
+        if (rootNode && (rootNode instanceof HTMLElement || rootNode instanceof DocumentFragment)) {
             try {
-                if (rootNode && (rootNode instanceof HTMLElement || rootNode instanceof DocumentFragment)) {
-                    window.lucide.createIcons({ root: rootNode });
-                } else {
-                    window.lucide.createIcons();
-                }
-            } catch (e) {
-                try { window.lucide.createIcons(); } catch (err) {}
-            }
+                window.lucide.createIcons({ root: rootNode });
+                return;
+            } catch (e) {}
         }
+        if (_refreshIconsPending) return;
+        _refreshIconsPending = true;
+        requestAnimationFrame(() => {
+            _refreshIconsPending = false;
+            try {
+                window.lucide.createIcons();
+            } catch (e) {}
+        });
     }
 
     // ── Day / Night Theme Controller ──
@@ -622,7 +627,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <p class="text-[11px] text-slate-400 mt-0.5">Yuqoridagi asboblardan foydalaning</p>
                     </div>
                 `;
-                refreshIcons();
+                refreshIcons(container);
                 return;
             }
 
@@ -671,7 +676,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 `;
             }).join('');
-            refreshIcons();
+            refreshIcons(container);
         } catch (e) {
             container.innerHTML = `<div class="p-4 text-center text-xs text-red-500">${e.message}</div>`;
         }

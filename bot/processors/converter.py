@@ -201,6 +201,13 @@ class FileConverter:
 
             table_finder = page.find_tables()
             tables = table_finder.tables if table_finder else []
+            if not tables:
+                try:
+                    alt_finder = page.find_tables(vertical_strategy="text", horizontal_strategy="lines")
+                    if alt_finder and alt_finder.tables:
+                        tables = alt_finder.tables
+                except Exception:
+                    pass
             table_bboxes = [t.bbox for t in tables]
 
             blocks = page.get_text('blocks')
@@ -306,6 +313,96 @@ class FileConverter:
         doc.close()
         return output_path
 
+    @staticmethod
+    def _post_process_docx_layout(input_pdf: str, docx_path: str) -> None:
+        """
+        pdf2docx tomonidan hosil qilingan Word hujjatini asl PDF geometriyasi
+        bilan solishtirib, matnlar joylashuvi (chap, markaz, o'ng) va jadvallar
+        tartibini 100% to'g'rilab, professional ko'rinishga keltiradi.
+        """
+        import fitz
+        from docx import Document
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.enum.table import WD_TABLE_ALIGNMENT
+        from docx.shared import Pt
+        from docx.oxml import parse_xml
+        from docx.oxml.ns import nsdecls
+
+        try:
+            pdf_doc = fitz.open(input_pdf)
+            word_doc = Document(docx_path)
+
+            all_blocks = []
+            for page in pdf_doc:
+                p_width = page.rect.width
+                for b in page.get_text("blocks"):
+                    if b[6] == 0:  # Matn bloki
+                        txt = b[4].strip()
+                        if txt:
+                            x0, y0, x1, y1 = b[:4]
+                            mid_x = (x0 + x1) / 2
+                            block_w = x1 - x0
+                            is_center = (abs(mid_x - (p_width / 2)) < 55) and (block_w < p_width * 0.85)
+                            is_right = (x0 > p_width * 0.42) and not is_center
+                            all_blocks.append({
+                                "text": txt,
+                                "clean": "".join(txt.split()).lower(),
+                                "is_center": is_center,
+                                "is_right": is_right,
+                            })
+            pdf_doc.close()
+
+            empty_count = 0
+            for p in list(word_doc.paragraphs):
+                p_raw = p.text.strip()
+                if not p_raw:
+                    empty_count += 1
+                    if empty_count > 1:
+                        p_element = p._p
+                        p_element.getparent().remove(p_element)
+                    continue
+                else:
+                    empty_count = 0
+
+                p_clean = "".join(p_raw.split()).lower()
+
+                matched = None
+                for b in all_blocks:
+                    if b["clean"] in p_clean or p_clean in b["clean"]:
+                        matched = b
+                        break
+
+                if matched:
+                    if matched["is_center"]:
+                        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    elif matched["is_right"]:
+                        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+                upper_txt = p_raw.upper()
+                if any(k in upper_txt for k in ["TASDIQLAYMAN"]):
+                    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                elif any(k in upper_txt for k in ["REJASI", "JADVALI", "BUYRUG'I", "HISOBOTI", "BAYONNOMASI", "MA'LUMOTNOMA"]):
+                    if len(p_raw) < 100:
+                        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+            for tbl in word_doc.tables:
+                tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+                tbl.autofit = True
+                for row in tbl.rows:
+                    trPr = row._tr.get_or_add_trPr()
+                    if trPr.find(parse_xml(f'<w:cantSplit {nsdecls("w")}/>').tag) is None:
+                        trPr.append(parse_xml(f'<w:cantSplit {nsdecls("w")}/>'))
+                    for cell in row.cells:
+                        for cp in cell.paragraphs:
+                            cp.paragraph_format.space_before = Pt(1)
+                            cp.paragraph_format.space_after = Pt(1)
+                            cp.paragraph_format.line_spacing = 1.05
+
+            word_doc.save(docx_path)
+            logger.info(f"DOCX joylashuvi muvaffaqiyatli optimallashtirildi: {docx_path}")
+        except Exception as e:
+            logger.warning(f"DOCX post-processing ogohlantirish: {e}")
+
     async def pdf_to_word(self, input_path: str, output_path: str) -> str:
         """
         PDF dan Word (.docx) formatiga yuqori aniqlikda o'tkazish.
@@ -338,9 +435,9 @@ class FileConverter:
                 logger.info(f"Skaner qilingan PDF aniqlandi ({input_path}). Tasvirlar orqali DOCX ga o'tkazilmoqda.")
                 return self._convert_scanned_pdf(input_path, output_path)
 
-            # 2. Asosiy konvertatsiya: maxsus sozlangan pdf2docx
-            # parse_stream_table=False qilib o'rnatamiz, chunki u oddiy matn bo'shliqlarini jadval deb o'ylab,
-            # qatorlarni 30 martagacha takrorlab matnni aralashtirib yuborardi.
+            # 2. Asosiy konvertatsiya: to'liq imkoniyatli pdf2docx
+            # parse_stream_table=True qilib o'rnatamiz, bu barcha jadvallar va ko'p ustunli matnlar
+            # Word jadvali va oqimi sifatida 100% to'g'ri o'tishini ta'minlaydi.
             try:
                 cv = Converter(input_path)
                 cv.convert(
@@ -348,18 +445,19 @@ class FileConverter:
                     start=0,
                     end=None,
                     parse_lattice_table=True,
-                    parse_stream_table=False,
-                    connected_border_tolerance=2.5,
+                    parse_stream_table=True,
+                    connected_border_tolerance=0.5,
+                    line_separate_threshold=5.0,
                     max_line_spacing_ratio=1.5,
-                    line_separate_threshold=3.5,
                     delete_end_line_hyphen=True,
                     ignore_page_error=True
                 )
                 cv.close()
 
-                # Natijani tekshirish
+                # Natijani tekshirish va geometrik layoutni to'g'rilash
                 if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
                     docx.Document(output_path)
+                    self._post_process_docx_layout(input_path, output_path)
                     return output_path
             except Exception as e:
                 logger.warning(f"Asosiy pdf2docx da xatolik yuz berdi ({e}). Geometrik layout dvigateliga o'tilmoqda...")

@@ -443,7 +443,48 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
     except Exception:
         pass
 
-    # 2. Check for File Tools intent in user natural language
+    # 2. Agar foydalanuvchi avval rasm yuborgan bo'lsa va AI so'ragan savolga javob yozayotgan bo'lsa:
+    waiting_photo = context.user_data.pop("waiting_photo_intent", False)
+    photo_info = context.user_data.get("last_photo")
+    if waiting_photo and photo_info and os.path.exists(photo_info.get("path", "")):
+        context.user_data["last_photo_user_wish"] = raw_text
+        lower_raw = raw_text.lower()
+        
+        # Qaysi rejimga mosligini aniqlash:
+        action_name = "Surat bilan ishlash"
+        if any(k in lower_raw for k in ["3x4", "3*4", "pasport", "viza", "hujjat", "surat"]):
+            action_name = "3×4 Hujjat fotosi tayyorlash"
+        elif any(k in lower_raw for k in ["pdf", "hujjat qil", "kitob"]):
+            action_name = "A4 PDF hujjatiga aylantirish"
+        elif any(k in lower_raw for k in ["matn", "ocr", "yozuv", "oqish", "o'qish", "tahlil"]):
+            action_name = "Rasmdagi matnni o'qish (AI tahlil)"
+        elif any(k in lower_raw for k in ["fon", "oq", "ko'k", "kok", "almashtir"]):
+            action_name = "Surat fonini almashtirish"
+        else:
+            action_name = f"«{raw_text[:35]}» vazifasi"
+
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("🤖 AI qilib berish (Avtomatik)", callback_data="photo_ai_auto"),
+            ],
+            [
+                InlineKeyboardButton("🛠️ Qo'lda qilish (Sozlamalar bilan)", callback_data="photo_manual_options"),
+            ]
+        ])
+
+        await update.message.reply_text(
+            f"💡 <b>Tushundim! Sizning tanlovingiz:</b>\n"
+            f"🎯 <i>{action_name}</i>\n\n"
+            f"Ushbu amalni qanday bajarishni xohlaysiz?\n"
+            f"• <b>🤖 AI qilib berish:</b> AI avtomatik tarzda eng maqbul parametrlar bilan tayyorlab beradi.\n"
+            f"• <b>🛠️ Qo'lda qilish:</b> Fon ranglari, o'lchamlari va sozlamalarini o'zingiz tanlaysiz.\n\n"
+            f"Quyidagi tugmalardan birini tanlang:",
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+        return
+
+    # 3. Check for File Tools intent in user natural language
     lower_text = raw_text.lower()
     if any(w in lower_text for w in ("pdf to word", "pdfni word", "pdf dan word", "pdf wordga")):
         context.user_data["expected_tool"] = "pdf_to_word"

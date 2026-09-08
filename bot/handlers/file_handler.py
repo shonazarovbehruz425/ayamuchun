@@ -137,13 +137,16 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 await execute_photo_3x4(update, context, input_path=local_path, bg_color="#FFFFFF", change_bg=False, add_corner=False, status_msg=msg)
                 return
             else:
+                context.user_data["waiting_photo_intent"] = True
                 await msg.edit_text(
                     "📸 <b>Suratingiz qabul qilindi!</b>\n\n"
-                    "Ushbu suratdan qanday foydalanamiz?\n"
-                    "• <b>3×4 Hujjat fotosi</b> — Pasport/viza standarti (yakka va 6 talik varaq)\n"
-                    "• <b>PDF ga aylantirish</b> — A4 formatidagi PDF hujjat qilish\n"
-                    "• <b>Mini App</b> — Fon rangini (oq, ko'k) va parametrlarini sozlash",
-                    reply_markup=photo_actions_keyboard(),
+                    "Ushbu rasm bilan nima qilmoqchisiz?\n\n"
+                    "Mavjud imkoniyatlar:\n"
+                    "• <b>3×4 Hujjat fotosi</b> — Pasport yoki viza uchun foto va 6 talik chop etish varag'i\n"
+                    "• <b>PDF ga aylantirish</b> — A4 formatidagi toza PDF hujjat qilish\n"
+                    "• <b>Rasm ichidagi matnni olish (OCR / AI tahlil)</b> — Rasmdagi yozuvlarni matnga aylantirish yoki tahlil qilish\n"
+                    "• <b>Fonini almashtirish</b> — Oq, ko'k yoki kulrang fonga o'tkazish\n\n"
+                    "✍️ <i>Iltimos, nima qilish kerakligini yozing (masalan: «3x4 qilib ber», «PDF qil», «matnini ol» yoki o'zingiz xohlagan vazifani ayting):</i>",
                     parse_mode="HTML"
                 )
                 return

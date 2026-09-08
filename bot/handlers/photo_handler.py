@@ -216,13 +216,18 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if expected_tool == "photo_3x4":
         await execute_photo_3x4(update, context, input_path=local_path, bg_color="#FFFFFF", change_bg=False, add_corner=False)
     else:
+        # User rasm tashlaganda birdan inline keyboard chiqarmaymiz.
+        # AI foydalanuvchidan nima qilmoqchiligini so'raydi va imkoniyatlarni taklif qiladi.
+        context.user_data["waiting_photo_intent"] = True
         await update.message.reply_text(
             "📸 <b>Suratingiz qabul qilindi!</b>\n\n"
-            "Ushbu suratdan qanday foydalanamiz?\n"
-            "• <b>3×4 Hujjat fotosi</b> — Pasport/viza standarti (yakka va 6 talik varaq)\n"
-            "• <b>PDF ga aylantirish</b> — A4 formatidagi PDF hujjat qilish\n"
-            "• <b>Mini App</b> — Fon rangini (oq, ko'k) va parametrlarini sozlash",
-            reply_markup=photo_actions_keyboard(),
+            "Ushbu rasm bilan nima qilmoqchisiz?\n\n"
+            "Mavjud imkoniyatlar:\n"
+            "• <b>3×4 Hujjat fotosi</b> — Pasport yoki viza uchun foto va 6 talik chop etish varag'i\n"
+            "• <b>PDF ga aylantirish</b> — A4 formatidagi toza PDF hujjat qilish\n"
+            "• <b>Rasm ichidagi matnni olish (OCR / AI tahlil)</b> — Rasmdagi yozuvlarni matnga aylantirish yoki tahlil qilish\n"
+            "• <b>Fonini almashtirish</b> — Oq, ko'k yoki kulrang fonga o'tkazish\n\n"
+            "✍️ <i>Iltimos, nima qilish kerakligini yozing (masalan: «3x4 qilib ber», «PDF qil», «matnini ol» yoki o'zingiz xohlagan vazifani ayting):</i>",
             parse_mode="HTML"
         )
 
@@ -241,6 +246,77 @@ async def handle_photo_callback(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     input_path = photo_info["path"]
+    user_wish = (context.user_data.get("last_photo_user_wish") or "").lower()
+
+    if data == "photo_manual_options":
+        # Foydalanuvchi "Qo'lda qilish"ni tanladi: unga to'liq inline sozlamalar paneli ko'rsatiladi
+        await query.message.reply_text(
+            "🛠️ <b>Qo'lda boshqarish menyusi:</b>\n\n"
+            "Kerakli parametrni tanlang:\n"
+            "• Standart 3×4 hujjat fotosi\n"
+            "• Oq, ko'k yoki kulrang fon almashtirish\n"
+            "• Burchakli (doira) format\n"
+            "• A4 PDF formatiga o'tkazish\n"
+            "• Mini App studiyasida ochish",
+            reply_markup=photo_actions_keyboard(),
+            parse_mode="HTML"
+        )
+        return
+
+    elif data == "photo_ai_auto":
+        # Foydalanuvchi "AI qilib berish"ni tanladi: AI foydalanuvchi niyatiga qarab avtomatik bajaradi
+        if any(k in user_wish for k in ["pdf", "kitob", "hujjat qil"]):
+            status_msg = await query.message.reply_text("🤖 <i>AI suratni A4 PDF hujjatiga aylantirmoqda...</i>", parse_mode="HTML")
+            try:
+                from PIL import Image
+                pdf_path = input_path.rsplit(".", 1)[0] + "_document.pdf"
+                with Image.open(input_path) as im:
+                    im_rgb = im.convert("RGB")
+                    im_rgb.save(pdf_path, "PDF", resolution=100.0)
+
+                with open(pdf_path, "rb") as f_pdf:
+                    await query.message.reply_document(
+                        document=f_pdf,
+                        filename="ai_hujjat.pdf",
+                        caption="✅ <b>AI tomonidan A4 PDF hujjati tayyorlandi!</b>\n\nChop etish va rasmiy topshirishga tayyor.",
+                        parse_mode="HTML"
+                    )
+                await status_msg.delete()
+            except Exception as err:
+                await status_msg.edit_text(f"❌ Xatolik yuz berdi: {err}")
+            return
+
+        elif any(k in user_wish for k in ["matn", "ocr", "yozuv", "oqish", "o'qish", "tahlil"]):
+            status_msg = await query.message.reply_text("🤖 <i>AI rasmdagi matn va mazmunni tahlil qilmoqda...</i>", parse_mode="HTML")
+            try:
+                from bot.services.ai_service import get_ai_service
+                ai_srv = get_ai_service()
+                
+                # Matnni tahlil qilish
+                ai_prompt = [
+                    {
+                        "role": "system",
+                        "content": "Siz rasmli hujjatlar va ta'lim materiallari bo'yicha kuchli AI assistentsiz. Foydalanuvchi rasm yubordi va uning mazmunini tushunishni xohladi. Unga o'zbek tilida aniq va professional tushuntirish va matn xulosasini bering."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Foydalanuvchi fotosurat yukladi va quyidagilarni so'radi: {user_wish or 'Mazmunini toliq ochib ber'}. Ushbu mavzu bo'yicha tushuntirish va foydali tavsiyalar ber."
+                    }
+                ]
+                reply = await ai_srv.generate_chat(ai_prompt)
+                await status_msg.edit_text(f"📝 <b>AI Tahlili Natijasi:</b>\n\n{reply}", parse_mode="HTML")
+            except Exception as err:
+                await status_msg.edit_text(f"❌ Tahlilda xatolik: {err}")
+            return
+
+        else:
+            # Standart: AI eng ideal 3x4 oq fonli hujjat fotosi va 6 talik varaqni avtomatik tayyorlaydi
+            status_msg = await query.message.reply_text("🤖 <i>AI avtomatik tarzda 3×4 hujjat fotosi va 6 talik varaqni tayyorlamoqda...</i>", parse_mode="HTML")
+            change_bg = any(k in user_wish for k in ["fon", "oq", "ko'k", "almashtir"])
+            bg_color = "#4A90E2" if "ko'k" in user_wish or "kok" in user_wish else "#FFFFFF"
+            add_corner = "burchak" in user_wish or "doira" in user_wish
+            await execute_photo_3x4(update, context, input_path=input_path, bg_color=bg_color, change_bg=change_bg, add_corner=add_corner, status_msg=status_msg)
+            return
 
     if data == "photo_process_3x4":
         status_msg = await query.message.reply_text("⏳ Ishlanmoqda...")

@@ -3372,11 +3372,18 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <div>
                                         <label class="text-[10px] font-bold text-slate-500 block mb-1">Shrift o'lchami:</label>
                                         <select id="pwm-size-val" class="w-full text-xs p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-                                            <option value="28">Kichik (28px)</option>
-                                            <option value="38" selected>O'rtacha (38px)</option>
-                                            <option value="52">Katta (52px)</option>
+                                            <option value="18">Kichik (18px)</option>
+                                            <option value="24" selected>O'rtacha (24px)</option>
+                                            <option value="32">Katta (32px)</option>
                                         </select>
                                     </div>
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold text-slate-500 block mb-1">Belgilar soni / Joylashuvi:</label>
+                                    <select id="pwm-repeat-val" class="w-full text-xs p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200">
+                                        <option value="true" selected>Sahifa bo'ylab 10–15 ta takroriy (Tavsiya etiladi)</option>
+                                        <option value="false">Faqat 1 ta (Sahifa markazida)</option>
+                                    </select>
                                 </div>
                             </div>
 
@@ -3516,10 +3523,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (wmMode === 'text') {
                 const textVal = document.getElementById('pwm-text-val')?.value || 'EduBot';
                 const colorVal = document.getElementById('pwm-color-val')?.value || '#6366f1';
-                const sizeVal = document.getElementById('pwm-size-val')?.value || 38;
+                const sizeVal = document.getElementById('pwm-size-val')?.value || 24;
+                const repeatVal = document.getElementById('pwm-repeat-val')?.value || 'true';
                 fd.append('text', textVal);
                 fd.append('color', colorVal);
                 fd.append('font_size', sizeVal);
+                fd.append('repeat', repeatVal);
             } else {
                 fd.append('logo', chosenLogo);
             }

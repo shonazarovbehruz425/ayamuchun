@@ -1644,10 +1644,11 @@ async def watermark_pdf_endpoint(
     file_id: int = Form(None),
     mode: str = Form("text"),
     text: str = Form("EduBot"),
-    font_size: int = Form(36),
+    font_size: int = Form(24),
     opacity: float = Form(0.35),
     angle: int = Form(45),
     color: str = Form("#6366f1"),
+    repeat: str = Form("true"),
     logo: UploadFile = File(None),
     user: dict = Depends(get_current_user)
 ):
@@ -1686,6 +1687,8 @@ async def watermark_pdf_endpoint(
             out_name = f"{clean_base}_watermark_{timestamp}.pdf"
             out_path = os.path.join(settings.processed_dir, out_name)
 
+            is_repeat = str(repeat).lower() in ("true", "1", "yes", "on")
+
             await pdf_processor.watermark_pdf(
                 file_path=src_path,
                 output_path=out_path,
@@ -1695,7 +1698,8 @@ async def watermark_pdf_endpoint(
                 opacity=float(opacity),
                 angle=int(angle),
                 color_hex=color or "#6366f1",
-                logo_path=temp_logo_path
+                logo_path=temp_logo_path,
+                repeat=is_repeat
             )
 
             record = await save_and_backup_user_file(

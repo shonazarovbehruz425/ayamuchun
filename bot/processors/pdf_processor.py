@@ -173,14 +173,17 @@ class PDFProcessor(BaseProcessor):
         output_path: str,
         mode: str = "text",
         text: str = "EduBot",
-        font_size: int = 36,
+        font_size: int = 24,
         opacity: float = 0.35,
         angle: int = 45,
         color_hex: str = "#6366f1",
-        logo_path: str = None
+        logo_path: str = None,
+        repeat: bool = True
     ) -> str:
         """
         PDF sahifalariga matn yoki rasm (logo) shaklida suv belgisi (watermark) qo'yish.
+        - Matn: sahifa bo'ylab 10-15 ta takroriy diagonal belgi yoki bitta markaziy belgi.
+        - Rasm (Logo): proporsiyasi buzilmasdan, shaffoflik va burchak saqlangan holda markazda joylashadi.
         """
         def _watermark():
             doc = fitz.open(file_path)
@@ -195,29 +198,86 @@ class PDFProcessor(BaseProcessor):
             else:
                 color_tuple = (0.4, 0.4, 0.9)
 
+            clamped_opacity = max(0.05, min(1.0, opacity))
+
+            # Agar rasm bo'lsa, uni bir marta yuklab, shaffoflik va burchakni qayta ishlaymiz
+            prepared_img_bytes = None
+            orig_img_w = 0
+            orig_img_h = 0
+            if mode == "image" and logo_path and os.path.exists(logo_path):
+                try:
+                    pil_img = Image.open(logo_path).convert("RGBA")
+                    # Shaffoflikni (alpha kanalini) moslash
+                    r_ch, g_ch, b_ch, a_ch = pil_img.split()
+                    a_ch = a_ch.point(lambda p: int(p * clamped_opacity))
+                    pil_img = Image.merge("RGBA", (r_ch, g_ch, b_ch, a_ch))
+
+                    # Agar burchak berilgan bo'lsa aylantirish
+                    if angle != 0:
+                        pil_img = pil_img.rotate(angle, expand=True, resample=Image.Resampling.BICUBIC)
+
+                    orig_img_w, orig_img_h = pil_img.size
+                    buf = io.BytesIO()
+                    pil_img.save(buf, format="PNG")
+                    prepared_img_bytes = buf.getvalue()
+                except Exception as img_err:
+                    logger.error(f"Suv belgisi rasmini qayta ishlashda xatolik: {img_err}")
+                    prepared_img_bytes = None
+
             for page in doc:
                 rect = page.rect
                 cx = rect.width / 2
                 cy = rect.height / 2
 
-                if mode == "image" and logo_path and os.path.exists(logo_path):
-                    # Image Watermark
-                    img_w = min(rect.width * 0.5, 300)
-                    img_h = img_w
-                    img_rect = fitz.Rect(cx - img_w / 2, cy - img_h / 2, cx + img_w / 2, cy + img_h / 2)
-                    page.insert_image(img_rect, filename=logo_path, overlay=True)
+                if mode == "image" and prepared_img_bytes:
+                    # Proporsiyasini saqlagan holda sahifaga moslashtirish (squash/buzilishsiz)
+                    max_w = min(rect.width * 0.65, 420)
+                    max_h = min(rect.height * 0.65, 420)
+                    scale = min(max_w / orig_img_w, max_h / orig_img_h, 1.0)
+                    w = orig_img_w * scale
+                    h = orig_img_h * scale
+
+                    img_rect = fitz.Rect(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
+                    page.insert_image(img_rect, stream=prepared_img_bytes, overlay=True)
+
                 else:
                     # Text Watermark
-                    center_point = fitz.Point(cx - (len(text) * font_size * 0.22), cy)
-                    page.insert_text(
-                        center_point,
-                        text,
-                        fontsize=font_size,
-                        color=color_tuple,
-                        fill_opacity=max(0.05, min(1.0, opacity)),
-                        morph=(fitz.Point(cx, cy), fitz.Matrix(angle)) if angle != 0 else None,
-                        overlay=True
-                    )
+                    if repeat:
+                        # Sahifa bo'ylab 10–15 ta takroriy panjara (grid) ko'rinishida
+                        num_cols = 3 if rect.height >= rect.width else 5
+                        num_rows = 5 if rect.height >= rect.width else 3
+                        # 3 ustun x 5 qator = 15 ta suv belgisi
+                        cell_w = rect.width / num_cols
+                        cell_h = rect.height / num_rows
+
+                        for r_idx in range(num_rows):
+                            # Qatorlar orasidagi siljish (staggered diagonal ko'rinish uchun)
+                            offset = (cell_w * 0.25) if (r_idx % 2 == 1) else (-cell_w * 0.25)
+                            for c_idx in range(num_cols):
+                                x = (c_idx + 0.5) * cell_w + offset
+                                y = (r_idx + 0.5) * cell_h
+                                pt = fitz.Point(x - (len(text) * font_size * 0.22), y)
+                                page.insert_text(
+                                    pt,
+                                    text,
+                                    fontsize=font_size,
+                                    color=color_tuple,
+                                    fill_opacity=clamped_opacity,
+                                    morph=(fitz.Point(x, y), fitz.Matrix(angle)) if angle != 0 else None,
+                                    overlay=True
+                                )
+                    else:
+                        # Bitta markazda joylashgan suv belgisi
+                        center_point = fitz.Point(cx - (len(text) * font_size * 0.22), cy)
+                        page.insert_text(
+                            center_point,
+                            text,
+                            fontsize=font_size,
+                            color=color_tuple,
+                            fill_opacity=clamped_opacity,
+                            morph=(fitz.Point(cx, cy), fitz.Matrix(angle)) if angle != 0 else None,
+                            overlay=True
+                        )
 
             doc.save(output_path, garbage=3, deflate=True)
             doc.close()

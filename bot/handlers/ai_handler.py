@@ -433,7 +433,7 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
     except Exception:
         pass
 
-    # 2. Agar foydalanuvchi avval rasm yuborgan bo'lsa va AI so'ragan savolga javob yozayotgan bo'lsa:
+    # 2. Agar foydalanuvchi avval rasm yuborgan bo'lsa va surat bilan bog'liq buyruq yozayotgan bo'lsa:
     waiting_photo = context.user_data.pop("waiting_photo_intent", False)
     photo_info = context.user_data.get("last_photo")
     photo_batch = context.user_data.get("photo_batch", [])
@@ -442,43 +442,113 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
         paths = [photo_info["path"]]
 
     if waiting_photo and paths:
-        context.user_data["last_photo_user_wish"] = raw_text
-        lower_raw = raw_text.lower()
+        lower_raw = raw_text.lower().strip()
         count = len(paths)
 
-        # Qaysi rejimga mosligini aniqlash:
-        action_name = "Surat bilan ishlash"
-        if any(k in lower_raw for k in ["3x4", "3*4", "pasport", "viza", "hujjat", "surat"]):
-            action_name = f"{count} ta suratdan 3×4 Hujjat fotosi tayyorlash" if count > 1 else "3×4 Hujjat fotosi tayyorlash"
-        elif any(k in lower_raw for k in ["pdf", "hujjat qil", "kitob"]):
-            action_name = f"Barcha {count} ta rasmni bitta A4 PDF hujjatiga aylantirish" if count > 1 else "A4 PDF hujjatiga aylantirish"
-        elif any(k in lower_raw for k in ["matn", "ocr", "yozuv", "oqish", "o'qish", "tahlil"]):
-            action_name = f"Rasmlardagi matnni o'qish (AI tahlil)" if count > 1 else "Rasmdagi matnni o'qish (AI tahlil)"
-        elif any(k in lower_raw for k in ["fon", "oq", "ko'k", "kok", "almashtir"]):
-            action_name = "Surat fonini almashtirish"
-        else:
-            action_name = f"«{raw_text[:35]}» vazifasi"
+        # Foydalanuvchi shunchaki salomlashgan yoki umumiy gap yozgan bo'lsa, surat deb tutib olmaymiz
+        is_greeting = any(g in lower_raw.split() for g in ["salom", "assalom", "assalomu", "alaykum", "hello", "hi", "qalaysiz", "qalaysan", "raxmat", "rahmat", "xayr"])
+        is_pdf = any(k in lower_raw for k in ["pdf", "kitob", "hujjat qil", "birlashtir", "fayl qil"])
+        is_3x4 = any(k in lower_raw for k in ["3x4", "3*4", "3 na 4", "3-4", "pasport", "viza", "hujjat foto", "chop et"])
+        is_ocr = any(k in lower_raw for k in ["matn", "ocr", "yozuv", "oqish", "o'qish", "tahlil", "nima yozilgan", "matnini", "yozuvini"])
+        is_bg = any(k in lower_raw for k in ["fon", "background", "oq fon", "ko'k fon", "kok fon", "almashtir"])
+        is_manual = any(k in lower_raw for k in ["sozlama", "qolda", "qo'lda", "variant", "opsiya"])
 
-        keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("🤖 AI qilib berish (Avtomatik)", callback_data="photo_ai_auto"),
-            ],
-            [
-                InlineKeyboardButton("🛠️ Qo'lda qilish (Sozlamalar bilan)", callback_data="photo_manual_options"),
-            ]
-        ])
+        if is_pdf and not is_greeting:
+            status_msg = await update.message.reply_text(
+                f"⏳ <b>{count} ta rasm bitta A4 PDF ga aylantirilmoqda...</b>" if count > 1 else "⏳ <b>Rasm A4 PDF ga aylantirilmoqda...</b>",
+                parse_mode="HTML"
+            )
+            try:
+                from PIL import Image
+                pil_images = []
+                for p in paths:
+                    try:
+                        im = Image.open(p)
+                        if im.mode in ("RGBA", "P"):
+                            im = im.convert("RGB")
+                        pil_images.append(im)
+                    except Exception:
+                        pass
+                if pil_images:
+                    pdf_path = paths[0].rsplit(".", 1)[0] + "_document.pdf"
+                    pil_images[0].save(pdf_path, "PDF", resolution=100.0, save_all=True, append_images=pil_images[1:])
+                    with open(pdf_path, "rb") as f_pdf:
+                        caption = (
+                            f"📄 <b>{len(pil_images)} ta rasm bitta PDF ga muvaffaqiyatli aylantirildi!</b>\n\nChop etish yoki rasmiy topshirishga tayyor."
+                            if len(pil_images) > 1
+                            else "📄 <b>Surat PDF formatiga muvaffaqiyatli aylantirildi!</b>\n\nChop etish yoki rasmiy topshirishga tayyor."
+                        )
+                        await update.message.reply_document(
+                            document=f_pdf,
+                            filename=f"rasmlar_{len(pil_images)}_ta.pdf" if len(pil_images) > 1 else "surat_hujjat.pdf",
+                            caption=caption,
+                            parse_mode="HTML"
+                        )
+                    await status_msg.delete()
+                    return
+                else:
+                    await status_msg.edit_text("❌ Rasmlarni ochib bo'lmadi.")
+                    return
+            except Exception as err:
+                await status_msg.edit_text(f"❌ Xatolik: {err}")
+                return
 
-        await update.message.reply_text(
-            f"💡 <b>Tushundim! Sizning tanlovingiz:</b>\n"
-            f"🎯 <i>{action_name}</i>\n\n"
-            f"Ushbu amalni qanday bajarishni xohlaysiz?\n"
-            f"• <b>🤖 AI qilib berish:</b> AI avtomatik tarzda eng maqbul parametrlar bilan tayyorlab beradi.\n"
-            f"• <b>🛠️ Qo'lda qilish:</b> Fon ranglari, o'lchamlari va sozlamalarini o'zingiz tanlaysiz.\n\n"
-            f"Quyidagi tugmalardan birini tanlang:",
-            reply_markup=keyboard,
-            parse_mode="HTML"
-        )
-        return
+        elif is_3x4 and not is_greeting:
+            from bot.handlers.photo_handler import execute_photo_3x4
+            status_msg = await update.message.reply_text("⏳ 3×4 Hujjat fotosi tayyorlanmoqda...")
+            for i, p_path in enumerate(paths[:5]):
+                if len(paths) > 1 and i > 0:
+                    status_msg = await update.message.reply_text(f"📷 <i>{i+1}/{min(len(paths), 5)}-surat ishlanmoqda...</i>", parse_mode="HTML")
+                await execute_photo_3x4(update, context, input_path=p_path, bg_color="#FFFFFF", change_bg=False, add_corner=False, status_msg=status_msg)
+            return
+
+        elif is_ocr and not is_greeting:
+            status_msg = await update.message.reply_text(
+                f"🤖 <i>AI {count} ta rasmdagi matnni o'qimoqda...</i>" if count > 1 else "🤖 <i>AI rasmdagi matnni o'qimoqda...</i>",
+                parse_mode="HTML"
+            )
+            try:
+                from bot.services.ai_service import get_ai_service
+                ai_srv = get_ai_service()
+                ai_prompt = [
+                    {
+                        "role": "system",
+                        "content": "Siz rasmli hujjatlar bo'yicha kuchli AI OCR assistentsiz. Foydalanuvchi yuborgan rasmdagi barcha matnlarni aniq, to'liq va tartibli ko'rinishda ajratib bering."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Foydalanuvchi {count} ta fotosurat yukladi va: «{raw_text}» deb so'radi. Rasmdagi matn va yozuvlarni to'liq o'qib, o'zbek tilida tartibli qilib chiqarib ber."
+                    }
+                ]
+                reply = await ai_srv.generate_chat(ai_prompt)
+                await status_msg.edit_text(f"📝 <b>Rasmdan olingan matn (OCR):</b>\n\n{reply}", parse_mode="HTML")
+                return
+            except Exception as err:
+                await status_msg.edit_text(f"❌ Matnni olishda xatolik: {err}")
+                return
+
+        elif is_bg and not is_greeting:
+            from bot.handlers.photo_handler import execute_photo_3x4
+            bg_color = "#4A90E2" if ("ko'k" in lower_raw or "kok" in lower_raw) else "#FFFFFF"
+            status_msg = await update.message.reply_text("⏳ Surat foni almashtirilmoqda...")
+            for i, p_path in enumerate(paths[:5]):
+                await execute_photo_3x4(update, context, input_path=p_path, bg_color=bg_color, change_bg=True, add_corner=False, status_msg=status_msg)
+            return
+
+        elif is_manual and not is_greeting:
+            from bot.handlers.photo_handler import photo_actions_keyboard
+            await update.message.reply_text(
+                "🛠️ <b>Qo'lda boshqarish menyusi:</b>\n\n"
+                "Kerakli parametrni tanlang:\n"
+                "• Standart 3×4 hujjat fotosi\n"
+                "• Oq, ko'k yoki kulrang fon almashtirish\n"
+                "• Burchakli (doira) format\n"
+                "• A4 PDF formatiga o'tkazish\n"
+                "• Mini App studiyasida ochish",
+                reply_markup=photo_actions_keyboard(),
+                parse_mode="HTML"
+            )
+            return
 
     import re
 

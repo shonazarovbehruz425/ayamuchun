@@ -2,6 +2,8 @@
 
 import io
 import os
+import time
+import asyncio
 import logging
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -127,18 +129,59 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 pass
 
         if ext_lower in ("jpg", "jpeg", "png", "webp"):
-            from bot.handlers.photo_handler import execute_photo_3x4, photo_actions_keyboard
-            context.user_data["last_photo"] = {
+            from bot.handlers.photo_handler import execute_photo_3x4, photo_batch_keyboard
+            photo_item = {
                 "path": local_path,
                 "file_id": document.file_id,
                 "file_size": document.file_size,
+                "time": time.time(),
+                "media_group_id": update.message.media_group_id if update.message else None
             }
+            batch = context.user_data.get("photo_batch", [])
+            now = time.time()
+            if batch and (now - batch[-1].get("time", 0) > 4.0):
+                batch = []
+            if update.message and update.message.media_group_id:
+                if batch and batch[-1].get("media_group_id") != update.message.media_group_id:
+                    batch = []
+
+            batch.append(photo_item)
+            context.user_data["photo_batch"] = batch
+            context.user_data["last_photo"] = photo_item
+
             if expected_tool == "photo_3x4":
                 await execute_photo_3x4(update, context, input_path=local_path, bg_color="#FFFFFF", change_bg=False, add_corner=False, status_msg=msg)
                 return
+
+            current_token = context.user_data.get("photo_batch_token", 0) + 1
+            context.user_data["photo_batch_token"] = current_token
+
+            await asyncio.sleep(1.2)
+
+            if context.user_data.get("photo_batch_token") != current_token:
+                try:
+                    await msg.delete()
+                except Exception:
+                    pass
+                return
+
+            collected = context.user_data.get("photo_batch", [photo_item])
+            count = len(collected)
+            context.user_data["waiting_photo_intent"] = True
+
+            if count > 1:
+                text = (
+                    f"📸 <b>{count} ta rasm qabul qilindi!</b>\n\n"
+                    "Ushbu rasmlar bilan nima qilmoqchisiz?\n\n"
+                    "Mavjud imkoniyatlar:\n"
+                    f"• <b>PDF yaratish</b> — Barcha {count} ta rasmni bitta sifatli PDF hujjatga birlashtirish\n"
+                    "• <b>3×4 Hujjat fotosi</b> — Rasmlardan 3×4 hujjat fotosi tayyorlash\n"
+                    "• <b>Matnni olish (OCR / AI)</b> — Rasmlardagi yozuvlarni matnga aylantirish\n"
+                    "• <b>Fonini almashtirish</b> — Rasmlar fonini oq yoki ko'k rangga o'tkazish\n\n"
+                    "✍️ <i>Iltimos, nima qilish kerakligini yozing (masalan: «Barchasini bitta PDF qil», «PDF ga aylantir», «3x4 qil» yoki o'zingiz xohlagan vazifani ayting):</i>"
+                )
             else:
-                context.user_data["waiting_photo_intent"] = True
-                await msg.edit_text(
+                text = (
                     "📸 <b>Suratingiz qabul qilindi!</b>\n\n"
                     "Ushbu rasm bilan nima qilmoqchisiz?\n\n"
                     "Mavjud imkoniyatlar:\n"
@@ -146,10 +189,11 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     "• <b>PDF ga aylantirish</b> — A4 formatidagi toza PDF hujjat qilish\n"
                     "• <b>Rasm ichidagi matnni olish (OCR / AI tahlil)</b> — Rasmdagi yozuvlarni matnga aylantirish yoki tahlil qilish\n"
                     "• <b>Fonini almashtirish</b> — Oq, ko'k yoki kulrang fonga o'tkazish\n\n"
-                    "✍️ <i>Iltimos, nima qilish kerakligini yozing (masalan: «3x4 qilib ber», «PDF qil», «matnini ol» yoki o'zingiz xohlagan vazifani ayting):</i>",
-                    parse_mode="HTML"
+                    "✍️ <i>Iltimos, nima qilish kerakligini yozing (masalan: «3x4 qilib ber», «PDF qil», «matnini ol» yoki o'zingiz xohlagan vazifani ayting):</i>"
                 )
-                return
+
+            await msg.edit_text(text, reply_markup=photo_batch_keyboard(count), parse_mode="HTML")
+            return
 
         if expected_tool == "pdf_to_word" and ext_lower == "pdf":
             await msg.edit_text("⏳ PDF ni Word (DOCX) ga aylantirish boshlandi...")

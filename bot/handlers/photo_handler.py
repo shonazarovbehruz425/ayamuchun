@@ -3,6 +3,9 @@
 import os
 import io
 import logging
+import asyncio
+import uuid
+import time
 from datetime import datetime
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from telegram.ext import ContextTypes
@@ -14,6 +17,29 @@ from bot.utils.helpers import format_file_size
 logger = logging.getLogger(__name__)
 config = get_settings()
 image_processor = ImageProcessor()
+
+
+def photo_batch_keyboard(count: int = 1) -> InlineKeyboardMarkup:
+    """Inline keyboard offered after photo(s) are uploaded."""
+    keyboard = []
+    if count > 1:
+        keyboard.append([
+            InlineKeyboardButton(f"📄 Barcha {count} ta rasmdan PDF qilish", callback_data="photo_to_pdf")
+        ])
+    else:
+        keyboard.append([
+            InlineKeyboardButton("📄 PDF ga aylantirish", callback_data="photo_to_pdf")
+        ])
+    keyboard.append([
+        InlineKeyboardButton("📸 3×4 Hujjat fotosi", callback_data="photo_process_3x4"),
+        InlineKeyboardButton("🔍 Matnni olish (OCR)", callback_data="photo_ocr_extract")
+    ])
+    if config.WEBAPP_URL:
+        tool_url = f"{config.WEBAPP_URL}#/?tool=images2pdf" if count > 1 else f"{config.WEBAPP_URL}#/?tool=photo3x4"
+        keyboard.append([
+            InlineKeyboardButton("🎨 Mini App Studiyasida ochish", web_app=WebAppInfo(url=tool_url))
+        ])
+    return InlineKeyboardMarkup(keyboard)
 
 
 def photo_actions_keyboard() -> InlineKeyboardMarkup:
@@ -188,8 +214,8 @@ async def execute_photo_3x4(
 
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle photo sent by user."""
-    if not update.message.photo:
+    """Handle photo sent by user with multi-photo/album debouncing."""
+    if not update.message or not update.message.photo:
         return
 
     photo = update.message.photo[-1]
@@ -198,28 +224,70 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     os.makedirs(user_dir, exist_ok=True)
 
     timestamp = int(datetime.now().timestamp())
-    local_path = os.path.join(user_dir, f"photo_{timestamp}.jpg")
+    rand_id = uuid.uuid4().hex[:6]
+    local_path = os.path.join(user_dir, f"photo_{timestamp}_{rand_id}.jpg")
 
     tg_file = await photo.get_file()
     await tg_file.download_to_drive(custom_path=local_path)
 
-    context.user_data["last_photo"] = {
+    photo_item = {
         "path": local_path,
         "file_id": photo.file_id,
         "file_size": photo.file_size or os.path.getsize(local_path),
         "width": photo.width,
-        "height": photo.height
+        "height": photo.height,
+        "time": time.time(),
+        "media_group_id": update.message.media_group_id
     }
 
-    expected_tool = context.user_data.pop("expected_tool", None)
+    # Batch tracking
+    batch = context.user_data.get("photo_batch", [])
+    now = time.time()
+    # Agar oldingi rasm 4 soniyadan oldin yuborilgan bo'lsa, yangi batch deb hisoblaymiz
+    if batch and (now - batch[-1].get("time", 0) > 4.0):
+        batch = []
+    if update.message.media_group_id:
+        if batch and batch[-1].get("media_group_id") != update.message.media_group_id:
+            batch = []
 
+    batch.append(photo_item)
+    context.user_data["photo_batch"] = batch
+    context.user_data["last_photo"] = photo_item
+
+    expected_tool = context.user_data.get("expected_tool")
     if expected_tool == "photo_3x4":
+        context.user_data.pop("expected_tool", None)
         await execute_photo_3x4(update, context, input_path=local_path, bg_color="#FFFFFF", change_bg=False, add_corner=False)
+        return
+
+    # Debounce token
+    current_token = context.user_data.get("photo_batch_token", 0) + 1
+    context.user_data["photo_batch_token"] = current_token
+
+    # Telegram album yoki bir nechta rasm yuborilganda ularning barchasi yetib kelishini kutamiz (~1.2 soniya)
+    await asyncio.sleep(1.2)
+
+    # Agar kutish vaqtida yangi rasm kelgan bo'lsa, javob berishni eng oxirgi chaqiruvga topshiramiz
+    if context.user_data.get("photo_batch_token") != current_token:
+        return
+
+    collected = context.user_data.get("photo_batch", [photo_item])
+    count = len(collected)
+    context.user_data["waiting_photo_intent"] = True
+
+    if count > 1:
+        text = (
+            f"📸 <b>{count} ta rasm qabul qilindi!</b>\n\n"
+            "Ushbu rasmlar bilan nima qilmoqchisiz?\n\n"
+            "Mavjud imkoniyatlar:\n"
+            f"• <b>PDF yaratish</b> — Barcha {count} ta rasmni bitta sifatli PDF hujjatga birlashtirish\n"
+            "• <b>3×4 Hujjat fotosi</b> — Rasmlardan 3×4 hujjat fotosi tayyorlash\n"
+            "• <b>Matnni olish (OCR / AI)</b> — Rasmlardagi yozuvlarni matnga aylantirish\n"
+            "• <b>Fonini almashtirish</b> — Rasmlar fonini oq yoki ko'k rangga o'tkazish\n\n"
+            "✍️ <i>Iltimos, nima qilish kerakligini yozing (masalan: «Barchasini bitta PDF qil», «PDF ga aylantir», «3x4 qil» yoki o'zingiz xohlagan vazifani ayting):</i>"
+        )
     else:
-        # User rasm tashlaganda birdan inline keyboard chiqarmaymiz.
-        # AI foydalanuvchidan nima qilmoqchiligini so'raydi va imkoniyatlarni taklif qiladi.
-        context.user_data["waiting_photo_intent"] = True
-        await update.message.reply_text(
+        text = (
             "📸 <b>Suratingiz qabul qilindi!</b>\n\n"
             "Ushbu rasm bilan nima qilmoqchisiz?\n\n"
             "Mavjud imkoniyatlar:\n"
@@ -227,9 +295,10 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             "• <b>PDF ga aylantirish</b> — A4 formatidagi toza PDF hujjat qilish\n"
             "• <b>Rasm ichidagi matnni olish (OCR / AI tahlil)</b> — Rasmdagi yozuvlarni matnga aylantirish yoki tahlil qilish\n"
             "• <b>Fonini almashtirish</b> — Oq, ko'k yoki kulrang fonga o'tkazish\n\n"
-            "✍️ <i>Iltimos, nima qilish kerakligini yozing (masalan: «3x4 qilib ber», «PDF qil», «matnini ol» yoki o'zingiz xohlagan vazifani ayting):</i>",
-            parse_mode="HTML"
+            "✍️ <i>Iltimos, nima qilish kerakligini yozing (masalan: «3x4 qilib ber», «PDF qil», «matnini ol» yoki o'zingiz xohlagan vazifani ayting):</i>"
         )
+
+    await update.message.reply_text(text, reply_markup=photo_batch_keyboard(count), parse_mode="HTML")
 
 
 async def handle_photo_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -248,6 +317,12 @@ async def handle_photo_callback(update: Update, context: ContextTypes.DEFAULT_TY
     input_path = photo_info["path"]
     user_wish = (context.user_data.get("last_photo_user_wish") or "").lower()
 
+    photo_batch = context.user_data.get("photo_batch", [])
+    paths = [p["path"] for p in photo_batch if os.path.exists(p.get("path", ""))]
+    if not paths and input_path:
+        paths = [input_path]
+    count = len(paths)
+
     if data == "photo_manual_options":
         # Foydalanuvchi "Qo'lda qilish"ni tanladi: unga to'liq inline sozlamalar paneli ko'rsatiladi
         await query.message.reply_text(
@@ -263,25 +338,69 @@ async def handle_photo_callback(update: Update, context: ContextTypes.DEFAULT_TY
         )
         return
 
+    elif data == "photo_ocr_extract":
+        status_msg = await query.message.reply_text(
+            f"🤖 <i>AI {count} ta rasmdagi matn va mazmunni o'qimoqda...</i>" if count > 1 else "🤖 <i>AI rasmdagi matn va mazmunni o'qimoqda...</i>",
+            parse_mode="HTML"
+        )
+        try:
+            from bot.services.ai_service import get_ai_service
+            ai_srv = get_ai_service()
+            ai_prompt = [
+                {
+                    "role": "system",
+                    "content": "Siz rasmli hujjatlar bo'yicha kuchli AI OCR assistentsiz. Foydalanuvchi yuborgan rasmdagi barcha matnlarni aniq, to'liq va tartibli ko'rinishda ajratib bering."
+                },
+                {
+                    "role": "user",
+                    "content": f"Foydalanuvchi {count} ta fotosurat yukladi. Undagi barcha matn va yozuvlarni to'liq o'qib, o'zbek tilida tartibli qilib chiqarib ber."
+                }
+            ]
+            reply = await ai_srv.generate_chat(ai_prompt)
+            await status_msg.edit_text(f"📝 <b>Rasmdan olingan matn (OCR):</b>\n\n{reply}", parse_mode="HTML")
+        except Exception as err:
+            await status_msg.edit_text(f"❌ Matnni olishda xatolik: {err}")
+        return
+
     elif data == "photo_ai_auto":
         # Foydalanuvchi "AI qilib berish"ni tanladi: AI foydalanuvchi niyatiga qarab avtomatik bajaradi
         if any(k in user_wish for k in ["pdf", "kitob", "hujjat qil"]):
-            status_msg = await query.message.reply_text("🤖 <i>AI suratni A4 PDF hujjatiga aylantirmoqda...</i>", parse_mode="HTML")
+            status_msg = await query.message.reply_text(
+                f"🤖 <i>AI {count} ta suratni bitta A4 PDF hujjatiga aylantirmoqda...</i>" if count > 1
+                else "🤖 <i>AI suratni A4 PDF hujjatiga aylantirmoqda...</i>",
+                parse_mode="HTML"
+            )
             try:
                 from PIL import Image
-                pdf_path = input_path.rsplit(".", 1)[0] + "_document.pdf"
-                with Image.open(input_path) as im:
-                    im_rgb = im.convert("RGB")
-                    im_rgb.save(pdf_path, "PDF", resolution=100.0)
+                pil_images = []
+                for p in paths:
+                    try:
+                        im = Image.open(p)
+                        if im.mode in ("RGBA", "P"):
+                            im = im.convert("RGB")
+                        pil_images.append(im)
+                    except Exception:
+                        pass
 
-                with open(pdf_path, "rb") as f_pdf:
-                    await query.message.reply_document(
-                        document=f_pdf,
-                        filename="ai_hujjat.pdf",
-                        caption="✅ <b>AI tomonidan A4 PDF hujjati tayyorlandi!</b>\n\nChop etish va rasmiy topshirishga tayyor.",
-                        parse_mode="HTML"
-                    )
-                await status_msg.delete()
+                if pil_images:
+                    pdf_path = paths[0].rsplit(".", 1)[0] + "_document.pdf"
+                    pil_images[0].save(pdf_path, "PDF", resolution=100.0, save_all=True, append_images=pil_images[1:])
+
+                    with open(pdf_path, "rb") as f_pdf:
+                        caption = (
+                            f"✅ <b>AI tomonidan {len(pil_images)} ta rasmdan bitta A4 PDF hujjati tayyorlandi!</b>\n\nChop etish va rasmiy topshirishga tayyor."
+                            if len(pil_images) > 1
+                            else "✅ <b>AI tomonidan A4 PDF hujjati tayyorlandi!</b>\n\nChop etish va rasmiy topshirishga tayyor."
+                        )
+                        await query.message.reply_document(
+                            document=f_pdf,
+                            filename=f"rasmlar_{len(pil_images)}_ta.pdf" if len(pil_images) > 1 else "ai_hujjat.pdf",
+                            caption=caption,
+                            parse_mode="HTML"
+                        )
+                    await status_msg.delete()
+                else:
+                    await status_msg.edit_text("❌ Rasmlarni ochib bo'lmadi.")
             except Exception as err:
                 await status_msg.edit_text(f"❌ Xatolik yuz berdi: {err}")
             return
@@ -292,7 +411,6 @@ async def handle_photo_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 from bot.services.ai_service import get_ai_service
                 ai_srv = get_ai_service()
                 
-                # Matnni tahlil qilish
                 ai_prompt = [
                     {
                         "role": "system",
@@ -300,7 +418,7 @@ async def handle_photo_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     },
                     {
                         "role": "user",
-                        "content": f"Foydalanuvchi fotosurat yukladi va quyidagilarni so'radi: {user_wish or 'Mazmunini toliq ochib ber'}. Ushbu mavzu bo'yicha tushuntirish va foydali tavsiyalar ber."
+                        "content": f"Foydalanuvchi {count} ta fotosurat yukladi va quyidagilarni so'radi: {user_wish or 'Mazmunini toliq ochib ber'}. Ushbu mavzu bo'yicha tushuntirish va foydali tavsiyalar ber."
                     }
                 ]
                 reply = await ai_srv.generate_chat(ai_prompt)
@@ -310,17 +428,24 @@ async def handle_photo_callback(update: Update, context: ContextTypes.DEFAULT_TY
             return
 
         else:
-            # Standart: AI eng ideal 3x4 oq fonli hujjat fotosi va 6 talik varaqni avtomatik tayyorlaydi
+            # Standart: AI 3x4 oq fonli hujjat fotosi va 6 talik varaqni tayyorlaydi
             status_msg = await query.message.reply_text("🤖 <i>AI avtomatik tarzda 3×4 hujjat fotosi va 6 talik varaqni tayyorlamoqda...</i>", parse_mode="HTML")
             change_bg = any(k in user_wish for k in ["fon", "oq", "ko'k", "almashtir"])
             bg_color = "#4A90E2" if "ko'k" in user_wish or "kok" in user_wish else "#FFFFFF"
             add_corner = "burchak" in user_wish or "doira" in user_wish
-            await execute_photo_3x4(update, context, input_path=input_path, bg_color=bg_color, change_bg=change_bg, add_corner=add_corner, status_msg=status_msg)
+
+            for i, p_path in enumerate(paths[:5]):
+                if len(paths) > 1 and i > 0:
+                    status_msg = await query.message.reply_text(f"📷 <i>{i+1}/{min(len(paths), 5)}-surat ishlanmoqda...</i>", parse_mode="HTML")
+                await execute_photo_3x4(update, context, input_path=p_path, bg_color=bg_color, change_bg=change_bg, add_corner=add_corner, status_msg=status_msg)
             return
 
     if data == "photo_process_3x4":
         status_msg = await query.message.reply_text("⏳ Ishlanmoqda...")
-        await execute_photo_3x4(update, context, input_path=input_path, bg_color="#FFFFFF", change_bg=False, add_corner=False, status_msg=status_msg)
+        for i, p_path in enumerate(paths[:5]):
+            if len(paths) > 1 and i > 0:
+                status_msg = await query.message.reply_text(f"📷 <i>{i+1}/{min(len(paths), 5)}-surat ishlanmoqda...</i>", parse_mode="HTML")
+            await execute_photo_3x4(update, context, input_path=p_path, bg_color="#FFFFFF", change_bg=False, add_corner=False, status_msg=status_msg)
 
     elif data == "photo_bg_white":
         status_msg = await query.message.reply_text("⏳ Oq fon bilan 3×4 foto tayyorlanmoqda...")
@@ -339,21 +464,40 @@ async def handle_photo_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await execute_photo_3x4(update, context, input_path=input_path, bg_color="#FFFFFF", change_bg=False, add_corner=True, status_msg=status_msg)
 
     elif data == "photo_to_pdf":
-        status_msg = await query.message.reply_text("⏳ Rasm A4 PDF ga aylantirilmoqda...")
+        status_msg = await query.message.reply_text(
+            f"⏳ <b>{count} ta rasm bitta A4 PDF ga aylantirilmoqda...</b>" if count > 1 else "⏳ <b>Rasm A4 PDF ga aylantirilmoqda...</b>",
+            parse_mode="HTML"
+        )
         try:
             from PIL import Image
-            pdf_path = input_path.rsplit(".", 1)[0] + "_document.pdf"
-            with Image.open(input_path) as im:
-                im_rgb = im.convert("RGB")
-                im_rgb.save(pdf_path, "PDF", resolution=100.0)
+            pil_images = []
+            for p in paths:
+                try:
+                    im = Image.open(p)
+                    if im.mode in ("RGBA", "P"):
+                        im = im.convert("RGB")
+                    pil_images.append(im)
+                except Exception:
+                    pass
 
-            with open(pdf_path, "rb") as f_pdf:
-                await query.message.reply_document(
-                    document=f_pdf,
-                    filename="surat_hujjat.pdf",
-                    caption="📄 <b>Surat PDF formatiga o'tkazildi!</b>\n\nBosmaga yoki rasmiy topshirishga tayyor.",
-                    parse_mode="HTML"
-                )
-            await status_msg.delete()
+            if pil_images:
+                pdf_path = paths[0].rsplit(".", 1)[0] + "_document.pdf"
+                pil_images[0].save(pdf_path, "PDF", resolution=100.0, save_all=True, append_images=pil_images[1:])
+
+                with open(pdf_path, "rb") as f_pdf:
+                    caption = (
+                        f"📄 <b>{len(pil_images)} ta rasm bitta PDF formatiga muvaffaqiyatli o'tkazildi!</b>\n\nBosmaga yoki rasmiy topshirishga tayyor."
+                        if len(pil_images) > 1
+                        else "📄 <b>Surat PDF formatiga o'tkazildi!</b>\n\nBosmaga yoki rasmiy topshirishga tayyor."
+                    )
+                    await query.message.reply_document(
+                        document=f_pdf,
+                        filename=f"rasmlar_{len(pil_images)}_ta.pdf" if len(pil_images) > 1 else "surat_hujjat.pdf",
+                        caption=caption,
+                        parse_mode="HTML"
+                    )
+                await status_msg.delete()
+            else:
+                await status_msg.edit_text("❌ Rasmlarni ochib bo'lmadi.")
         except Exception as err:
             await status_msg.edit_text(f"❌ Xatolik: {err}")

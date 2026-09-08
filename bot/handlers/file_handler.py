@@ -202,12 +202,12 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         has_pdf_intent = any(k in caption for k in ["pdf", "pdfga", "pdf qil"])
         has_img_intent = any(k in caption for k in ["rasm", "rasmlar", "ajrat", "rasmini ol", "extract"])
 
-        if (expected_tool == "pdf_to_word" or has_word_intent) and ext_lower == "pdf":
-            await msg.edit_text("⏳ PDF ni Word (DOCX) ga aylantirish boshlandi...")
+        if (expected_tool == "pdf_to_word" or has_word_intent) and ext_lower in ("pdf", "xlsx", "xls", "xlsm"):
+            await msg.edit_text("⏳ Word (DOCX) ga aylantirish boshlandi...")
             await _convert_to_docx(msg, update, local_path, file_name)
             return
-        elif (expected_tool == "word_to_pdf" or has_pdf_intent) and ext_lower in ("docx", "doc"):
-            await msg.edit_text("⏳ Word ni PDF ga aylantirish boshlandi...")
+        elif (expected_tool == "word_to_pdf" or has_pdf_intent) and ext_lower in ("docx", "doc", "xlsx", "xls", "xlsm"):
+            await msg.edit_text("⏳ PDF ga aylantirish boshlandi...")
             await _convert_to_pdf(msg, update, local_path, file_name)
             return
         elif (expected_tool == "extract_images" or has_img_intent) and ext_lower == "pdf":
@@ -402,20 +402,28 @@ async def _ai_analyze(msg, query, file_path: str) -> None:
 
 
 async def _convert_to_docx(msg, query_or_update, file_path: str, file_name: str) -> None:
-    """Convert PDF to DOCX (Word)."""
+    """Convert PDF or Excel to DOCX (Word)."""
     output_path = os.path.join(
         config.processed_dir,
         os.path.splitext(os.path.basename(file_name))[0] + ".docx",
     )
     reply_target = query_or_update.message if hasattr(query_or_update, "message") and query_or_update.message else msg
+    ext = os.path.splitext(file_path)[1].lower()
     try:
-        await converter.pdf_to_word(file_path, output_path)
-        await msg.edit_text("✅ Word (DOCX) ga aylantirildi!")
+        if ext in (".xlsx", ".xls", ".xlsm"):
+            await converter.excel_to_word(file_path, output_path)
+            await msg.edit_text("✅ Excel jadvali Word (DOCX) ga aylantirildi!")
+            caption_text = "📊 Excel jadvali asosida Word (DOCX) hujjati tayyorlandi!"
+        else:
+            await converter.pdf_to_word(file_path, output_path)
+            await msg.edit_text("✅ Word (DOCX) ga aylantirildi!")
+            caption_text = "📝 Word (DOCX) hujjati tayyor!"
+
         with open(output_path, "rb") as f:
             await reply_target.reply_document(
                 document=f,
                 filename=os.path.basename(output_path),
-                caption="📝 Word (DOCX) hujjati tayyor!",
+                caption=caption_text,
             )
     except Exception as e:
         await msg.edit_text(f"❌ Word ga aylantirishda xatolik: {str(e)}")

@@ -41,14 +41,15 @@ def file_actions_keyboard(file_type: str) -> InlineKeyboardMarkup:
         ])
     elif file_type in ('xlsx', 'xls', 'xlsm'):
         keyboard.append([
-            InlineKeyboardButton("📊 Statistika", callback_data="file_stats"),
+            InlineKeyboardButton("🔄 Word (DOCX) ga", callback_data="file_to_docx"),
             InlineKeyboardButton("🔄 PDF ga", callback_data="file_to_pdf")
         ])
         keyboard.append([
-            InlineKeyboardButton("📋 CSV ga", callback_data="file_to_csv"),
-            InlineKeyboardButton("📖 Matn olish", callback_data="file_extract_text")
+            InlineKeyboardButton("📊 Statistika", callback_data="file_stats"),
+            InlineKeyboardButton("📋 CSV ga", callback_data="file_to_csv")
         ])
         keyboard.append([
+            InlineKeyboardButton("📖 Matn olish", callback_data="file_extract_text"),
             InlineKeyboardButton("🧠 AI tahlil", callback_data="file_ai_analyze")
         ])
     elif file_type == 'csv':

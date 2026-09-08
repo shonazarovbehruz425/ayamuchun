@@ -608,13 +608,13 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
         ask_word = any(k in lower_raw for k in ["doc", "docx", "word", "vord", "wordga", "word qil", "doc qil", "docx qil"])
         ask_pdf = any(k in lower_raw for k in ["pdf", "pdfga", "pdf qil"])
 
-        if ask_word and not is_greeting and f_type == "pdf":
-            status_msg = await update.message.reply_text("⏳ PDF ni Word (DOCX) ga aylantirish boshlandi...")
+        if ask_word and not is_greeting and f_type in ("pdf", "xlsx", "xls", "xlsm"):
+            status_msg = await update.message.reply_text("⏳ Word (DOCX) ga aylantirish boshlandi...")
             from bot.handlers.file_handler import _convert_to_docx
             await _convert_to_docx(status_msg, update, f_path, f_name)
             return
-        elif ask_pdf and not is_greeting and f_type in ("docx", "doc"):
-            status_msg = await update.message.reply_text("⏳ Word ni PDF ga aylantirish boshlandi...")
+        elif ask_pdf and not is_greeting and f_type in ("docx", "doc", "xlsx", "xls", "xlsm", "pptx", "ppt"):
+            status_msg = await update.message.reply_text("⏳ PDF ga aylantirish boshlandi...")
             from bot.handlers.file_handler import _convert_to_pdf
             await _convert_to_pdf(status_msg, update, f_path, f_name)
             return

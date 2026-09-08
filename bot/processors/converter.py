@@ -377,6 +377,105 @@ class FileConverter:
             logger.error(f"Xato: PDF dan Word ga o'tkazishda xatolik - {e}")
             raise
 
+    async def excel_to_word(self, input_path: str, output_path: str) -> str:
+        """Excel (.xlsx/.xls) jadvallarini Word (.docx) formatiga chiroyli jadval ko'rinishida o'tkazish."""
+        def _convert():
+            import openpyxl
+            from docx import Document
+            from docx.shared import Pt, Inches, RGBColor
+            from docx.enum.text import WD_ALIGN_PARAGRAPH
+            from docx.enum.table import WD_TABLE_ALIGNMENT
+            from docx.oxml import parse_xml
+            from docx.oxml.ns import nsdecls
+
+            wb = openpyxl.load_workbook(input_path, data_only=True)
+            doc = Document()
+
+            # Sahifani landscape (albom) qilib qo'yamiz, chunki Excel jadvallari ko'pincha keng bo'ladi
+            for sec in doc.sections:
+                sec.top_margin = Inches(0.5)
+                sec.bottom_margin = Inches(0.5)
+                sec.left_margin = Inches(0.5)
+                sec.right_margin = Inches(0.5)
+                sec.page_width = Inches(11.69) # A4 Landscape
+                sec.page_height = Inches(8.27)
+
+            first_sheet = True
+            for sheet_name in wb.sheetnames:
+                sheet = wb[sheet_name]
+                rows_data = list(sheet.iter_rows(values_only=True))
+                # Bo'sh qatorlarni tozalash
+                non_empty_rows = [r for r in rows_data if any(c is not None and str(c).strip() != "" for c in r)]
+                if not non_empty_rows:
+                    continue
+
+                if not first_sheet:
+                    doc.add_page_break()
+                first_sheet = False
+
+                # Varaq nomi sarlavhasi
+                p_title = doc.add_paragraph()
+                r_title = p_title.add_run(f"📊 {sheet_name}")
+                r_title.bold = True
+                r_title.font.size = Pt(13)
+                r_title.font.color.rgb = RGBColor(30, 58, 138)
+                p_title.paragraph_format.space_after = Pt(6)
+
+                max_cols = max(len(r) for r in non_empty_rows)
+                table = doc.add_table(rows=0, cols=max_cols)
+                table.alignment = WD_TABLE_ALIGNMENT.CENTER
+
+                # Jadval chiziqlari (grid)
+                tblPr = table._tbl.tblPr
+                borders_xml = parse_xml(
+                    r'<w:tblBorders %s>'
+                    r'  <w:top w:val="single" w:sz="4" w:space="0" w:color="D1D5DB"/>'
+                    r'  <w:left w:val="single" w:sz="4" w:space="0" w:color="D1D5DB"/>'
+                    r'  <w:bottom w:val="single" w:sz="4" w:space="0" w:color="D1D5DB"/>'
+                    r'  <w:right w:val="single" w:sz="4" w:space="0" w:color="D1D5DB"/>'
+                    r'  <w:insideH w:val="single" w:sz="4" w:space="0" w:color="E5E7EB"/>'
+                    r'  <w:insideV w:val="single" w:sz="4" w:space="0" w:color="E5E7EB"/>'
+                    r'</w:tblBorders>' % nsdecls('w')
+                )
+                tblPr.append(borders_xml)
+
+                for r_idx, row in enumerate(non_empty_rows):
+                    row_cells = table.add_row().cells
+                    is_header = (r_idx == 0)
+                    for c_idx in range(max_cols):
+                        val = row[c_idx] if c_idx < len(row) else ""
+                        val_str = str(val).strip() if val is not None else ""
+                        cell = row_cells[c_idx]
+                        cell.text = val_str
+                        p = cell.paragraphs[0]
+                        p.paragraph_format.space_before = Pt(2)
+                        p.paragraph_format.space_after = Pt(2)
+
+                        for r in p.runs:
+                            r.font.size = Pt(8.5)
+                            r.font.name = "Calibri"
+                            if is_header:
+                                r.bold = True
+                                r.font.color.rgb = RGBColor(17, 24, 39)
+
+                        # Fon rangi
+                        tcPr = cell._tc.get_or_add_tcPr()
+                        bg_hex = "F3F4F6" if is_header else ("FFFFFF" if r_idx % 2 == 0 else "F9FAFB")
+                        shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{bg_hex}"/>')
+                        tcPr.append(shd)
+
+                p_after = doc.add_paragraph()
+                p_after.paragraph_format.space_after = Pt(8)
+
+            doc.save(output_path)
+            return output_path
+
+        try:
+            return await asyncio.to_thread(_convert)
+        except Exception as e:
+            logger.error(f"Xato: Excel dan Word ga o'tkazishda xatolik - {e}")
+            raise
+
     async def excel_to_csv(self, input_path: str, output_path: str) -> str:
         """Excel dan CSV formatiga o'tkazish."""
         def _convert():

@@ -124,12 +124,50 @@ const TelegramApp = {
         }
     },
 
-    openLink(url) {
-        if (tg?.openLink) {
-            tg.openLink(url);
-        } else {
-            window.open(url, '_blank');
+    botUsername: (function() {
+        try {
+            return localStorage.getItem('edubot_bot_username') || "AyamUchunBot";
+        } catch (e) {
+            return "AyamUchunBot";
         }
+    })(),
+
+    setBotUsername(username) {
+        if (!username) return;
+        this.botUsername = String(username).replace(/^@/, '').trim();
+        try {
+            localStorage.setItem('edubot_bot_username', this.botUsername);
+        } catch (e) {}
+    },
+
+    openTelegramLink(url) {
+        this.hapticFeedback('light');
+        if (tg && typeof tg.openTelegramLink === 'function') {
+            try {
+                tg.openTelegramLink(url);
+                return true;
+            } catch (e) {
+                console.warn("tg.openTelegramLink error:", e);
+            }
+        }
+        if (tg && typeof tg.openLink === 'function') {
+            try {
+                tg.openLink(url);
+                return true;
+            } catch (e) {
+                console.warn("tg.openLink error:", e);
+            }
+        }
+        window.open(url, '_blank');
+        return false;
+    },
+
+    openChat(botUsername = null) {
+        this.hapticFeedback('medium');
+        const username = botUsername || this.botUsername || "AyamUchunBot";
+        const cleanUsername = String(username).replace(/^@/, '').trim();
+        const tgUrl = `https://t.me/${cleanUsername}`;
+        this.openTelegramLink(tgUrl);
     },
 
     closeApp() {
@@ -151,7 +189,8 @@ const TelegramApp = {
     },
 
     closeToChat() {
-        this.closeApp();
+        // Safe navigation to chat without destroying/closing the web app
+        this.openChat();
     },
 
     downloadFile(url, fileName = "") {

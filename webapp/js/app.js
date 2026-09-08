@@ -36,6 +36,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let isCurrentUserAdmin = false;
     window.activeUserProfile = null;
     api.getMe().then(res => {
+        if (res && res.bot_username) {
+            TelegramApp.setBotUsername(res.bot_username);
+        }
         if (res && res.user) {
             window.activeUserProfile = res.user;
             if (res.user.phone_number) {
@@ -276,6 +279,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     window.closeModal = closeModal;
+
+    function openChatAndCloseModal() {
+        TelegramApp.openChat();
+        closeModal();
+    }
+    window.openChatAndCloseModal = openChatAndCloseModal;
 
     function positionToolsFilterCapsule(activeBtn, animated = true) {
         const capsule = document.getElementById('toolsFilterCapsule');
@@ -763,7 +772,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                             </div>
                             <div class="pt-1">
-                                <button onclick="TelegramApp.closeApp()" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-brand-600 to-blue-600 text-white text-xs font-extrabold shadow-lg shadow-brand-500/25 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
+                                <button onclick="TelegramApp.openChat(); closeModal();" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-brand-600 to-blue-600 text-white text-xs font-extrabold shadow-lg shadow-brand-500/25 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
                                     <i data-lucide="send" class="w-4 h-4"></i> Telegram Chatiga O'tish (Word faylni olish) ✓
                                 </button>
                             </div>
@@ -872,7 +881,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                             </div>
                             <div class="pt-1">
-                                <button onclick="TelegramApp.closeApp()" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-brand-600 text-white text-xs font-extrabold shadow-lg shadow-blue-500/25 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
+                                <button onclick="TelegramApp.openChat(); closeModal();" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-brand-600 text-white text-xs font-extrabold shadow-lg shadow-blue-500/25 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
                                     <i data-lucide="send" class="w-4 h-4"></i> Telegram Chatiga O'tish (PDF faylni olish) ✓
                                 </button>
                             </div>
@@ -1705,7 +1714,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
 
                             <div class="space-y-2 pt-1">
-                                <button onclick="TelegramApp.closeApp()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-brand-600 to-blue-600 text-white text-xs font-bold shadow-md shadow-brand-500/25 flex items-center justify-center gap-2">
+                                <button onclick="TelegramApp.openChat(); closeModal();" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-brand-600 to-blue-600 text-white text-xs font-bold shadow-md shadow-brand-500/25 flex items-center justify-center gap-2">
                                     <i data-lucide="send" class="w-4 h-4"></i> Telegram chatida ochish ✓
                                 </button>
                                 ${saveRes.docx_file_id ? `
@@ -2073,7 +2082,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                             </div>
                             <div class="pt-1">
-                                <button onclick="TelegramApp.closeApp()" class="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-green-600 text-white text-xs font-extrabold shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
+                                <button onclick="TelegramApp.openChat(); closeModal();" class="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-green-600 text-white text-xs font-extrabold shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
                                     <i data-lucide="send" class="w-4 h-4"></i> Telegram Chatiga O'tish (PDF faylni olish) ✓
                                 </button>
                             </div>
@@ -2343,7 +2352,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                             </div>
                             <div class="pt-1">
-                                <button onclick="TelegramApp.closeApp()" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-cyan-600 via-sky-600 to-blue-600 text-white text-xs font-extrabold shadow-lg shadow-cyan-500/25 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
+                                <button onclick="TelegramApp.openChat(); closeModal();" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-cyan-600 via-sky-600 to-blue-600 text-white text-xs font-extrabold shadow-lg shadow-cyan-500/25 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
                                     <i data-lucide="send" class="w-4 h-4"></i> Telegram Chatiga O'tish (ZIP arxivni olish) ✓
                                 </button>
                             </div>
@@ -2479,7 +2488,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                             </div>
                             <div class="pt-1">
-                                <button onclick="TelegramApp.closeApp()" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-pink-600 text-white text-xs font-extrabold shadow-lg shadow-red-500/25 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
+                                <button onclick="TelegramApp.openChat(); closeModal();" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-pink-600 text-white text-xs font-extrabold shadow-lg shadow-red-500/25 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
                                     <i data-lucide="send" class="w-4 h-4"></i> Telegram Chatiga O'tish (PDF faylni olish) ✓
                                 </button>
                             </div>
@@ -2685,7 +2694,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                             </div>
                             <div class="pt-1">
-                                <button onclick="TelegramApp.closeApp()" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-amber-600 via-orange-600 to-yellow-600 text-white text-xs font-extrabold shadow-lg shadow-amber-500/25 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
+                                <button onclick="TelegramApp.openChat(); closeModal();" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-amber-600 via-orange-600 to-yellow-600 text-white text-xs font-extrabold shadow-lg shadow-amber-500/25 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
                                     <i data-lucide="send" class="w-4 h-4"></i> Telegram Chatiga O'tish (PDF faylni olish) ✓
                                 </button>
                             </div>
@@ -2867,7 +2876,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                             </div>
                             <div class="pt-1">
-                                <button onclick="TelegramApp.closeApp()" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-fuchsia-600 via-pink-600 to-purple-600 text-white text-xs font-extrabold shadow-lg shadow-fuchsia-500/25 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
+                                <button onclick="TelegramApp.openChat(); closeModal();" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-fuchsia-600 via-pink-600 to-purple-600 text-white text-xs font-extrabold shadow-lg shadow-fuchsia-500/25 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
                                     <i data-lucide="send" class="w-4 h-4"></i> Telegram Chatiga O'tish (Siqilgan PDF faylni olish) ✓
                                 </button>
                             </div>
@@ -3080,7 +3089,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                             </div>
                             <div class="pt-1">
-                                <button onclick="TelegramApp.closeApp()" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 text-white text-xs font-extrabold shadow-lg shadow-indigo-500/25 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
+                                <button onclick="TelegramApp.openChat(); closeModal();" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 text-white text-xs font-extrabold shadow-lg shadow-indigo-500/25 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
                                     <i data-lucide="send" class="w-4 h-4"></i> Telegram Chatiga O'tish (PDF faylni olish) ✓
                                 </button>
                             </div>
@@ -3351,7 +3360,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
 
                             <div class="pt-1">
-                                <button onclick="TelegramApp.closeApp()" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white text-xs font-extrabold shadow-lg shadow-purple-500/30 flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
+                                <button onclick="TelegramApp.openChat(); closeModal();" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white text-xs font-extrabold shadow-lg shadow-purple-500/30 flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
                                     <i data-lucide="send" class="w-4 h-4"></i> Telegram Chatiga O'tish (Fotolarni olish) ✓
                                 </button>
                             </div>
@@ -4607,10 +4616,10 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await api.sendFileToTelegram(fileId);
             TelegramApp.hapticFeedback('heavy');
-            TelegramApp.showAlert("📬 Fayl to'g'ridan-to'g'ri Telegram botingizga yuborildi! Chatga o'tilmoqda...");
+            TelegramApp.showAlert("📬 Fayl to'g'ridan-to'g'ri Telegram botingizga yuborildi!");
             setTimeout(() => {
-                TelegramApp.closeApp();
-            }, 600);
+                TelegramApp.openChat();
+            }, 500);
         } catch (e) {
             TelegramApp.showAlert(`Yuborishda xatolik: ${e.message}`);
         }

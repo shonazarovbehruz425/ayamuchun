@@ -20,6 +20,7 @@ def _parse_channel_id(val: Optional[object]) -> Optional[int]:
 class Settings(BaseSettings):
     # Telegram Bot
     BOT_TOKEN: str = "local_dev_preview_token"
+    BOT_USERNAME: Optional[str] = os.getenv("BOT_USERNAME", None)
     ADMIN_IDS: List[int] = []
     ADMIN_SECRET_KEY: str = os.getenv("ADMIN_SECRET_KEY", "edubot_admin_secret_2026_superkey")
 

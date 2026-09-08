@@ -148,11 +148,40 @@ async def get_telegram_avatar(uid: int, current_user: dict = Depends(get_current
 
     raise HTTPException(status_code=404, detail="Avatar not found")
 
+_cached_bot_username = None
+
+async def get_bot_username() -> str:
+    global _cached_bot_username
+    if _cached_bot_username:
+        return _cached_bot_username
+    if getattr(settings, "BOT_USERNAME", None):
+        _cached_bot_username = settings.BOT_USERNAME.lstrip("@")
+        return _cached_bot_username
+    if settings.BOT_TOKEN and settings.BOT_TOKEN not in ("your_bot_token_here", "local_dev_preview_token"):
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(f"https://api.telegram.org/bot{settings.BOT_TOKEN}/getMe")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get("ok"):
+                        _cached_bot_username = data.get("result", {}).get("username", "")
+                        return _cached_bot_username
+        except Exception as e:
+            logger.warning(f"Failed to fetch bot username: {e}")
+    return "AyamUchunBot"
+
 @router.get("/me")
 @router.post("/validate")
 async def validate_auth(authorization: str = Header(None)):
     user = await get_current_user(authorization)
-    return {"status": "ok", "user": user, "is_admin": user.get("is_admin", False)}
+    bot_user = await get_bot_username()
+    return {
+        "status": "ok",
+        "user": user,
+        "is_admin": user.get("is_admin", False),
+        "bot_username": bot_user
+    }
 
 import re
 from pydantic import BaseModel, field_validator

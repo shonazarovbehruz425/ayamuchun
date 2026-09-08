@@ -1,29 +1,31 @@
 import asyncio
+import time
 import logging
 from typing import Optional, List, Tuple
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_AI_STAGES: List[Tuple[str, str, str, str]] = [
-    ("🧠", "Savolingiz tahlil qilinmoqda...", "▰▰▱▱▱▱▱▱▱▱", "20%"),
-    ("🔍", "Kerakli ma'lumotlar saralanmoqda...", "▰▰▰▰▱▱▱▱▱▱", "45%"),
-    ("⚡️", "Eng to'g'ri yechim shakllantirilmoqda...", "▰▰▰▰▰▰▱▱▱▱", "70%"),
-    ("💡", "Javob matni tuzilmoqda...", "▰▰▰▰▰▰▰▰▱▱", "85%"),
-    ("✨", "Matn sayqallanmoqda...", "▰▰▰▰▰▰▰▰▰▱", "95%"),
-    ("🚀", "Deyarli tayyor...", "▰▰▰▰▰▰▰▰▰▰", "99%"),
+# Real holat bosqichlari (soxta foizlarsiz, real soniyalar bilan)
+DEFAULT_AI_STAGES: List[Tuple[str, str]] = [
+    ("⚡️", "AI serveriga ulanilmoqda..."),
+    ("🧠", "Savol o'rganilmoqda va rejalashtirilmoqda..."),
+    ("🔍", "Kerakli ma'lumotlar tahlil qilinmoqda..."),
+    ("💡", "Javob matni tuzilmoqda..."),
+    ("✨", "Matn sayqallanmoqda..."),
+    ("🚀", "Javob yakunlanmoqda...")
 ]
 
-VISION_STAGES: List[Tuple[str, str, str, str]] = [
-    ("👁", "Surat piksellari o'qilmoqda...", "▰▰▱▱▱▱▱▱▱▱", "25%"),
-    ("🔍", "Matn va obyektlar ajratilmoqda...", "▰▰▰▰▱▱▱▱▱▱", "50%"),
-    ("⚡️", "Tafsilotlar tahlil qilinmoqda...", "▰▰▰▰▰▰▱▱▱▱", "75%"),
-    ("✨", "Natija shakllantirilmoqda...", "▰▰▰▰▰▰▰▰▰▰", "98%"),
+VISION_STAGES: List[Tuple[str, str]] = [
+    ("👁", "Surat piksellari o'qilmoqda..."),
+    ("🔍", "Matn va obyektlar tahlil qilinmoqda..."),
+    ("⚡️", "Tafsilotlar o'rganilmoqda..."),
+    ("✨", "Javob shakllantirilmoqda...")
 ]
 
 class TelegramAiLoadingAnimation:
     """
-    Telegram chatda yuklanish vaqtida 'VAU' effekt beruvchi
-    jonli animatsiyali progress xabari.
+    Telegram chatda yuklanish vaqtida soxta foizlar o'rniga
+    real soniyalar hisoblagichi va jonli faollik indikatorini ko'rsatuvchi xabar.
     """
 
     def __init__(
@@ -32,8 +34,8 @@ class TelegramAiLoadingAnimation:
         bot,
         chat_id: int,
         title: str = "EduBot AI",
-        stages: Optional[List[Tuple[str, str, str, str]]] = None,
-        interval: float = 0.95
+        stages: Optional[List[Tuple[str, str]]] = None,
+        interval: float = 1.0
     ):
         self.message = message
         self.bot = bot
@@ -41,6 +43,7 @@ class TelegramAiLoadingAnimation:
         self.title = title
         self.stages = stages or DEFAULT_AI_STAGES
         self.interval = interval
+        self._start_time = time.time()
         self._stop_event = asyncio.Event()
         self._task: Optional[asyncio.Task] = None
 
@@ -51,17 +54,17 @@ class TelegramAiLoadingAnimation:
         bot,
         chat_id: int,
         title: str = "EduBot AI",
-        initial_desc: str = "Fikrlash boshlandi...",
-        stages: Optional[List[Tuple[str, str, str, str]]] = None,
-        interval: float = 0.95
+        initial_desc: str = "AI serveriga ulanilmoqda...",
+        stages: Optional[List[Tuple[str, str]]] = None,
+        interval: float = 1.0
     ):
         """
         Dastlabki xabarni darhol jo'natib, animatsiyani avtomatik ishga tushiradi.
         """
         initial_text = (
             f"⚡️ <b>{title}</b>\n"
-            f"<code>▰▱▱▱▱▱▱▱▱▱</code> <b>10%</b>\n"
-            f"💭 <i>{initial_desc}</i>"
+            f"⏱ <b>0 soniya</b> | <i>{initial_desc}</i>\n"
+            f"<code>[▰▱▱▱▱▱▱▱]</code>"
         )
         msg = await reply_target.reply_text(initial_text, parse_mode="HTML")
         animator = cls(
@@ -89,26 +92,53 @@ class TelegramAiLoadingAnimation:
                 pass
 
     async def _run(self):
-        idx = 0
+        wave_frames = [
+            "[▰▱▱▱▱▱▱▱]",
+            "[▱▰▱▱▱▱▱▱]",
+            "[▱▱▰▱▱▱▱▱]",
+            "[▱▱▱▰▱▱▱▱]",
+            "[▱▱▱▱▰▱▱▱]",
+            "[▱▱▱▱▱▰▱▱]",
+            "[▱▱▱▱▱▱▰▱]",
+            "[▱▱▱▱▱▱▱▰]",
+            "[▱▱▱▱▱▱▰▱]",
+            "[▱▱▱▱▱▰▱▱]",
+            "[▱▱▱▱▰▱▱▱]",
+            "[▱▱▱▰▱▱▱▱]",
+            "[▱▱▰▱▱▱▱▱]",
+            "[▱▰▱▱▱▱▱▱]",
+        ]
+        tick = 0
+
         while not self._stop_event.is_set():
             try:
                 await asyncio.sleep(self.interval)
                 if self._stop_event.is_set():
                     break
 
-                if idx < len(self.stages):
-                    icon, text, bar, pct = self.stages[idx]
+                elapsed = int(time.time() - self._start_time)
+                wave = wave_frames[tick % len(wave_frames)]
+
+                # Vaqtga qarab real holatni aks ettirish
+                if elapsed < 3:
+                    icon, desc = self.stages[0]
+                elif elapsed < 7:
+                    icon, desc = self.stages[min(1, len(self.stages) - 1)]
+                elif elapsed < 15:
+                    icon, desc = self.stages[min(2, len(self.stages) - 1)]
+                elif elapsed < 25:
+                    icon, desc = self.stages[min(3, len(self.stages) - 1)]
+                elif elapsed < 45:
+                    icon, desc = ("⏳", "Katta hajmdagi javob tuzilmoqda, kutilmoqda...")
+                elif elapsed < 75:
+                    icon, desc = ("⚡️", "Server hali hisoblamoqda, jarayon davom etmoqda...")
                 else:
-                    pulse_icons = ["🔮", "✨", "⚡️", "💡", "🧠"]
-                    icon = pulse_icons[idx % len(pulse_icons)]
-                    text = "Mukammal javob yakunlanmoqda..."
-                    bar = "▰▰▰▰▰▰▰▰▰▰"
-                    pct = "99%"
+                    icon, desc = ("⏱", "Javob juda katta yoki server band, kutilmoqda...")
 
                 content = (
                     f"⚡️ <b>{self.title}</b>\n"
-                    f"<code>{bar}</code> <b>{pct}</b>\n"
-                    f"{icon} <i>{text}</i>"
+                    f"⏱ <b>{elapsed} soniya</b> | {icon} <i>{desc}</i>\n"
+                    f"<code>{wave}</code>"
                 )
 
                 try:
@@ -117,7 +147,7 @@ class TelegramAiLoadingAnimation:
                     pass
 
                 await self.message.edit_text(content, parse_mode="HTML")
-                idx += 1
+                tick += 1
             except asyncio.CancelledError:
                 break
             except Exception:

@@ -199,6 +199,23 @@ class AIService:
         """Execute text generation through configured AI provider."""
         return await self.generate_chat([{"role": "user", "content": prompt[:15000]}])
 
+    async def generate_response(
+        self,
+        messages: Optional[List[Dict[str, str]]] = None,
+        prompt: Optional[str] = None,
+        system_instruction: Optional[str] = None,
+        system_prompt: Optional[str] = None
+    ) -> str:
+        """
+        Universal response generator method (supports both multi-turn messages and single prompt).
+        """
+        sys = system_instruction or system_prompt
+        if messages:
+            return await self.generate_chat(messages, system_prompt=sys)
+        if prompt:
+            return await self.generate_chat([{"role": "user", "content": prompt[:15000]}], system_prompt=sys)
+        return await self.generate_chat([{"role": "user", "content": "Salom"}], system_prompt=sys)
+
     async def generate_chat(self, messages: List[Dict[str, str]], system_prompt: Optional[str] = None) -> str:
         """
         Interactive multi-turn conversation generation (like ChatGPT / Gemini).

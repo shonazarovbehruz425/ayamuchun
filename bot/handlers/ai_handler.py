@@ -404,22 +404,11 @@ def format_ai_response_for_telegram(text: str) -> str:
 
 
 def build_ai_suggestions_keyboard(topic: str = "") -> InlineKeyboardMarkup:
-    """Build quick interactive next-action suggestion chips for Telegram AI responses."""
-    settings = get_settings()
-    webapp_url = settings.WEBAPP_URL or "https://ayamuchun.onrender.com"
-    
+    """Build compact action chips only for generated educational document/lesson materials."""
     buttons = [
         [
             InlineKeyboardButton("📄 Word (.docx) yuklab olish", callback_data="chat_ai_word"),
             InlineKeyboardButton("📝 5 ta test tuzish", callback_data="chat_ai_quiz"),
-        ],
-        [
-            InlineKeyboardButton("🔄 Rus/Eng tarjima", callback_data="chat_ai_translate"),
-            InlineKeyboardButton("📋 Qisqa xulosa", callback_data="chat_ai_summarize"),
-        ],
-        [
-            InlineKeyboardButton("📱 Mini App'da ochish", web_app=WebAppInfo(url=f"{webapp_url}#/ai")),
-            InlineKeyboardButton("🗑️ Yangi mavzu", callback_data="chat_ai_clear"),
         ]
     ]
     return InlineKeyboardMarkup(buttons)
@@ -558,11 +547,12 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
             context.user_data["telegram_chat_history"] = chat_history
         
         system_instruction = (
-            "Siz EduBot AI — o'qituvchilar, talabalar va barcha foydalanuvchilar uchun "
-            "yuksak bilimdon, pedagogik tajribali va do'stona virtual sun'iy intellekt yordamchisisiz. "
-            "Foydalanuvchining savol, matn va topshiriqlariga doim o'zbek tilida, aniq, chiroyli va tartibli "
-            "(sarlavha, qalin harflar, nuqtali ro'yxatlar bilan) javob bering. "
-            "Agar savol test yoki konspektga oid bo'lsa, to'liq va o'quv standartlariga mos shaklda tuzing."
+            "Siz EduBot AI — intellektual va do'stona virtual yordamchisiz. "
+            "Foydalanuvchi bilan o'zbek tilida erkin, tabiiy, samimiy va xushmuomala suhbatlashing. "
+            "Agar foydalanuvchi oddiy salomlashsa, qisqa gap yoki savol yozsa (masalan: 'salom', 'oka', 'qalesiz', 'rahmat', 'ok'), "
+            "unga ham xuddi odamdek qisqa, samimiy va erkin javob qaytaring (hech qanday sun'iy rasmiyatchilik, yo'riqnomalar va ro'yxatlarsiz). "
+            "Faqat foydalanuvchi biror ta'limiy mavzu, dars rejasi, test yoki konspekt so'ragandagina "
+            "to'liq, tartibli va sifatli pedagogik material tayyorlab bering."
         )
 
         chat_history.append({"role": "user", "content": clean_prompt})
@@ -606,7 +596,17 @@ async def handle_smart_chat_message(update: Update, context: ContextTypes.DEFAUL
 
         # Format reply
         formatted_html = format_ai_response_for_telegram(ai_reply)
-        keyboard = build_ai_suggestions_keyboard(topic=clean_prompt[:30])
+
+        # Foydalanuvchi oddiy gap yozganda inline keyboard chiqarilmaydi!
+        keyboard = None
+        lower_prompt = clean_prompt.lower()
+        has_doc_intent = any(w in lower_prompt for w in (
+            "konspekt", "dars rejasi", "dars ishlanmasi", "referat", "test tuz", 
+            "test yarat", "savol tuz", "word", "docx", "hujjat"
+        ))
+        # Faqat foydalanuvchi aniq hujjat/test so'raganda yoki javob yirik o'quv materiali bo'lganda tugma beriladi
+        if has_doc_intent or (len(ai_reply) > 750 and any(h in ai_reply for h in ("Dars rejasi", "Test savollari", "Variant A", "Mavzu:", "Reja:"))):
+            keyboard = build_ai_suggestions_keyboard(topic=clean_prompt[:30])
 
         try:
             await status_msg.delete()

@@ -2859,22 +2859,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('pmerge-result').classList.remove('hidden');
                     document.getElementById('pmerge-out-name').innerText = res.file_name;
                     const footer = document.getElementById('pmerge-footer');
-                if (footer) {
-                    footer.innerHTML = `
-                        <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 ml-auto">
-                            Yopish
-                        </button>
-                    `;
-                    footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
-                }
-                const mergeDlBtn = document.getElementById('pmerge-dl-btn');
-                if (mergeDlBtn) {
-                    mergeDlBtn.onclick = () => {
-                        TelegramApp.downloadFile(res.download_url);
-                    };
-                }
-                refreshIcons();
-                loadRecentFiles();
+                    if (footer) {
+                        footer.innerHTML = `
+                            <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 ml-auto">
+                                Yopish
+                            </button>
+                        `;
+                        footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
+                    }
+                    const mergeDlBtn = document.getElementById('pmerge-dl-btn');
+                    if (mergeDlBtn) {
+                        mergeDlBtn.onclick = () => {
+                            TelegramApp.downloadFile(res.download_url);
+                        };
+                    }
+                    refreshIcons();
+                    loadRecentFiles();
+                }, 300);
             } catch (err) {
                 document.getElementById('pmerge-loading').classList.add('hidden');
                 document.getElementById('pmerge-result').classList.add('hidden');
@@ -3848,21 +3849,22 @@ document.addEventListener('DOMContentLoaded', () => {
                         footer.className = "p-3 border-t border-white/60 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-950/40 shrink-0";
                     }
 
-                const p34DlSingle = document.getElementById('p34-dl-single');
-                if (p34DlSingle) {
-                    p34DlSingle.onclick = () => {
-                        TelegramApp.downloadFile(res.single_download_url);
-                    };
-                }
-                const p34DlSheet = document.getElementById('p34-dl-sheet');
-                if (p34DlSheet) {
-                    p34DlSheet.onclick = () => {
-                        TelegramApp.downloadFile(res.sheet_download_url);
-                    };
-                }
+                    const p34DlSingle = document.getElementById('p34-dl-single');
+                    if (p34DlSingle) {
+                        p34DlSingle.onclick = () => {
+                            TelegramApp.downloadFile(res.single_download_url);
+                        };
+                    }
+                    const p34DlSheet = document.getElementById('p34-dl-sheet');
+                    if (p34DlSheet) {
+                        p34DlSheet.onclick = () => {
+                            TelegramApp.downloadFile(res.sheet_download_url);
+                        };
+                    }
 
-                refreshIcons();
-                loadRecentFiles();
+                    refreshIcons();
+                    loadRecentFiles();
+                }, 300);
             } catch (err) {
                 document.getElementById('p34-loading').classList.add('hidden');
                 document.getElementById('p34-result').classList.add('hidden');

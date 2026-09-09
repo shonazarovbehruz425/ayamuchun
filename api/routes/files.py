@@ -571,6 +571,17 @@ def docx_to_filtered_html(docx_path: str, temp_dir: str) -> str:
                 runs_html.append(f'<span style="{span_style}">{t}</span>' if span_style else t)
             
             p_content = ''.join(runs_html) if runs_html else '&nbsp;'
+            
+            # Detect explicit and rendered page breaks in paragraph
+            is_p_break = bool(
+                el.xpath('.//w:br[@w:type="page"]') or 
+                el.xpath('.//w:lastRenderedPageBreak') or 
+                el.xpath('.//w:pPr/w:pageBreakBefore')
+            )
+            if is_p_break and parts:
+                page_count += 1
+                parts.append(f'<div class="doc-page-break" data-page="{page_count}" contenteditable="false"></div>')
+                
             parts.append(f'<p style="margin: 3px 0; line-height: 1.35; {align_css}">{p_content}</p>')
             
         elif tag == 'tbl':
@@ -580,9 +591,9 @@ def docx_to_filtered_html(docx_path: str, temp_dir: str) -> str:
             for r_idx, row in enumerate(tbl.rows):
                 xml = row._tr.xml
                 is_break = 'lastrenderedpagebreak' in xml.lower()
-                if is_break:
+                if is_break and parts:
                     page_count += 1
-                    tbl_html.append(f'<tr class="page-divider-row"><td colspan="{col_count}" style="padding:0; border:none;"><div class="doc-page-break" data-page="{page_count}"><div class="page-divider-line"></div><span class="page-tag">Sahifa {page_count}</span></div></td></tr>')
+                    tbl_html.append(f'<tr class="page-divider-row"><td colspan="{col_count}" style="padding:0; border:none;"><div class="doc-page-break" data-page="{page_count}" contenteditable="false"></div></td></tr>')
                 
                 tbl_html.append('<tr>')
                 # Iterate over true XML tc cells to eliminate python-docx cell duplication on merged/grid columns
@@ -643,28 +654,21 @@ html, body {{
 ::-webkit-scrollbar {{
     display: none !important;
     width: 0 !important;
-    height: 0 !important;
-}}
 .doc-page-break {{
-    margin: 30px -45px;
-    padding: 10px 0;
-    background: #f8fafc;
-    border-top: 2px dashed #94a3b8;
-    border-bottom: 2px dashed #94a3b8;
-    text-align: center;
-    position: relative;
-    user-select: none;
-}}
-.page-tag {{
-    display: inline-block;
-    padding: 3px 12px;
-    background: #4f46e5;
-    color: #ffffff;
-    font-size: 11px;
-    font-family: system-ui, sans-serif;
-    font-weight: 700;
-    border-radius: 9999px;
-    box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+    display: block !important;
+    width: calc(100% + 90px) !important;
+    margin: 32px -45px 32px -45px !important;
+    height: 18px !important;
+    min-height: 18px !important;
+    max-height: 18px !important;
+    background-color: #22262e !important;
+    border-top: 1px solid #14171c !important;
+    border-bottom: 1px solid #14171c !important;
+    box-shadow: inset 0 4px 6px -2px rgba(0, 0, 0, 0.45), inset 0 -4px 6px -2px rgba(0, 0, 0, 0.45) !important;
+    position: relative !important;
+    user-select: none !important;
+    pointer-events: none !important;
+    box-sizing: border-box !important;
 }}
 </style>
 </head>
@@ -771,7 +775,7 @@ def pdf_to_filtered_html(pdf_path: str, temp_dir: str) -> str:
             p_num = idx + 1
             break_tag = ""
             if idx > 0:
-                break_tag = f'<div class="doc-page-break" data-page="{p_num}"><span class="page-tag">Sahifa {p_num}</span></div>'
+                break_tag = f'<div class="doc-page-break" data-page="{p_num}" contenteditable="false"></div>'
             
             page_dict = page.get_text("dict")
             page_content = []
@@ -811,8 +815,22 @@ def pdf_to_filtered_html(pdf_path: str, temp_dir: str) -> str:
         return f"""<!DOCTYPE html><html><head><meta charset='utf-8'><style>
 html, body {{ font-family: 'Times New Roman', Arial, sans-serif; padding: 25px 35px; margin: 0; background: #ffffff; color: #0f172a; overflow: hidden !important; scrollbar-width: none !important; -ms-overflow-style: none !important; }}
 ::-webkit-scrollbar {{ display: none !important; width: 0 !important; height: 0 !important; }}
-.doc-page-break {{ margin: 30px -35px; padding: 10px 0; background: #f8fafc; border-top: 2px dashed #94a3b8; border-bottom: 2px dashed #94a3b8; text-align: center; }}
-.page-tag {{ display: inline-block; padding: 3px 12px; background: #4f46e5; color: #ffffff; font-size: 11px; font-weight: 700; border-radius: 9999px; }}
+.doc-page-break {{
+    display: block !important;
+    width: calc(100% + 70px) !important;
+    margin: 32px -35px 32px -35px !important;
+    height: 18px !important;
+    min-height: 18px !important;
+    max-height: 18px !important;
+    background-color: #22262e !important;
+    border-top: 1px solid #14171c !important;
+    border-bottom: 1px solid #14171c !important;
+    box-shadow: inset 0 4px 6px -2px rgba(0, 0, 0, 0.45), inset 0 -4px 6px -2px rgba(0, 0, 0, 0.45) !important;
+    position: relative !important;
+    user-select: none !important;
+    pointer-events: none !important;
+    box-sizing: border-box !important;
+}}
 </style></head><body data-total-pages="{total_p}">{''.join(pages_html)}</body></html>"""
     except Exception as e:
         logger.error(f"PyMuPDF structured fallback failed: {e}")

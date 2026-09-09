@@ -1669,26 +1669,33 @@ document.addEventListener('DOMContentLoaded', () => {
                     height: auto !important;
                 }
                 .doc-page-break {
-                    margin: 30px -40px;
-                    padding: 10px 0;
-                    background: #f8fafc;
-                    border-top: 2px dashed #94a3b8;
-                    border-bottom: 2px dashed #94a3b8;
-                    text-align: center;
-                    position: relative;
-                    user-select: none;
-                    cursor: default;
+                    display: block !important;
+                    width: calc(100% + 100px) !important;
+                    margin: 32px -50px 32px -50px !important;
+                    height: 18px !important;
+                    min-height: 18px !important;
+                    max-height: 18px !important;
+                    background-color: #22262e !important;
+                    border-top: 1px solid #14171c !important;
+                    border-bottom: 1px solid #14171c !important;
+                    box-shadow: inset 0 4px 6px -2px rgba(0, 0, 0, 0.45), inset 0 -4px 6px -2px rgba(0, 0, 0, 0.45) !important;
+                    position: relative !important;
+                    user-select: none !important;
+                    pointer-events: none !important;
+                    box-sizing: border-box !important;
+                }
+                .page-divider-row {
+                    display: block !important;
+                    width: 100% !important;
+                }
+                .page-divider-row td {
+                    display: block !important;
+                    width: 100% !important;
+                    padding: 0 !important;
+                    border: none !important;
                 }
                 .page-tag {
-                    display: inline-block;
-                    padding: 3px 12px;
-                    background: #4f46e5;
-                    color: #ffffff;
-                    font-size: 11px;
-                    font-family: system-ui, -apple-system, sans-serif;
-                    font-weight: 700;
-                    border-radius: 9999px;
-                    box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+                    display: none !important;
                 }
             </style>
         `;

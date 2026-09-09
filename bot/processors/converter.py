@@ -1,10 +1,13 @@
 import asyncio
+import errno
 import os
+import shutil
 import subprocess
 import csv
 import logging
 from pdf2docx import Converter
 from openpyxl import load_workbook, Workbook
+from bot.utils.helpers import generate_unique_filename
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +23,7 @@ class FileConverter:
             # Windows da "soffice" asosan tizim o'zgaruvchilari orasida bo'lishi kerak.
             cmd = ['soffice', '--headless', '--convert-to', output_format, '--outdir', output_dir, input_path]
             try:
-                subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
                 
                 # Natijaviy fayl manzilini topish
                 base_name = os.path.splitext(os.path.basename(input_path))[0]
@@ -30,13 +33,16 @@ class FileConverter:
                     return expected_output
                 else:
                     raise FileNotFoundError("Konvertatsiya qilingan fayl topilmadi.")
+            except subprocess.TimeoutExpired as e:
+                logger.error(f"LibreOffice konvertatsiya timeout (120s): {input_path} -> {output_format}: {e}")
+                raise
             except FileNotFoundError:
                 raise Exception("LibreOffice o'rnatilmagan yoki tizim PATH ro'yxatida yo'q. Iltimos, o'rnating.")
             except subprocess.CalledProcessError as e:
                 raise Exception(f"LibreOffice orqali konvertatsiya qilishda xatolik: {e.stderr.decode('utf-8', errors='ignore')}")
                 
         try:
-            return await asyncio.to_thread(_run_cmd)
+            return await asyncio.wait_for(asyncio.to_thread(_run_cmd), timeout=150)
         except Exception as e:
             logger.error(f"Xato: {e}")
             raise
@@ -87,31 +93,46 @@ class FileConverter:
             if result_path != output_path and os.path.exists(result_path):
                 if os.path.exists(output_path):
                     os.remove(output_path)
-                os.rename(result_path, output_path)
+                try:
+                    os.rename(result_path, output_path)
+                except OSError as e:
+                    if e.errno == errno.EXDEV:
+                        shutil.move(result_path, output_path)
+                    else:
+                        raise
             return output_path
         except Exception:
             pass
 
         # 3. Python-native fallback: PyMuPDF orqali to'liq UTF-8 matnli PDF yaratish
         def _fallback_convert():
-            import fitz
-            from docx import Document
-            doc = Document(input_path)
-            pdf = fitz.open()
-            
-            page = pdf.new_page(width=595, height=842) # A4
-            rect = fitz.Rect(50, 50, 545, 792)
-            
-            lines = []
-            for p in doc.paragraphs:
-                if p.text.strip():
-                    lines.append(p.text.strip())
-            
-            full_text = "\n\n".join(lines)
-            page.insert_textbox(rect, full_text, fontsize=11, fontname="helv")
-            pdf.save(output_path)
-            pdf.close()
-            return output_path
+            try:
+                import fitz
+                from docx import Document
+                doc = Document(input_path)
+                pdf = fitz.open()
+
+                page = pdf.new_page(width=595, height=842) # A4
+                rect = fitz.Rect(50, 50, 545, 792)
+
+                lines = []
+                for p in doc.paragraphs:
+                    if p.text.strip():
+                        lines.append(p.text.strip())
+
+                full_text = "\n\n".join(lines)
+                if not full_text.strip():
+                    pdf.close()
+                    raise ValueError("Word hujjatida konvertatsiya uchun matn topilmadi (bo'sh hujjat).")
+                page.insert_textbox(rect, full_text, fontsize=11, fontname="helv")
+                pdf.save(output_path)
+                pdf.close()
+                return output_path
+            except ValueError:
+                raise
+            except Exception as e:
+                logger.error(f"Fallback konvertatsiyada xatolik: {e}")
+                raise Exception(f"Fallback konvertatsiyada xatolik: {e}")
 
         return await asyncio.to_thread(_fallback_convert)
 
@@ -119,16 +140,36 @@ class FileConverter:
         """Excel dan PDF formatiga o'tkazish."""
         output_dir = os.path.dirname(output_path) or '.'
         result_path = await self._convert_with_libreoffice(input_path, output_dir, 'pdf')
-        if result_path != output_path:
-            os.rename(result_path, output_path)
+        if result_path != output_path and os.path.exists(result_path):
+            if os.path.exists(output_path):
+                os.remove(output_path)
+            try:
+                os.rename(result_path, output_path)
+            except OSError as e:
+                if e.errno == errno.EXDEV:
+                    shutil.move(result_path, output_path)
+                else:
+                    raise
+        if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+            raise Exception("Konvertatsiya natijasi topilmadi yoki bo'sh.")
         return output_path
 
     async def pptx_to_pdf(self, input_path: str, output_path: str) -> str:
         """PowerPoint dan PDF formatiga o'tkazish."""
         output_dir = os.path.dirname(output_path) or '.'
         result_path = await self._convert_with_libreoffice(input_path, output_dir, 'pdf')
-        if result_path != output_path:
-            os.rename(result_path, output_path)
+        if result_path != output_path and os.path.exists(result_path):
+            if os.path.exists(output_path):
+                os.remove(output_path)
+            try:
+                os.rename(result_path, output_path)
+            except OSError as e:
+                if e.errno == errno.EXDEV:
+                    shutil.move(result_path, output_path)
+                else:
+                    raise
+        if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+            raise Exception("Konvertatsiya natijasi topilmadi yoki bo'sh.")
         return output_path
 
     def _convert_scanned_pdf(self, input_path: str, output_path: str) -> str:
@@ -530,7 +571,7 @@ class FileConverter:
         """Auto-detect file type and convert to PDF."""
         ext = os.path.splitext(input_path)[1].lower()
         base_name = os.path.splitext(os.path.basename(input_path))[0]
-        output_path = os.path.join(output_dir, f"{base_name}.pdf")
+        output_path = os.path.join(output_dir, generate_unique_filename(f"{base_name}.pdf"))
         os.makedirs(output_dir, exist_ok=True)
 
         if ext in ('.docx', '.doc'):

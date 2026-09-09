@@ -39,7 +39,12 @@ def generate_unique_filename(original: str) -> str:
     return f"{sanitized_name}_{timestamp}_{unique_id}{ext}"
 
 def sanitize_filename(filename: str) -> str:
-    return re.sub(r'[^a-zA-Z0-9_\-]', '_', filename)
+    if not filename:
+        return "file"
+    sanitized = re.sub(r'[^a-zA-Z0-9_\-]', '_', filename)
+    if not sanitized or not sanitized.strip('_-'):
+        return "file"
+    return sanitized[:100]
 
 def truncate_text(text: str, max_length: int = 4096) -> str:
     if len(text) <= max_length:

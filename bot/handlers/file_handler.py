@@ -486,9 +486,10 @@ async def _ai_analyze(msg, query, file_path: str) -> None:
 
 async def _convert_to_docx(msg, query_or_update, file_path: str, file_name: str) -> None:
     """Convert PDF or Excel to DOCX (Word)."""
+    display_name = os.path.splitext(os.path.basename(file_name))[0] + ".docx"
     output_path = os.path.join(
         config.processed_dir,
-        os.path.splitext(os.path.basename(file_name))[0] + ".docx",
+        generate_unique_filename(display_name),
     )
     reply_target = query_or_update.message if hasattr(query_or_update, "message") and query_or_update.message else msg
     ext = os.path.splitext(file_path)[1].lower()
@@ -505,7 +506,7 @@ async def _convert_to_docx(msg, query_or_update, file_path: str, file_name: str)
         with open(output_path, "rb") as f:
             await reply_target.reply_document(
                 document=f,
-                filename=os.path.basename(output_path),
+                filename=display_name,
                 caption=caption_text,
             )
     except Exception as e:
@@ -517,8 +518,8 @@ async def _extract_images(msg, query_or_update, file_path: str, file_name: str) 
     import fitz
     import zipfile
     
-    zip_name = f"{os.path.splitext(os.path.basename(file_name))[0]}_rasmlar.zip"
-    zip_path = os.path.join(config.processed_dir, zip_name)
+    display_name = f"{os.path.splitext(os.path.basename(file_name))[0]}_rasmlar.zip"
+    zip_path = os.path.join(config.processed_dir, generate_unique_filename(display_name))
     reply_target = query_or_update.message if hasattr(query_or_update, "message") and query_or_update.message else msg
     
     try:
@@ -548,7 +549,7 @@ async def _extract_images(msg, query_or_update, file_path: str, file_name: str) 
         with open(zip_path, "rb") as f:
             await reply_target.reply_document(
                 document=f,
-                filename=zip_name,
+                filename=display_name,
                 caption=f"🖼️ PDF dagi {img_count} ta rasm arxivi (ZIP)",
             )
     except Exception as e:
@@ -558,9 +559,10 @@ async def _extract_images(msg, query_or_update, file_path: str, file_name: str) 
 async def _compress_pdf(msg, query_or_update, file_path: str, file_name: str) -> None:
     """Compress PDF file and send back to user."""
     from bot.processors.pdf_processor import PDFProcessor
+    display_name = os.path.splitext(os.path.basename(file_name))[0] + "_siqilgan.pdf"
     output_path = os.path.join(
         config.processed_dir,
-        os.path.splitext(os.path.basename(file_name))[0] + "_siqilgan.pdf",
+        generate_unique_filename(display_name),
     )
     reply_target = query_or_update.message if hasattr(query_or_update, "message") and query_or_update.message else msg
     try:
@@ -594,7 +596,7 @@ async def _compress_pdf(msg, query_or_update, file_path: str, file_name: str) ->
         with open(output_path, "rb") as f:
             await reply_target.reply_document(
                 document=f,
-                filename=os.path.basename(output_path),
+                filename=display_name,
                 caption=caption_text,
                 parse_mode="HTML"
             )
@@ -623,9 +625,10 @@ async def _convert_to_pdf(msg, query_or_update, file_path: str, file_name: str) 
 
 async def _convert_to_csv(msg, query, file_path: str, file_name: str) -> None:
     """Convert Excel to CSV."""
+    display_name = os.path.splitext(os.path.basename(file_name))[0] + ".csv"
     output_path = os.path.join(
         config.processed_dir,
-        os.path.splitext(os.path.basename(file_name))[0] + ".csv",
+        generate_unique_filename(display_name),
     )
     try:
         result = await converter.excel_to_csv(file_path, output_path)
@@ -633,7 +636,7 @@ async def _convert_to_csv(msg, query, file_path: str, file_name: str) -> None:
         with open(result, "rb") as f:
             await query.message.reply_document(
                 document=f,
-                filename=os.path.basename(result),
+                filename=display_name,
                 caption="📋 CSV fayl",
             )
     except Exception as e:

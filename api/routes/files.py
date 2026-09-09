@@ -220,17 +220,21 @@ async def convert_file(
             
         try:
             target_ext = format.lower()
+            display_name = None
             if target_ext == "pdf":
                 out_path = await converter.convert_to_pdf(target.local_path, settings.processed_dir)
+                display_name = os.path.basename(out_path)
             elif target_ext in ("docx", "word"):
-                out_path = os.path.join(settings.processed_dir, f"{os.path.splitext(target.file_name)[0]}.docx")
+                display_name = f"{os.path.splitext(target.file_name)[0]}.docx"
+                out_path = os.path.join(settings.processed_dir, generate_unique_filename(display_name))
                 in_ext = os.path.splitext(target.file_name)[1].lower()
                 if in_ext in ('.xlsx', '.xls', '.csv'):
                     await converter.excel_to_word(target.local_path, out_path)
                 else:
                     await converter.pdf_to_word(target.local_path, out_path)
             elif target_ext == "csv":
-                out_path = os.path.join(settings.processed_dir, f"{os.path.splitext(target.file_name)[0]}.csv")
+                display_name = f"{os.path.splitext(target.file_name)[0]}.csv"
+                out_path = os.path.join(settings.processed_dir, generate_unique_filename(display_name))
                 await converter.excel_to_csv(target.local_path, out_path)
             else:
                 raise HTTPException(status_code=400, detail=f"{format} formatiga konvertatsiya mavjud emas")
@@ -242,7 +246,7 @@ async def convert_file(
                 db_user=db_user,
                 user_dict=user,
                 local_path=out_path,
-                file_name=os.path.basename(out_path),
+                file_name=display_name or os.path.basename(out_path),
                 file_type=new_ext,
                 tool_name=tool_title
             )

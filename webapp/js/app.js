@@ -1513,13 +1513,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
 
                     <!-- Word shaklida yuklab olish button -->
-                    <button id="btn-save-doc" title="Word (.docx) shaklida yuklab olish" class="h-8 px-3 sm:px-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-blue-500/25 transition-all flex items-center gap-1.5 cursor-pointer shrink-0">
+                    <button id="btn-save-doc" type="button" onclick="window.handleDocEditorSave('docx')" ontouchend="window.handleDocEditorSave('docx')" title="Word (.docx) shaklida yuklab olish" class="h-8 px-3 sm:px-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-blue-500/25 transition-all flex items-center gap-1.5 cursor-pointer shrink-0 select-none">
                         <i data-lucide="download" class="w-3.5 h-3.5"></i>
                         <span class="whitespace-nowrap">Word shaklida yuklab olish</span>
                     </button>
 
                     <!-- PDF shaklida yuklab olish button -->
-                    <button id="btn-save-pdf" title="PDF shaklida yuklab olish" class="h-8 px-3 sm:px-3.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-rose-500/25 transition-all flex items-center gap-1.5 cursor-pointer shrink-0">
+                    <button id="btn-save-pdf" type="button" onclick="window.handleDocEditorSave('pdf')" ontouchend="window.handleDocEditorSave('pdf')" title="PDF shaklida yuklab olish" class="h-8 px-3 sm:px-3.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-rose-500/25 transition-all flex items-center gap-1.5 cursor-pointer shrink-0 select-none">
                         <i data-lucide="download" class="w-3.5 h-3.5"></i>
                         <span class="whitespace-nowrap">PDF shaklida yuklab olish</span>
                     </button>
@@ -1849,12 +1849,43 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        // Save Functionality (Word DOCX & PDF)
-        async function handleSaveDocument(formatToSave) {
+        // Save Functionality (Word DOCX & PDF) - Expose globally for instant inline triggering
+        window.handleDocEditorSave = async function(formatToSave) {
             TelegramApp.hapticFeedback('medium');
 
-            // Clean up injected style tag before saving to Word
-            let outputHtml = iDoc.documentElement.outerHTML;
+            const saveBtnDoc = document.getElementById('btn-save-doc');
+            const saveBtnPdf = document.getElementById('btn-save-pdf');
+            const activeBtn = (formatToSave === 'docx') ? saveBtnDoc : saveBtnPdf;
+
+            // Visual feedback directly on button immediately
+            if (activeBtn) {
+                activeBtn.dataset.originalHtml = activeBtn.innerHTML;
+                activeBtn.disabled = true;
+                activeBtn.classList.add('opacity-80', 'pointer-events-none');
+                activeBtn.innerHTML = `
+                    <svg class="animate-spin w-3.5 h-3.5 text-white shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                    </svg>
+                    <span class="whitespace-nowrap">${formatToSave === 'docx' ? 'Word tayyorlanmoqda...' : 'PDF tayyorlanmoqda...'}</span>
+                `;
+            }
+
+            const restoreBtn = () => {
+                if (activeBtn && activeBtn.dataset.originalHtml) {
+                    activeBtn.innerHTML = activeBtn.dataset.originalHtml;
+                    activeBtn.disabled = false;
+                    activeBtn.classList.remove('opacity-80', 'pointer-events-none');
+                    delete activeBtn.dataset.originalHtml;
+                    refreshIcons();
+                }
+            };
+
+            // Grab fresh document content from iframe
+            const currentFrame = document.getElementById('doc-active-iframe') || iframe;
+            const activeDoc = (currentFrame && (currentFrame.contentDocument || currentFrame.contentWindow?.document)) || iDoc;
+
+            let outputHtml = activeDoc?.documentElement?.outerHTML || activeDoc?.body?.innerHTML || '';
             outputHtml = outputHtml.replace(/<style id="edubot-injected-style">[\s\S]*?<\/style>/gi, '');
 
             openModal(`
@@ -1898,7 +1929,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const targetFileId = isDocx ? (saveRes.docx_file_id || saveRes.new_file_id) : (saveRes.pdf_file_id || saveRes.new_file_id);
                 const targetFileName = isDocx ? (saveRes.docx_file_name || saveRes.new_file_name || 'document.docx') : (saveRes.pdf_file_name || saveRes.new_file_name || 'document.pdf');
 
-                // Avtomatik ravishda qurilmaga yuklab olishni boshlash
+                // Real vaqtda avtomatik tarzda qurilmaga to'g'ridan-to'g'ri yuklab olish
                 if (targetFileId) {
                     TelegramApp.downloadFile(`/api/files/${targetFileId}/download`, targetFileName);
                 }
@@ -1957,11 +1988,17 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (saveErr) {
                 closeModal();
                 TelegramApp.showAlert(`Saqlashda xatolik: ${saveErr.message}`);
+            } finally {
+                restoreBtn();
             }
-        }
+        };
 
-        document.getElementById('btn-save-doc').onclick = () => handleSaveDocument('docx');
-        document.getElementById('btn-save-pdf').onclick = () => handleSaveDocument('pdf');
+        if (document.getElementById('btn-save-doc')) {
+            document.getElementById('btn-save-doc').onclick = () => window.handleDocEditorSave('docx');
+        }
+        if (document.getElementById('btn-save-pdf')) {
+            document.getElementById('btn-save-pdf').onclick = () => window.handleDocEditorSave('pdf');
+        }
     }
 
     function closeDocumentEditor() {

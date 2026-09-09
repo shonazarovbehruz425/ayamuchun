@@ -3,7 +3,7 @@ import re
 import json
 import logging
 from html.parser import HTMLParser
-from typing import List
+from typing import List, Optional, Union, Dict, Any
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Query, Header
 from fastapi.responses import FileResponse as FastFileResponse
 from datetime import datetime

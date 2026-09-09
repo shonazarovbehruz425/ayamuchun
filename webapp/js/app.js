@@ -443,7 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div>
                     <div class="flex items-center justify-between mb-2.5 px-0.5">
                         <h3 class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Asosiy Asboblar</h3>
-                        <span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold font-mono">12 ta asbob ✓</span>
+                        <span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold font-mono">11 ta asbob ✓</span>
                     </div>
 
                     <!-- Filter Tabs for Quick Navigation (Liquid Glass Track & Sliding Capsule) -->
@@ -452,24 +452,25 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div id="toolsFilterCapsule" class="tools-filter-capsule"></div>
                             <button onclick="filterTools('all', this)" class="tool-filter-chip active-chip" data-filter="all">
                                 <i data-lucide="layers" class="w-3.5 h-3.5"></i>
-                                <span>Barchasi (12)</span>
+                                <span>Barchasi (11)</span>
                             </button>
                             <button onclick="filterTools('pdf', this)" class="tool-filter-chip" data-filter="pdf">
                                 <i data-lucide="file-text" class="w-3.5 h-3.5 text-rose-500"></i>
-                                <span>PDF Vositalari (6)</span>
+                                <span>PDF Vositalari (7)</span>
                             </button>
                             <button onclick="filterTools('word', this)" class="tool-filter-chip" data-filter="word">
                                 <i data-lucide="file-edit" class="w-3.5 h-3.5 text-blue-500"></i>
-                                <span>Word & Doc (3)</span>
+                                <span>Word & Doc (2)</span>
                             </button>
                             <button onclick="filterTools('media', this)" class="tool-filter-chip" data-filter="media">
                                 <i data-lucide="image" class="w-3.5 h-3.5 text-purple-500"></i>
-                                <span>Surat & 3×4 (3)</span>
+                                <span>Surat & Rasm (2)</span>
                             </button>
                         </div>
                     </div>
 
                     <div id="tools-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <!-- ==================== 1. PDF VOSITALARI (7 TA) ==================== -->
                         <!-- Tool 1: PDF to Word -->
                         <div data-category="pdf" onclick="openPdfToWordModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-rose-400/50 transition-all border-l-4 border-l-rose-500">
                             <div class="flex items-center gap-3">
@@ -486,39 +487,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
 
-                        <!-- Tool 2: Word to PDF -->
-                        <div data-category="word" onclick="openWordToPdfModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-blue-400/50 transition-all border-l-4 border-l-blue-500">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-50 to-indigo-100 dark:from-blue-950/40 dark:to-indigo-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-sm border border-white dark:border-white/10 shrink-0 group-hover:scale-105 transition-transform">
-                                    <i data-lucide="file-text" class="w-5 h-5"></i>
-                                </div>
-                                <div class="min-w-0">
-                                    <div class="flex items-center gap-1.5">
-                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">Word ➔ PDF</h4>
-                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">PDF</span>
-                                    </div>
-                                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">DOCX hujjatini PDF qilish</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Tool 3: Word Editing -->
-                        <div data-category="word" onclick="openDocEditModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-indigo-400/50 transition-all border-l-4 border-l-indigo-500">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-50 to-violet-100 dark:from-indigo-950/40 dark:to-violet-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-sm border border-white dark:border-white/10 shrink-0 group-hover:scale-105 transition-transform">
-                                    <i data-lucide="file-edit" class="w-5 h-5"></i>
-                                </div>
-                                <div class="min-w-0">
-                                    <div class="flex items-center gap-1.5">
-                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">Doc tahrirlash</h4>
-                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">Tahrirlash</span>
-                                    </div>
-                                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">Word matnini tahrirlash va almashtirish</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Tool 4: PDF Editing -->
+                        <!-- Tool 2: PDF Editing -->
                         <div data-category="pdf" onclick="openPdfEditModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-amber-400/50 transition-all border-l-4 border-l-amber-500">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-50 to-orange-100 dark:from-amber-950/40 dark:to-orange-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shadow-sm border border-white dark:border-white/10 shrink-0 group-hover:scale-105 transition-transform">
@@ -534,7 +503,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
 
-                        <!-- Tool 5: PDF Merge -->
+                        <!-- Tool 3: PDF Merge -->
                         <div data-category="pdf" onclick="openPdfMergeModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-red-400/50 transition-all border-l-4 border-l-red-500">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-red-50 to-rose-100 dark:from-red-950/40 dark:to-rose-900/40 text-red-600 dark:text-red-400 flex items-center justify-center shadow-sm border border-white dark:border-white/10 shrink-0 group-hover:scale-105 transition-transform">
@@ -550,7 +519,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
 
-                        <!-- Tool 6: PDF Split -->
+                        <!-- Tool 4: PDF Split -->
                         <div data-category="pdf" onclick="openPdfSplitModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-amber-400/50 transition-all border-l-4 border-l-amber-500">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-50 to-yellow-100 dark:from-amber-950/40 dark:to-yellow-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shadow-sm border border-white dark:border-white/10 shrink-0 group-hover:scale-105 transition-transform">
@@ -566,7 +535,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
 
-                        <!-- Tool 7: PDF Compress -->
+                        <!-- Tool 5: PDF Compress -->
                         <div data-category="pdf" onclick="openPdfCompressModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-fuchsia-400/50 transition-all border-l-4 border-l-fuchsia-500">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-fuchsia-50 to-pink-100 dark:from-fuchsia-950/40 dark:to-pink-900/40 text-fuchsia-600 dark:text-fuchsia-400 flex items-center justify-center shadow-sm border border-white dark:border-white/10 shrink-0 group-hover:scale-105 transition-transform">
@@ -582,7 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
 
-                        <!-- Tool 8: PDF Watermark -->
+                        <!-- Tool 6: PDF Watermark -->
                         <div data-category="pdf" onclick="openPdfWatermarkModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-indigo-400/50 transition-all border-l-4 border-l-indigo-500">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-50 to-blue-100 dark:from-indigo-950/40 dark:to-blue-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-sm border border-white dark:border-white/10 shrink-0 group-hover:scale-105 transition-transform">
@@ -598,39 +567,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
 
-                        <!-- Tool 9: Hujjat foto (3x4) - PROMINENT HIGHLIGHT -->
-                        <div data-category="media" onclick="openPhoto3x4Modal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-purple-400/50 transition-all border-l-4 border-l-purple-500 bg-gradient-to-r from-purple-500/5 to-indigo-500/5">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-purple-500/25 shrink-0 group-hover:scale-105 transition-transform">
-                                    <i data-lucide="contact" class="w-5 h-5"></i>
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <div class="flex items-center gap-1.5">
-                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">Hujjat foto (3×4)</h4>
-                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30">300 DPI</span>
-                                    </div>
-                                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">Pasport, viza, oq/ko'k fon, 6 talik varaq</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Tool 10: Images to PDF -->
-                        <div data-category="media" onclick="openImagesToPdfModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-emerald-400/50 transition-all border-l-4 border-l-emerald-500">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-50 to-teal-100 dark:from-emerald-950/40 dark:to-teal-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-sm border border-white dark:border-white/10 shrink-0 group-hover:scale-105 transition-transform">
-                                    <i data-lucide="images" class="w-5 h-5"></i>
-                                </div>
-                                <div class="min-w-0">
-                                    <div class="flex items-center gap-1.5">
-                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">Rasmlarni PDF qilish</h4>
-                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">A4 PDF</span>
-                                    </div>
-                                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">Rasmlarni bitta tartibli PDF ga yig'ish</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Tool 11: Extract Images from PDF -->
+                        <!-- Tool 7: Extract Images from PDF -->
                         <div data-category="pdf" onclick="openExtractImagesModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-cyan-400/50 transition-all border-l-4 border-l-cyan-500">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-50 to-sky-100 dark:from-cyan-950/40 dark:to-sky-900/40 text-cyan-600 dark:text-cyan-400 flex items-center justify-center shadow-sm border border-white dark:border-white/10 shrink-0 group-hover:scale-105 transition-transform">
@@ -646,6 +583,73 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
 
+                        <!-- ==================== 2. WORD & DOC VOSITALARI (2 TA) ==================== -->
+                        <!-- Tool 8: Word to PDF -->
+                        <div data-category="word" onclick="openWordToPdfModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-blue-400/50 transition-all border-l-4 border-l-blue-500">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-50 to-indigo-100 dark:from-blue-950/40 dark:to-indigo-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-sm border border-white dark:border-white/10 shrink-0 group-hover:scale-105 transition-transform">
+                                    <i data-lucide="file-text" class="w-5 h-5"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">Word ➔ PDF</h4>
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">PDF</span>
+                                    </div>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">DOCX hujjatini PDF qilish</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tool 9: Word Editing -->
+                        <div data-category="word" onclick="openDocEditModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-indigo-400/50 transition-all border-l-4 border-l-indigo-500">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-50 to-violet-100 dark:from-indigo-950/40 dark:to-violet-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-sm border border-white dark:border-white/10 shrink-0 group-hover:scale-105 transition-transform">
+                                    <i data-lucide="file-edit" class="w-5 h-5"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">Doc tahrirlash</h4>
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">Tahrirlash</span>
+                                    </div>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">Word matnini tahrirlash va almashtirish</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ==================== 3. SURAT & RASM VOSITALARI (2 TA) ==================== -->
+                        <!-- Tool 10: Hujjat foto (3x4) - PROMINENT HIGHLIGHT -->
+                        <div data-category="media" onclick="openPhoto3x4Modal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-purple-400/50 transition-all border-l-4 border-l-purple-500 bg-gradient-to-r from-purple-500/5 to-indigo-500/5">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-purple-500/25 shrink-0 group-hover:scale-105 transition-transform">
+                                    <i data-lucide="contact" class="w-5 h-5"></i>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center gap-1.5">
+                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">Hujjat foto (3×4)</h4>
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30">300 DPI</span>
+                                    </div>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">Pasport, viza, oq/ko'k fon, 6 talik varaq</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tool 11: Images to PDF -->
+                        <div data-category="media" onclick="openImagesToPdfModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-emerald-400/50 transition-all border-l-4 border-l-emerald-500">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-50 to-teal-100 dark:from-emerald-950/40 dark:to-teal-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-sm border border-white dark:border-white/10 shrink-0 group-hover:scale-105 transition-transform">
+                                    <i data-lucide="images" class="w-5 h-5"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">Rasmlarni PDF qilish</h4>
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">A4 PDF</span>
+                                    </div>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">Rasmlarni bitta tartibli PDF ga yig'ish</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ==================== 4. AI PEDAGOGIK YORDAMCHI ==================== -->
                         <!-- Tool 12: AI Assistant -->
                         <div data-category="all" onclick="window.navigateTo('#/ai')" class="sm:col-span-2 liquid-glass-interactive p-4 cursor-pointer group bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-brand-500/10 border-purple-500/30 hover:border-purple-400/60 transition-all">
                             <div class="flex items-center justify-between">

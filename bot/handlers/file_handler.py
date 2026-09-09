@@ -493,10 +493,10 @@ async def _convert_to_docx(msg, query_or_update, file_path: str, file_name: str)
     reply_target = query_or_update.message if hasattr(query_or_update, "message") and query_or_update.message else msg
     ext = os.path.splitext(file_path)[1].lower()
     try:
-        if ext in (".xlsx", ".xls", ".xlsm"):
+        if ext in (".xlsx", ".xls", ".xlsm", ".csv"):
             await converter.excel_to_word(file_path, output_path)
-            await msg.edit_text("✅ Excel jadvali Word (DOCX) ga aylantirildi!")
-            caption_text = "📊 Excel jadvali asosida Word (DOCX) hujjati tayyorlandi!"
+            await msg.edit_text("✅ Excel / CSV jadvali Word (DOCX) ga aylantirildi!")
+            caption_text = "📊 Jadval asosida Word (DOCX) hujjati tayyorlandi!"
         else:
             await converter.pdf_to_word(file_path, output_path)
             await msg.edit_text("✅ Word (DOCX) ga aylantirildi!")

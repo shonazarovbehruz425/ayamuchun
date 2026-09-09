@@ -443,7 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div>
                     <div class="flex items-center justify-between mb-2.5 px-0.5">
                         <h3 class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Asosiy Asboblar</h3>
-                        <span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold font-mono">11 ta asbob ✓</span>
+                        <span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold font-mono">12 ta asbob ✓</span>
                     </div>
 
                     <!-- Filter Tabs for Quick Navigation (Liquid Glass Track & Sliding Capsule) -->
@@ -452,7 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div id="toolsFilterCapsule" class="tools-filter-capsule"></div>
                             <button onclick="filterTools('all', this)" class="tool-filter-chip active-chip" data-filter="all">
                                 <i data-lucide="layers" class="w-3.5 h-3.5"></i>
-                                <span>Barchasi (11)</span>
+                                <span>Barchasi (12)</span>
                             </button>
                             <button onclick="filterTools('pdf', this)" class="tool-filter-chip" data-filter="pdf">
                                 <i data-lucide="file-text" class="w-3.5 h-3.5 text-rose-500"></i>
@@ -460,7 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </button>
                             <button onclick="filterTools('word', this)" class="tool-filter-chip" data-filter="word">
                                 <i data-lucide="file-edit" class="w-3.5 h-3.5 text-blue-500"></i>
-                                <span>Word & Doc (2)</span>
+                                <span>Word & Doc (3)</span>
                             </button>
                             <button onclick="filterTools('media', this)" class="tool-filter-chip" data-filter="media">
                                 <i data-lucide="image" class="w-3.5 h-3.5 text-purple-500"></i>
@@ -583,7 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
 
-                        <!-- ==================== 2. WORD & DOC VOSITALARI (2 TA) ==================== -->
+                        <!-- ==================== 2. WORD & DOC VOSITALARI (3 TA) ==================== -->
                         <!-- Tool 8: Word to PDF -->
                         <div data-category="word" onclick="openWordToPdfModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-blue-400/50 transition-all border-l-4 border-l-blue-500">
                             <div class="flex items-center gap-3">
@@ -612,6 +612,22 @@ document.addEventListener('DOMContentLoaded', () => {
                                         <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">Tahrirlash</span>
                                     </div>
                                     <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">Word matnini tahrirlash va almashtirish</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tool 10: Excel to Word -->
+                        <div data-category="word" onclick="openExcelToWordModal()" class="liquid-glass-interactive p-4 cursor-pointer group hover:border-emerald-400/50 transition-all border-l-4 border-l-emerald-500">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-50 to-teal-100 dark:from-emerald-950/40 dark:to-teal-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-sm border border-white dark:border-white/10 shrink-0 group-hover:scale-105 transition-transform">
+                                    <i data-lucide="sheet" class="w-5 h-5"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5">
+                                        <h4 class="text-sm font-bold text-slate-900 dark:text-white">Excel ➔ Word</h4>
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">Jadval</span>
+                                    </div>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">Jadvallarni moslab, avto-orientatsiya bilan DOCX qilish</p>
                                 </div>
                             </div>
                         </div>
@@ -3679,6 +3695,272 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // ─────────────────────────────────────────────────────────────
+    // TOOL: Excel ➔ Word (Jadvalli DOCX) Modal (Auto Orientation)
+    // ─────────────────────────────────────────────────────────────
+    window.openExcelToWordModal = () => {
+        TelegramApp.hapticFeedback();
+        openModal(`
+            <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-md animate-fade-in">
+                <div class="liquid-glass-card max-w-md w-full flex flex-col overflow-hidden bg-white/95 dark:bg-slate-900/95 border border-white/80 dark:border-slate-700/80 shadow-2xl">
+                    <!-- Header -->
+                    <div class="p-4 border-b border-white/60 dark:border-slate-800 flex items-center justify-between">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                                <i data-lucide="sheet" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-900 dark:text-white">Excel ➔ Word (Jadvalli DOCX)</h3>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400">Jadvallarni to'g'irlab, avtomatik orientatsiyada DOCX qilish</p>
+                            </div>
+                        </div>
+                        <button onclick="closeModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600">
+                            <i data-lucide="x" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <!-- Body -->
+                    <div class="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+                        <!-- Upload Box -->
+                        <div id="e2w-upload-box" class="p-6 rounded-2xl border-2 border-dashed border-emerald-300/80 dark:border-emerald-700/80 text-center hover:border-emerald-500 transition-colors bg-emerald-50/20 dark:bg-emerald-950/20 cursor-pointer" onclick="document.getElementById('e2w-file-input').click()">
+                            <i data-lucide="upload-cloud" class="w-9 h-9 mx-auto text-emerald-500 mb-2"></i>
+                            <span class="text-xs font-bold text-slate-800 dark:text-slate-200 block" id="e2w-file-label">Excel yoki CSV faylni tanlang</span>
+                            <span class="text-[11px] text-slate-500 mt-1 block">.xlsx, .xls yoki .csv formatlari</span>
+                            <input type="file" id="e2w-file-input" accept=".xlsx,.xls,.csv" class="hidden">
+                        </div>
+
+                        <!-- Selected File Pill -->
+                        <div id="e2w-file-info" class="hidden p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/30 flex items-center justify-between">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+                                <span id="e2w-file-name" class="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">fayl.xlsx</span>
+                            </div>
+                            <button type="button" onclick="window.resetE2wFile()" class="text-xs text-rose-500 hover:text-rose-700 font-bold p-1">O'chirish</button>
+                        </div>
+
+                        <!-- Options: Orientation & Table Style -->
+                        <div id="e2w-options" class="space-y-3">
+                            <!-- Orientation Selector -->
+                            <div>
+                                <label class="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1.5">Sahifa orientatsiyasi:</label>
+                                <div class="grid grid-cols-3 gap-2">
+                                    <button type="button" onclick="window.selectE2wOrientation('auto')" id="e2w-orient-auto" class="p-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-bold text-xs flex flex-col items-center shadow-xs">
+                                        <span class="flex items-center gap-1"><i data-lucide="wand-2" class="w-3.5 h-3.5 text-emerald-600"></i> Avtomatik</span>
+                                        <span class="text-[9.5px] text-emerald-600 dark:text-emerald-400 font-normal">Tavsiya</span>
+                                    </button>
+                                    <button type="button" onclick="window.selectE2wOrientation('landscape')" id="e2w-orient-landscape" class="p-2.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-xs flex flex-col items-center">
+                                        <span class="flex items-center gap-1"><i data-lucide="maximize" class="w-3.5 h-3.5"></i> Albom</span>
+                                        <span class="text-[9.5px] text-slate-400 font-normal">Landscape</span>
+                                    </button>
+                                    <button type="button" onclick="window.selectE2wOrientation('portrait')" id="e2w-orient-portrait" class="p-2.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-xs flex flex-col items-center">
+                                        <span class="flex items-center gap-1"><i data-lucide="file" class="w-3.5 h-3.5"></i> Kitob</span>
+                                        <span class="text-[9.5px] text-slate-400 font-normal">Portrait</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Table Style Selector -->
+                            <div>
+                                <label class="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1.5">Jadval dizayni (Uslubi):</label>
+                                <div class="grid grid-cols-3 gap-2">
+                                    <button type="button" onclick="window.selectE2wStyle('modern_blue')" id="e2w-style-blue" class="p-2 rounded-xl border-2 border-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs">
+                                        <div class="w-2.5 h-2.5 rounded-full bg-blue-600"></div>
+                                        <span>Moviy</span>
+                                    </button>
+                                    <button type="button" onclick="window.selectE2wStyle('emerald')" id="e2w-style-emerald" class="p-2 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-xs flex items-center justify-center gap-1.5">
+                                        <div class="w-2.5 h-2.5 rounded-full bg-emerald-600"></div>
+                                        <span>Zumrad</span>
+                                    </button>
+                                    <button type="button" onclick="window.selectE2wStyle('classic_slate')" id="e2w-style-slate" class="p-2 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-xs flex items-center justify-center gap-1.5">
+                                        <div class="w-2.5 h-2.5 rounded-full bg-slate-600"></div>
+                                        <span>Klassik</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Processing Indicator -->
+                        <div id="e2w-loading" class="hidden py-6 text-center"></div>
+
+                        <!-- Result Box -->
+                        <div id="e2w-result" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-center space-y-3.5">
+                            <div class="w-11 h-11 mx-auto rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                                <i data-lucide="check-check" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-bold text-slate-900 dark:text-white" id="e2w-out-name">Fayl</h4>
+                                <div id="e2w-stats-badge" class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-1"></div>
+                                <div class="mt-2 p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-left space-y-1">
+                                    <div class="flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
+                                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                        <span>Word (DOCX) tayyor bo'ldi!</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
+                                        Jadvallar sahifaga moslandi, avto-orientatsiya qo'llandi va botingizga ham yuborildi.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="space-y-2 pt-1">
+                                <button id="e2w-dl-btn" class="w-full py-3 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-bold border border-slate-200 dark:border-slate-700 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
+                                    <i data-lucide="download" class="w-4 h-4 text-emerald-600"></i> Word (.docx) faylni yuklab olish
+                                </button>
+                                <button onclick="TelegramApp.openChat(); closeModal();" class="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 text-white text-xs font-extrabold shadow-lg shadow-emerald-500/25 inline-flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer">
+                                    <i data-lucide="send" class="w-4 h-4"></i> Telegram Chatiga O'tish (Botdan olish) ✓
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer -->
+                    <div id="e2w-footer" class="p-3.5 border-t border-white/60 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/40">
+                        <button onclick="closeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100">
+                            Bekor qilish
+                        </button>
+                        <button id="e2w-action-btn" onclick="window.executeExcelToWord()" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 inline-flex items-center gap-1.5 transition-all">
+                            <i data-lucide="file-text" class="w-4 h-4"></i> Word ga o'tkazish
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `);
+        refreshIcons();
+
+        let chosenFile = null;
+        let selectedOrientation = 'auto';
+        let selectedStyle = 'modern_blue';
+
+        window.selectE2wOrientation = (mode) => {
+            TelegramApp.hapticFeedback('light');
+            selectedOrientation = mode;
+            ['auto', 'landscape', 'portrait'].forEach(m => {
+                const btn = document.getElementById(`e2w-orient-${m}`);
+                if (!btn) return;
+                if (m === mode) {
+                    btn.className = 'p-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-bold text-xs flex flex-col items-center shadow-xs';
+                } else {
+                    btn.className = 'p-2.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-xs flex flex-col items-center';
+                }
+            });
+        };
+
+        window.selectE2wStyle = (style) => {
+            TelegramApp.hapticFeedback('light');
+            selectedStyle = style;
+            const styleConfigs = {
+                'modern_blue': { id: 'e2w-style-blue', border: 'border-indigo-500', bg: 'bg-indigo-50/40 dark:bg-indigo-950/30', text: 'text-indigo-700 dark:text-indigo-300' },
+                'emerald': { id: 'e2w-style-emerald', border: 'border-emerald-500', bg: 'bg-emerald-50/40 dark:bg-emerald-950/30', text: 'text-emerald-700 dark:text-emerald-300' },
+                'classic_slate': { id: 'e2w-style-slate', border: 'border-slate-500', bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-800 dark:text-slate-200' }
+            };
+            Object.keys(styleConfigs).forEach(k => {
+                const cfg = styleConfigs[k];
+                const btn = document.getElementById(cfg.id);
+                if (!btn) return;
+                if (k === style) {
+                    btn.className = `p-2 rounded-xl border-2 ${cfg.border} ${cfg.bg} ${cfg.text} font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs`;
+                } else {
+                    btn.className = 'p-2 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-xs flex items-center justify-center gap-1.5';
+                }
+            });
+        };
+
+        window.resetE2wFile = () => {
+            chosenFile = null;
+            document.getElementById('e2w-file-input').value = '';
+            document.getElementById('e2w-file-info').classList.add('hidden');
+            document.getElementById('e2w-upload-box').classList.remove('hidden');
+        };
+
+        const fileInput = document.getElementById('e2w-file-input');
+        fileInput.onchange = () => {
+            if (!fileInput.files.length) return;
+            chosenFile = fileInput.files[0];
+            document.getElementById('e2w-file-name').innerText = chosenFile.name;
+            document.getElementById('e2w-upload-box').classList.add('hidden');
+            document.getElementById('e2w-file-info').classList.remove('hidden');
+            TelegramApp.hapticFeedback('light');
+            refreshIcons();
+        };
+
+        window.executeExcelToWord = async () => {
+            if (!chosenFile) {
+                TelegramApp.showAlert("Iltimos, avval Excel yoki CSV faylni tanlang!");
+                return;
+            }
+
+            TelegramApp.hapticFeedback('medium');
+            document.getElementById('e2w-upload-box').classList.add('hidden');
+            document.getElementById('e2w-file-info').classList.add('hidden');
+            document.getElementById('e2w-options').classList.add('hidden');
+            document.getElementById('e2w-footer').classList.add('hidden');
+
+            window.showPercentageLoader('e2w-loading', {
+                color: 'emerald',
+                icon: 'sheet',
+                title: 'Excel tahlil qilinmoqda...',
+                desc: 'Jadvallar o\'lchami va orientatsiyasi moslanmoqda'
+            });
+
+            try {
+                const fd = new FormData();
+                fd.append('file', chosenFile);
+                fd.append('orientation', selectedOrientation);
+                fd.append('table_style', selectedStyle);
+
+                const res = await api.excelToWord(fd, (pct) => {
+                    const mapped = Math.min(85, Math.round(pct * 0.85));
+                    window.updatePercentageLoader('e2w-loading', mapped, {
+                        title: 'Excel yuklanmoqda...',
+                        desc: `${pct}% uzatildi`
+                    });
+                });
+
+                window.updatePercentageLoader('e2w-loading', 96, {
+                    title: 'Jadvallar shakllantirilmoqda...',
+                    desc: 'DOCX sahifasi yaratilmoqda'
+                });
+
+                setTimeout(() => {
+                    window.updatePercentageLoader('e2w-loading', 100, {
+                        title: 'Tayyor!',
+                        desc: 'Jadval to\'liq moslandi'
+                    });
+
+                    document.getElementById('e2w-loading').classList.add('hidden');
+                    document.getElementById('e2w-result').classList.remove('hidden');
+                    document.getElementById('e2w-out-name').innerText = res.new_file_name || "jadval.docx";
+
+                    const stats = res.stats || {};
+                    const sheetsCount = stats.sheets_count || 1;
+                    const rowsCount = stats.total_rows || 0;
+                    const primaryOrient = stats.primary_orientation || (selectedOrientation === 'landscape' ? 'Albom' : 'Kitob');
+                    document.getElementById('e2w-stats-badge').innerText = `📊 ${sheetsCount} ta varaq • ${rowsCount} qator • ${primaryOrient}`;
+
+                    const dlBtn = document.getElementById('e2w-dl-btn');
+                    if (dlBtn && res.download_url) {
+                        dlBtn.onclick = () => {
+                            TelegramApp.downloadFile(res.download_url);
+                        };
+                    }
+
+                    refreshIcons();
+                    loadRecentFiles();
+                }, 350);
+            } catch (err) {
+                document.getElementById('e2w-loading').classList.add('hidden');
+                document.getElementById('e2w-result').classList.add('hidden');
+                if (chosenFile) {
+                    document.getElementById('e2w-file-info').classList.remove('hidden');
+                } else {
+                    document.getElementById('e2w-upload-box').classList.remove('hidden');
+                }
+                document.getElementById('e2w-options').classList.remove('hidden');
+                document.getElementById('e2w-footer').classList.remove('hidden');
+                TelegramApp.showAlert(`Xatolik: ${err.message}`);
+                refreshIcons();
+            }
+        };
+    };
+
+    // ─────────────────────────────────────────────────────────────
     // TOOL 12: Hujjat Foto (3x4) Modal (Passport & ID Photos)
     // ─────────────────────────────────────────────────────────────
     window.openPhoto3x4Modal = () => {
@@ -5067,6 +5349,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (route === '#/photo3x4' || search.includes('tool=photo3x4')) {
             renderDashboard();
             setTimeout(() => { if (window.openPhoto3x4Modal) window.openPhoto3x4Modal(); }, 200);
+            return;
+        }
+        if (route === '#/excel2word' || search.includes('tool=excel2word')) {
+            renderDashboard();
+            setTimeout(() => { if (window.openExcelToWordModal) window.openExcelToWordModal(); }, 200);
             return;
         }
 

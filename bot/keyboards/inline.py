@@ -54,10 +54,11 @@ def file_actions_keyboard(file_type: str) -> InlineKeyboardMarkup:
         ])
     elif file_type == 'csv':
         keyboard.append([
-            InlineKeyboardButton("📊 Statistika", callback_data="file_stats"),
-            InlineKeyboardButton("📖 Matn olish", callback_data="file_extract_text")
+            InlineKeyboardButton("🔄 Word (DOCX) ga", callback_data="file_to_docx"),
+            InlineKeyboardButton("📊 Statistika", callback_data="file_stats")
         ])
         keyboard.append([
+            InlineKeyboardButton("📖 Matn olish", callback_data="file_extract_text"),
             InlineKeyboardButton("🧠 AI tahlil", callback_data="file_ai_analyze")
         ])
     else:

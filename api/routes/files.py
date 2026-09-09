@@ -224,7 +224,11 @@ async def convert_file(
                 out_path = await converter.convert_to_pdf(target.local_path, settings.processed_dir)
             elif target_ext in ("docx", "word"):
                 out_path = os.path.join(settings.processed_dir, f"{os.path.splitext(target.file_name)[0]}.docx")
-                await converter.pdf_to_word(target.local_path, out_path)
+                in_ext = os.path.splitext(target.file_name)[1].lower()
+                if in_ext in ('.xlsx', '.xls', '.csv'):
+                    await converter.excel_to_word(target.local_path, out_path)
+                else:
+                    await converter.pdf_to_word(target.local_path, out_path)
             elif target_ext == "csv":
                 out_path = os.path.join(settings.processed_dir, f"{os.path.splitext(target.file_name)[0]}.csv")
                 await converter.excel_to_csv(target.local_path, out_path)
@@ -1950,3 +1954,99 @@ async def resend_file_to_telegram_endpoint(
             file_id=target.telegram_file_id
         )
         return {"success": True, "message": "Fayl Telegram chatiga yuborildi!"}
+
+
+@router.post("/excel-to-word")
+async def excel_to_word_endpoint(
+    file: UploadFile = File(None),
+    file_id: int = Form(None),
+    orientation: str = Form("auto"),
+    table_style: str = Form("modern_blue"),
+    user: dict = Depends(get_current_user)
+):
+    """Excel (.xlsx/.xls/.csv) jadvallarini avto-orientatsiya va chiroyli dizayn bilan Word (.docx) ga o'tkazish."""
+    src_path = None
+    is_temp = False
+    timestamp = int(datetime.now().timestamp())
+
+    try:
+        async with get_session() as session:
+            db_user = await crud.get_or_create_user(session, user["telegram_id"], user.get("first_name", "Teacher"))
+            orig_name = "jadval.xlsx"
+            if file and file.filename:
+                orig_name = file.filename
+                ext = os.path.splitext(file.filename)[1].lower()
+                src_path = os.path.join(settings.upload_dir, f"excel_in_{timestamp}{ext}")
+                await save_upload_stream_safely(file, src_path)
+                is_temp = True
+            elif file_id:
+                files = await crud.get_user_files(session, db_user.id)
+                target = next((f for f in files if f.id == file_id), None)
+                if not target or not os.path.exists(target.local_path):
+                    raise HTTPException(status_code=404, detail="Fayl topilmadi")
+                src_path = target.local_path
+                orig_name = target.file_name
+            else:
+                raise HTTPException(status_code=400, detail="Excel fayl yuklanishi kerak")
+
+            base = os.path.splitext(orig_name)[0]
+            clean_base = re.sub(r'(_jadval.*|_docx.*)', '', base)
+            out_name = f"{clean_base}_jadval_{timestamp}.docx"
+            out_path = os.path.join(settings.processed_dir, out_name)
+
+            from bot.processors.excel_processor import ExcelProcessor
+            ep = ExcelProcessor()
+            stats = await ep.convert_to_word_table(
+                file_path=src_path,
+                output_path=out_path,
+                orientation_mode=orientation,
+                table_style=table_style
+            )
+
+            record = await save_and_backup_user_file(
+                session=session,
+                db_user=db_user,
+                user_dict=user,
+                local_path=out_path,
+                file_name=out_name,
+                file_type="docx",
+                tool_name="Excel_Word_Jadval"
+            )
+
+            if user.get("telegram_id"):
+                try:
+                    caption = build_file_caption(
+                        file_name=out_name,
+                        tool_name="Excel ➔ Word (Jadvalli DOCX)",
+                        details=[
+                            f"Varaqlar: {stats.get('sheets_count', 1)} ta",
+                            f"Qatorlar: {stats.get('total_rows', 0)} ta",
+                            f"Ustunlar: {stats.get('total_cols', 0)} ta",
+                            f"Orientatsiya: {stats.get('primary_orientation', 'Avto')}"
+                        ],
+                        file_size=os.path.getsize(out_path)
+                    )
+                    await send_file_to_telegram(
+                        telegram_id=user["telegram_id"],
+                        file_path=out_path,
+                        caption=caption,
+                        file_id=record.telegram_file_id
+                    )
+                except Exception as tg_err:
+                    logger.warning(f"Telegramga yuborishda xato: {tg_err}")
+
+            return {
+                "success": True,
+                "message": "Excel jadvali Word (DOCX) ga muvaffaqiyatli o'tkazildi",
+                "new_file_id": record.id,
+                "new_file_name": record.file_name,
+                "download_url": f"/api/files/{record.id}/download",
+                "stats": stats
+            }
+    finally:
+        if is_temp and src_path and os.path.exists(src_path):
+            try:
+                os.remove(src_path)
+            except Exception:
+                pass
+

@@ -104,6 +104,10 @@ const api = {
         if (typeof onProgress === 'function') return this.uploadWithProgress('/files/photo-3x4', formData, onProgress);
         return this.fetchWithAuth('/files/photo-3x4', { method: 'POST', body: formData });
     },
+    excelToWord(formData, onProgress) {
+        if (typeof onProgress === 'function') return this.uploadWithProgress('/files/excel-to-word', formData, onProgress);
+        return this.fetchWithAuth('/files/excel-to-word', { method: 'POST', body: formData });
+    },
     sendFileToTelegram(fileId) { return this.fetchWithAuth(`/files/${fileId}/send-to-telegram`, { method: 'POST' }); },
     
     // AI tools
